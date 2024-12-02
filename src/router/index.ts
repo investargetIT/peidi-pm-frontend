@@ -67,73 +67,73 @@ const routes = [
   //   }
   // ]
   // },
-  {
-    path: "/productFile",
-    name: "productFile",
-    redirect: "/productFile/index",
-    component: Layout,
-    meta: {
-      icon: "prime:book",
-      title: "首页",
-      rank: 0
-    },
-    children: [
-      {
-        path: "/productFile/index",
-        name: "productFile",
-        component: () => import("@/views/productFile/index.vue"),
-        meta: {
-          title: "产品档案",
-          showParent: false
-        }
-      }
-    ]
-  },
-  {
-    path: "/quota",
-    name: "quota",
-    redirect: "/quota/index",
-    component: Layout,
-    meta: {
-      icon: "akar-icons:coin",
-      title: "报价管理",
-      rank: 0
-    },
-    children: [
-      {
-        path: "/quota/index",
-        name: "quota",
-        component: () => import("@/views/quota/index.vue"),
-        meta: {
-          title: "报价管理",
-          showParent: false
-        }
-      }
-    ]
-  },
-  {
-    path: "/supplier",
-    name: "supplier",
-    redirect: "/supplier/index",
-    component: Layout,
-    meta: {
-      icon: "flowbite:address-book-outline",
-      title: "供应商管理",
-      rank: 0
-    },
-    children: [
-      {
-        path: "/supplier/index",
-        name: "supplier",
-        component: () => import("@/views/supplier/index.vue"),
-        meta: {
-          title: "供应商管理",
-          showParent: false,
-          icon: "flowbite:address-book-outline"
-        }
-      }
-    ]
-  }
+  // {
+  //   path: "/productFile",
+  //   name: "productFile",
+  //   redirect: "/productFile/index",
+  //   component: Layout,
+  //   meta: {
+  //     icon: "prime:book",
+  //     title: "首页",
+  //     rank: 0
+  //   },
+  //   children: [
+  //     {
+  //       path: "/productFile/index",
+  //       name: "productFile",
+  //       component: () => import("@/views/productFile/index.vue"),
+  //       meta: {
+  //         title: "产品档案",
+  //         showParent: false
+  //       }
+  //     }
+  //   ]
+  // },
+  // {
+  //   path: "/quota",
+  //   name: "quota",
+  //   redirect: "/quota/index",
+  //   component: Layout,
+  //   meta: {
+  //     icon: "akar-icons:coin",
+  //     title: "报价管理",
+  //     rank: 0
+  //   },
+  //   children: [
+  //     {
+  //       path: "/quota/index",
+  //       name: "quota",
+  //       component: () => import("@/views/quota/index.vue"),
+  //       meta: {
+  //         title: "报价管理",
+  //         showParent: false
+  //       }
+  //     }
+  //   ]
+  // },
+  // {
+  //   path: "/supplier",
+  //   name: "supplier",
+  //   redirect: "/supplier/index",
+  //   component: Layout,
+  //   meta: {
+  //     icon: "flowbite:address-book-outline",
+  //     title: "供应商管理",
+  //     rank: 0
+  //   },
+  //   children: [
+  //     {
+  //       path: "/supplier/index",
+  //       name: "supplier",
+  //       component: () => import("@/views/supplier/index.vue"),
+  //       meta: {
+  //         title: "供应商管理",
+  //         showParent: false,
+  //         icon: "flowbite:address-book-outline"
+  //       }
+  //     }
+  //   ]
+  // }
 ];
 
 Object.keys(modules).forEach(key => {
