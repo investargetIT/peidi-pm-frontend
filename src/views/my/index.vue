@@ -25,6 +25,7 @@ import {
 } from "../../api/pmApi";
 import axios from "axios";
 import { extractInfo } from "../classify/utils";
+import myTask from "./myTask.vue";
 import {
   ElDialog,
   ElCard,
@@ -271,11 +272,10 @@ const clear = () => {
 };
 
 let actionType = "new";
-const newTask = () => {
-  actionType = "new";
+const updateMyTask = val => {
+  actionType = "isEdit";
+  taskData.value = val;
   dialogFormVisible.value = true;
-
-  console.log("新建任务");
 };
 
 const taskData = ref(null);
@@ -450,7 +450,11 @@ const allLength = ref(0);
           <template #default="scope">
             <span
               class="clickable-topic"
-              @click="handleTopicClick(scope.row)"
+              @click="
+                activeTab == 'worker'
+                  ? handleTopicClick(scope.row)
+                  : updateMyTask(scope.row)
+              "
               >{{ scope.row.title }}</span
             >
           </template>
@@ -566,6 +570,15 @@ const allLength = ref(0);
       :taskStatus="taskStatus"
     >
     </TaskDetailModal>
+    <el-dialog v-model="dialogFormVisible" title="修改任务" width="800">
+      <myTask
+        v-if="dialogFormVisible"
+        @finish="getCurrentPage"
+        @close="dialogFormVisible = false"
+        actionType="edit"
+        :taskData="taskData"
+      />
+    </el-dialog>
   </div>
 </template>
 

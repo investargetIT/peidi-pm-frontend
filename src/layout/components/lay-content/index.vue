@@ -130,12 +130,12 @@ const transitionMain = defineComponent({
                 'flex-direction': 'column'
               }"
             >
-              <el-backtop
+              <!-- <el-backtop
                 title="回到顶部"
                 target=".app-main .el-scrollbar__wrap"
               >
                 <BackTopIcon />
-              </el-backtop>
+              </el-backtop> -->
               <div class="grow">
                 <transitionMain :route="route">
                   <keep-alive

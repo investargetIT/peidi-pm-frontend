@@ -9,7 +9,22 @@ import {
   getPriorty,
   updateTask
 } from "../../api/pmApi";
-import { removeDuplicates, extractEmplId, extractInfo } from "./utils";
+import {
+  ElDialog,
+  ElCard,
+  ElRow,
+  ElCol,
+  ElFormItem,
+  ElTable,
+  ElTableColumn,
+  ElButton,
+  dayjs
+} from "element-plus";
+import {
+  removeDuplicates,
+  extractEmplId,
+  extractInfo
+} from "../classify/utils";
 import { jsonp } from "vue-jsonp";
 import {
   testAllIPs,
@@ -18,10 +33,11 @@ import {
 } from "../../utils/chaohuiapi";
 import Axios from "axios";
 import { message } from "@/utils/message";
+import { debug } from "console";
 
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 defineOptions({
-  name: "addTask"
+  name: "myTask"
 });
 const emit = defineEmits(["close", "finish"]);
 const { actionType, taskData } = defineProps(["actionType", "taskData"]);
@@ -167,6 +183,24 @@ const newTaskDataDefault = {
 };
 const newTaskData = ref(JSON.parse(JSON.stringify(newTaskDataDefault)));
 if (isEdit) {
+  let newArr: any = [];
+  if (taskData?.attachments) {
+    taskData.attachments.map(item => {
+      newArr.push({
+        raw: {
+          name: item
+        },
+        response: {
+          success: true
+        },
+        name: item,
+        status: "success",
+        uid: Date.now()
+      });
+    });
+  }
+  taskData.attachments = JSON.parse(JSON.stringify(newArr));
+
   newTaskData.value = {
     ...newTaskData.value,
     ...taskData
@@ -178,6 +212,10 @@ if (isEdit) {
     item.name = item.userName;
     item.emplId = item.userId;
   });
+  newTaskData.value.workers.map(item => {
+    item.name = item.userName;
+    item.emplId = item.userId;
+  });
   newTaskData.value.taskTheme = taskData.title;
 }
 const resetData = () => {
@@ -185,13 +223,13 @@ const resetData = () => {
   downloadFileName.value = [];
 };
 const delteHelper = index => {
+  if (isEdit) {
+    return;
+  }
   newTaskData.value.workers.splice(index, 1);
 };
 
 const deleteHoster = index => {
-  if (isEdit) {
-    return;
-  }
   newTaskData.value.contacters.splice(index, 1);
 };
 
@@ -207,23 +245,25 @@ const deleteUrl = index => {
 
 const uploadUrl = ref("");
 const taskRules = {
-  taskTheme: [{ required: true, message: "输入任务主题", trigger: "blur" }],
+  taskTheme: [{ required: isEdit, message: "输入任务主题", trigger: "blur" }],
   businessUnitId: [
-    { required: true, message: "输入业务单元", trigger: "blur" }
+    { required: isEdit, message: "输入业务单元", trigger: "blur" }
   ],
-  taskTypeId: [{ required: true, message: "输入任务类型", trigger: "blur" }],
-  workTypeId: [{ required: true, message: "输入工作类型", trigger: "blur" }],
-  priorityId: [{ required: true, message: "输入任务优先级", trigger: "blur" }],
+  taskTypeId: [{ required: isEdit, message: "输入任务类型", trigger: "blur" }],
+  workTypeId: [{ required: isEdit, message: "输入工作类型", trigger: "blur" }],
+  priorityId: [
+    { required: isEdit, message: "输入任务优先级", trigger: "blur" }
+  ],
   expectEndDate: [
-    { required: true, message: "选择期望完成时间", trigger: "blur" }
+    { required: isEdit, message: "选择期望完成时间", trigger: "blur" }
   ],
   predictDuration: [
-    { required: isEdit, message: "输入预估工时", trigger: "blur" }
+    { required: !isEdit, message: "输入预估工时", trigger: "blur" }
   ],
-  endTime: [{ required: isEdit, message: "输入交付时间", trigger: "blur" }],
-  contacters: [{ required: true, message: "选择对接人", trigger: "blur" }],
-  workers: [{ required: isEdit, message: "选择承接人", trigger: "blur" }],
-  description: [{ required: true, message: "输入任务描述", trigger: "blur" }],
+  endTime: [{ required: !isEdit, message: "输入交付时间", trigger: "blur" }],
+  contacters: [{ required: isEdit, message: "选择对接人", trigger: "blur" }],
+  workers: [{ required: !isEdit, message: "选择承接人", trigger: "blur" }],
+  description: [{ required: isEdit, message: "输入任务描述", trigger: "blur" }],
   attachments: [{ required: false, message: "附件上传", trigger: "change" }],
   links: [{ required: false, message: "链接上传", trigger: "change" }]
 };
@@ -246,8 +286,10 @@ const updateTaskFun = async () => {
         }),
         creator: newTaskData.value.creator,
         description: newTaskData.value.description,
-        endTime: newTaskData.value.endTime,
-        expectEndDate: newTaskData.value.expectEndDate,
+        endTime: dayjs(newTaskData.value.endTime).format("YYYY-MM-DD"),
+        expectEndDate: dayjs(newTaskData.value.expectEndDate).format(
+          "YYYY-MM-DD"
+        ),
         links: newTaskData.value.links,
         predictDuration: newTaskData.value.predictDuration,
         priorityId: newTaskData.value.priorityId,
@@ -290,7 +332,9 @@ const addNewTask = async () => {
         creator: { userName: ddUserInfo.name, userId: ddUserInfo.userid },
         description: newTaskData.value.description,
         // "endTime": newTaskData.value.endTime,
-        expectEndDate: newTaskData.value.expectEndDate,
+        expectEndDate: dayjs(newTaskData.value.expectEndDate).format(
+          "YYYY-MM-DD"
+        ),
         links: newTaskData.value.links,
         // "predictDuration": newTaskData.value.predictDuration,
         priorityId: newTaskData.value.priorityId,
@@ -336,6 +380,7 @@ const ipThis = ref("");
 
 const sid = ref("");
 const postUrl = ref("");
+
 // 获取优先级
 const canSetHighPrior = ref(false);
 const getCanHigh = () => {
@@ -419,17 +464,12 @@ const beforeUpload = () => {
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="任务主题" prop="taskTheme">
-            <el-input
-              :disabled="isEdit"
-              v-model="newTaskData.taskTheme"
-              autocomplete="off"
-            />
+            <el-input v-model="newTaskData.taskTheme" autocomplete="off" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="业务单元" prop="businessUnitId">
             <el-select
-              :disabled="isEdit"
               v-model="newTaskData.businessUnitId"
               placeholder="请选择业务单元"
             >
@@ -446,7 +486,6 @@ const beforeUpload = () => {
         <el-col :span="12">
           <el-form-item label="任务类型" prop="taskTypeId">
             <el-select
-              :disabled="isEdit"
               v-model="newTaskData.taskTypeId"
               placeholder="选择任务类型"
             >
@@ -461,7 +500,6 @@ const beforeUpload = () => {
         <el-col :span="12">
           <el-form-item class="flex" label="工作类型" prop="workTypeId">
             <el-select
-              :disabled="isEdit"
               class="flex-1"
               v-model="newTaskData.workTypeId"
               @change="workTypeChange"
@@ -478,7 +516,6 @@ const beforeUpload = () => {
               class="flex w-[400px] mt-1 ml-1"
             >
               <el-button
-                :disabled="isEdit"
                 v-for="item in downloadFileName"
                 @click="chaohuiDownload(item)"
                 type="primary"
@@ -497,7 +534,6 @@ const beforeUpload = () => {
             prop="priorityId"
           >
             <el-select
-              :disabled="isEdit"
               v-model="newTaskData.priorityId"
               placeholder="选择任务优先级"
             >
@@ -513,7 +549,6 @@ const beforeUpload = () => {
           <el-form-item label="期望结束日期" prop="expectEndDate">
             <el-date-picker
               class="!w-full"
-              :disabled="isEdit"
               v-model="newTaskData.expectEndDate"
               type="date"
               placeholder="选择期望结束日期"
@@ -525,7 +560,7 @@ const beforeUpload = () => {
         <el-col :span="12">
           <el-form-item label="预估工时" prop="predictDuration">
             <el-input
-              :disabled="isNew"
+              :disabled="isEdit"
               v-model="newTaskData.predictDuration"
               autocomplete="off"
             />
@@ -535,7 +570,7 @@ const beforeUpload = () => {
           <el-form-item label="交付时间" prop="endTime">
             <el-date-picker
               class="!w-full"
-              :disabled="isNew"
+              :disabled="isEdit"
               v-model="newTaskData.endTime"
               type="date"
               placeholder="选择交付时间"
@@ -545,9 +580,7 @@ const beforeUpload = () => {
       </el-row>
       <el-form-item label="对接人" prop="contacters">
         <!-- <el-input v-model="newTaskData.contacters" autocomplete="off" /> -->
-        <el-button :disabled="isEdit" @click="choosePerson('contacters')"
-          >选择对接人</el-button
-        >
+        <el-button @click="choosePerson('contacters')">选择对接人</el-button>
         <div class="helpers">
           <p v-for="(item, index) in newTaskData.contacters" class="help-item">
             {{ item.name }}
@@ -560,7 +593,7 @@ const beforeUpload = () => {
       <el-row :gutter="20">
         <el-col :span="20">
           <el-form-item label="承接人" prop="workers">
-            <el-button :disabled="isNew" @click="choosePerson('workers')"
+            <el-button :disabled="isEdit" @click="choosePerson('workers')"
               >选择承接人</el-button
             >
             <div class="helpers">
