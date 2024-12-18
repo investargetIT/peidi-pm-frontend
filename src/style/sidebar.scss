@@ -2,13 +2,13 @@
 @mixin merge-style($sideBarWidth) {
   $menuActiveText: #7a80b4;
 
-  @media screen and (width >= 150px) and (width <= 420px) {
+  @media screen and (width >=150px) and (width <=420px) {
     .app-main-nofixed-header {
       overflow-y: hidden;
     }
   }
 
-  @media screen and (width >= 420px) {
+  @media screen and (width >=420px) {
     .app-main-nofixed-header {
       overflow: hidden;
     }
@@ -245,7 +245,9 @@
       margin: 4px 0;
       clear: both;
       content: "";
-      background: var(--el-color-primary) !important;
+
+      // background: var(--el-color-primary) !important;
+      background-color: #171719;
       border-radius: 3px;
     }
   }

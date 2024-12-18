@@ -37,7 +37,6 @@ export type RefreshTokenResult = {
 export const baseUrlApi = (url: string) => {
   return `https://srm.peidigroup.cn${url}`;
 };
-
 const commonUrlApi = (url: string) => `${"https://user.peidigroup.cn"}${url}`;
 
 /** 登录 */
@@ -133,5 +132,3 @@ export const getPagePd = params => {
     params
   });
 };
-
-// 获取业务单元

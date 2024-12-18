@@ -158,6 +158,7 @@ function resolvePath(routePath) {
               theme: tooltipEffect
             }"
             class="!w-full !text-inherit"
+            style="font-weight: 800"
           >
             {{ onlyOneChild.meta.title }}
           </ReText>

@@ -37,8 +37,8 @@ dataThemeChange(overallStyle.value);
 const { title } = useNav();
 initDingH5RemoteDebug();
 const ruleForm = reactive({
-  username: "",
-  password: ""
+  username: "taijp@peidibrand.com",
+  password: "Aa123456"
 });
 const onLogin = async (formEl: FormInstance | undefined) => {
   if (!formEl) return;
@@ -81,6 +81,8 @@ const ddLogin = () => {
           if (res.success) {
             const { data: ddUserInfo } = res;
             console.log("ddUserInfo", ddUserInfo);
+            alert(JSON.stringify(ddUserInfo));
+            localStorage.setItem("ddUserInfo", JSON.stringify(ddUserInfo));
             const { org_email, name } = ddUserInfo;
             if (org_email) {
               console.log("ddEmail", org_email);
@@ -111,11 +113,6 @@ const ddLogin = () => {
                 res.msg === "EMAIL_ACCOUNT_ALREADY_EXIST")
             ) {
               // 注册成功，调用登录接口
-
-              // return request(process.env.USER_AUTH_BASE_URL + '/user/login/password', {
-              //   method: 'POST',
-              //   data: `username=${ddUserEmail}&password=${process.env.DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD}`,
-              // });
               onLogin(ruleFormRef.value);
             } else {
               message("用户注册失败：" + JSON.stringify(res), {

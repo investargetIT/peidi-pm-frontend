@@ -67,28 +67,72 @@ const routes = [
   //   }
   // ]
   // },
+  {
+    path: "/addTasks",
+    name: "addTasks",
+    redirect: "/addTask/index",
+    component: Layout,
+    meta: {
+      icon: "prime:book",
+      title: "首页",
+      rank: 21
+    },
+    children: [
+      {
+        path: "/addTask/index",
+        name: "addTask",
+        component: () => import("@/views/addTask/index.vue"),
+        meta: {
+          title: "添加任务",
+          showParent: false
+        }
+      }
+    ]
+  },
+  {
+    path: "/my",
+    name: "my",
+    redirect: "/my/index",
+    component: Layout,
+    meta: {
+      icon: "flowbite:address-book-outline",
+      title: "",
+      rank: 20
+    },
+    children: [
+      {
+        path: "/my/index",
+        name: "my",
+        component: () => import("@/views/my/index.vue"),
+        meta: {
+          title: "我的",
+          showParent: false
+        }
+      }
+    ]
+  }
   // {
-  //   path: "/productFile",
-  //   name: "productFile",
-  //   redirect: "/productFile/index",
+  //   path: "/gante",
+  //   name: "gante",
+  //   redirect: "/gante/index",
   //   component: Layout,
   //   meta: {
   //     icon: "prime:book",
-  //     title: "首页",
+  //     title: "",
   //     rank: 0
   //   },
   //   children: [
   //     {
-  //       path: "/productFile/index",
-  //       name: "productFile",
-  //       component: () => import("@/views/productFile/index.vue"),
+  //       path: "/gante/index",
+  //       name: "gante",
+  //       component: () => import("@/views/gante/index.vue"),
   //       meta: {
-  //         title: "产品档案",
+  //         title: "工时分配及汇总",
   //         showParent: false
   //       }
   //     }
   //   ]
-  // },
+  // }
   // {
   //   path: "/quota",
   //   name: "quota",

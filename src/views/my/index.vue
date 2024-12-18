@@ -12,8 +12,7 @@ import Cookies from "js-cookie";
 import { ref, watch } from "vue";
 import * as dd from "dingtalk-jsapi";
 import { initDingH5RemoteDebug } from "dingtalk-h5-remote-debug";
-import AddTask from "./addTask.vue";
-import TaskDetailModal from "./TaskDetailModal.vue";
+import TaskDetailModal from "../classify/TaskDetailModal.vue";
 import { message } from "@/utils/message";
 import {
   getTaskPage,
@@ -21,11 +20,23 @@ import {
   getStatusEnum,
   getPriorityEnum,
   getWorkTypeEnum,
-  getTaskTypeEnum
+  getTaskTypeEnum,
+  updateTask
 } from "../../api/pmApi";
 import axios from "axios";
-import { extractInfo, extractEmplId } from "./utils";
-import { canExamineTask } from "../../utils/permission";
+import { extractInfo } from "../classify/utils";
+import {
+  ElDialog,
+  ElCard,
+  ElRow,
+  ElCol,
+  ElFormItem,
+  ElTable,
+  ElTableColumn,
+  ElButton,
+  dayjs
+} from "element-plus";
+import { updateExpectData } from "../../utils/permission";
 
 ddAuthFun();
 
@@ -92,11 +103,12 @@ const getCurrentPage = () => {
   // 添加worktype的筛选
   if (activeTab.value) {
     searchArr.push({
-      searchName: "workTypeId",
-      searchType: "equals",
-      searchValue: activeTab.value
+      searchName: { creator: "creator", worker: "worker" }[activeTab.value],
+      searchType: "like",
+      searchValue: ddUserInfo.userid
     });
   }
+
   // 添加任务优先级筛选
   if (form.value.priority) {
     searchArr.push({
@@ -113,7 +125,6 @@ const getCurrentPage = () => {
       searchValue: form.value.status
     });
   }
-
   // 添加任务主题筛选
   if (form.value.topic) {
     searchArr.push({
@@ -131,23 +142,6 @@ const getCurrentPage = () => {
       searchValue: form.value.description
     });
   }
-  // 添加对接人
-  if (form.value.requester) {
-    searchArr.push({
-      searchName: "contacter",
-      searchType: "like",
-      searchValue: extractEmplId(form.value.requester).join("&#&")
-    });
-  }
-
-  // 添加worker
-  if (form.value.assignee) {
-    searchArr.push({
-      searchName: "worker",
-      searchType: "like",
-      searchValue: extractEmplId(form.value.assignee).join("&#&")
-    });
-  }
 
   // [{ "searchName": "worker", "searchType": "equal", "searchValue": "userid" }]
   getTaskPage({
@@ -158,7 +152,6 @@ const getCurrentPage = () => {
   }).then(res => {
     console.log("res", res);
     if (res?.code) {
-      allLength.value = res?.data?.total;
       currentPage.value = res?.data?.records || [];
       currentPage.value.map(item => {
         item.workerAds = [
@@ -166,46 +159,13 @@ const getCurrentPage = () => {
         ];
       });
       console.log("currentPage", currentPage.value);
+      allLength.value = res.data.total;
     }
   });
 };
 
 // getAllCateFun();
 
-// 清除新增任务信息
-const clearNewCateData = () => {
-  newCateData.value.name = "";
-  newCateData.value.code = "";
-};
-const choosePerson = type => {
-  let data_this =
-    type == "contacter" ? form.value.requester : form.value.assignee;
-  // let test = [{ "avatar": "", "name": "台江鹏", "emplId": "474805081221550528" }];
-  // if (type == 'contacter') {
-  //   form.value.requester = (test)
-  // }
-  // if (type == 'worker') {
-  //   form.value.assignee = (test)
-  // }
-  // return
-  dd.biz.contact.choose({
-    multiple: true, //是否多选：true多选 false单选； 默认true
-    users: extractEmplId(data_this), //默认选中的用户列表，员工userid；成功回调中应包含该信息
-    corpId: DINGTALK_CORP_ID, //企业id
-    max: 10, //人数限制，当multiple为true才生效，可选范围1-1500
-    onSuccess: function (data) {
-      console.log("data", data);
-      if (type == "contacter") {
-        form.value.requester = data;
-      }
-      if (type == "worker") {
-        form.value.assignee = data;
-      }
-      // alert("dd successs: " + JSON.stringify(data));
-    },
-    onFail: function (err) {}
-  });
-};
 const dialogFormVisible = ref(false);
 const formLabelWidth = "140px";
 const newCateData = ref({
@@ -223,50 +183,6 @@ const activeCateData = ref({});
 const dialogUpdateVisible = ref(false);
 const dialogDeleteVisible = ref(false);
 
-// 更新任务接口
-const updateCateData = val => {
-  console.log("activeCateData", activeCateData.value);
-
-  if (
-    !activeCateData.value.categoryCode ||
-    !activeCateData.value.categoryName ||
-    !activeCateData.value.id
-  ) {
-    return;
-  }
-  updateCate({
-    categoryCode: "" + activeCateData.value.categoryCode,
-    categoryName: "" + activeCateData.value.categoryName,
-    id: activeCateData.value.id
-  })
-    .then(res => {
-      const { code, data, msg } = res;
-      if (res.code == 200) {
-        message("更新任务成功", { type: "success" });
-        dialogUpdateVisible.value = false;
-        getAllCateFun();
-        getCurrentPage();
-      } else {
-        message("更新任务失败--" + msg, { type: "error" });
-      }
-    })
-    .catch(err => {
-      message("更新任务失败", { type: "error" });
-    });
-};
-
-// 打开更新弹窗
-const openUpdatePop = val => {
-  activeCateData.value = JSON.parse(JSON.stringify(val.row));
-  dialogUpdateVisible.value = true;
-};
-
-// 删除弹窗打开
-const deletePop = val => {
-  activeCateData.value = JSON.parse(JSON.stringify(val.row));
-  dialogDeleteVisible.value = true;
-};
-
 const changeCurrentPage = val => {
   console.log("val", val);
 };
@@ -278,12 +194,12 @@ const rules = ref({
 });
 
 // 定义数据
-const activeTab = ref(9);
+const activeTab = ref("creator");
 const form = ref({
   status: "",
   priority: "",
   workType: "",
-  requester: [],
+  requester: "",
   assignee: "",
   range: "",
   topic: "",
@@ -347,7 +263,7 @@ const clear = () => {
     status: "",
     priority: "",
     workType: "",
-    requester: [],
+    requester: "",
     assignee: "",
     range: "",
     topic: ""
@@ -363,28 +279,6 @@ const newTask = () => {
 };
 
 const taskData = ref(null);
-const updateTask = data => {
-  actionType = "edit";
-  let newArr: any = [];
-  if (data.attachments) {
-    data.attachments.map(item => {
-      newArr.push({
-        raw: {
-          name: item
-        },
-        response: {
-          success: true
-        },
-        name: item,
-        status: "success",
-        uid: Date.now()
-      });
-    });
-  }
-  data.attachments = JSON.parse(JSON.stringify(newArr));
-  taskData.value = data;
-  dialogFormVisible.value = true;
-};
 
 const getAllName = list => {
   let name = "";
@@ -395,21 +289,105 @@ const getAllName = list => {
   return name;
 };
 
+const updateDialogStatus = ref(false);
+const updateCommunicateData = ref({});
+let beforeexpectEndDate = "";
+const doCommunicate = val => {
+  if (!updateExpectData(val)) {
+    message("当前角色没有权限更改", { type: "error" });
+
+    return;
+  }
+  if (val.statusName != "待沟通") {
+    return;
+  }
+  updateDialogStatus.value = true;
+  beforeexpectEndDate = val.expectEndDate;
+  updateCommunicateData.value = JSON.parse(JSON.stringify(val));
+};
+
+const updateCommunicate = () => {
+  function compareDates() {
+    const endTimeDate = new Date(updateCommunicateData.value.endTime);
+    const expectEndDateDate = new Date(
+      updateCommunicateData.value.expectEndDate
+    );
+    return expectEndDateDate >= endTimeDate;
+  }
+
+  let updateContent = `${dayjs(Date.now()).format("YYYY/MM/DD")}:从${beforeexpectEndDate}改为${dayjs(updateCommunicateData.value.expectEndDate).format("YYYY/MM/DD")}(by${ddUserInfo.name})`;
+  // 如果当前期望时间 大=于 endTime 就可以变成待处理了
+
+  updateTask({
+    ...updateCommunicateData.value,
+    updateContent,
+    expectEndDate: dayjs(updateCommunicateData.value.expectEndDate).format(
+      "YYYY-MM-DD"
+    ),
+    updateUser: { userName: ddUserInfo.name, userId: ddUserInfo.userid },
+    statusId: compareDates()
+      ? taskStatus.value.find(item => item.value == "待处理").id
+      : updateCommunicateData.value.statusId,
+    statusName: compareDates()
+      ? taskStatus.value.find(item => item.value == "待处理").value
+      : updateCommunicateData.value.statusName
+  }).then(res => {
+    const { code } = res;
+    if (code == 200) {
+      message("更新成功", { type: "success" });
+      updateDialogStatus.value = false;
+      getCurrentPage();
+    }
+  });
+};
+
+const tableRowClassName = ({ row, rowIndex }) => {
+  if (row.statusName === "待沟通") {
+    return "warning-row";
+  }
+  return "";
+};
+
 const allLength = ref(0);
 </script>
 
 <template>
   <div class="container">
     <el-card style="width: 100%" class="box-card">
-      <el-tabs v-model="activeTab" @tab-click="handleTabClick">
-        <el-tab-pane
-          v-for="item in workTypeEnum"
-          :label="item.showValue"
-          :name="item.id"
-        ></el-tab-pane>
-      </el-tabs>
+      <!-- <el-tabs v-model="activeTab" @tab-click="handleTabClick">
+        <el-tab-pane v-for="item in workTypeEnum" :label="item.showValue" :name="item.id"></el-tab-pane>
+      </el-tabs> -->
+      <div class="w-full h-[50px] bg-[#f2f2f3] flex p-2 justify-between mb-6">
+        <div
+          @click="activeTab = 'creator'"
+          :class="[
+            'cursor-pointer',
+            'text-center',
+            'leading-[35px]',
+            'w-[50%]',
+            'h-full',
+            activeTab == 'creator' ? 'bg-white' : ''
+          ]"
+        >
+          我发起的任务
+        </div>
+        <div
+          @click="activeTab = 'worker'"
+          :class="[
+            'cursor-pointer',
+            'text-center',
+            'leading-[35px]',
+            'align-middle',
+            'w-[50%]',
+            'h-full',
+            activeTab == 'worker' ? 'bg-white' : ''
+          ]"
+        >
+          分配给我的任务
+        </div>
+      </div>
       <el-form :inline="true" :model="form">
-        <el-form-item style="width: 30%" label="任务状态">
+        <el-form-item style="width: 20%" label="任务状态">
           <el-select v-model="form.status" placeholder="任务状态">
             <el-option
               v-for="item in taskStatus"
@@ -418,7 +396,7 @@ const allLength = ref(0);
             ></el-option>
           </el-select>
         </el-form-item>
-        <el-form-item style="width: 30%" label="优先级">
+        <el-form-item style="width: 20%" label="优先级">
           <el-select v-model="form.priority" placeholder="优先级">
             <el-option
               v-for="item in priorityEnum"
@@ -427,87 +405,33 @@ const allLength = ref(0);
             ></el-option>
           </el-select>
         </el-form-item>
-        <el-form-item style="width: 30%" label="任务类型">
+        <!-- <el-form-item style="width: 30%;" label="任务类型">
           <el-select v-model="form.workType" placeholder="任务类型">
-            <el-option
-              v-for="item in taskTypeEnum"
-              :label="item.value"
-              :value="item.id"
-            ></el-option>
+            <el-option v-for="item in taskTypeEnum" :label="item.value" :value="item.id"></el-option>
           </el-select>
+        </el-form-item> -->
+        <el-form-item style="width: 10%">
+          <el-input v-model="form.topic" placeholder="主题/描述内容"></el-input>
         </el-form-item>
-        <br />
-        <el-form-item style="width: 30%" label="对接人">
-          <el-tag
-            v-for="tag in form.requester"
-            :key="tag"
-            :disable-transitions="false"
-          >
-            {{ tag.name }}
-          </el-tag>
-          <el-button
-            class="button-new-tag"
-            size="default"
-            @click="choosePerson('contacter')"
-          >
-            + 对接人
-          </el-button>
-        </el-form-item>
-        <el-form-item style="width: 30%" label="承接人">
-          <el-tag
-            v-for="tag in form.assignee"
-            :key="tag"
-            :disable-transitions="false"
-          >
-            {{ tag.name }}
-          </el-tag>
-          <el-button
-            class="button-new-tag"
-            size="default"
-            @click="choosePerson('worker')"
-          >
-            + 承接人
-          </el-button>
-        </el-form-item>
-        <el-form-item style="width: 15%" label="主题">
-          <el-input v-model="form.topic" placeholder="主题"></el-input>
-        </el-form-item>
-        <el-form-item style="width: 15%" label="描述内容">
+        <el-form-item style="width: 15%">
           <el-input
             v-model="form.description"
             placeholder="描述内容"
           ></el-input>
         </el-form-item>
-        <br />
-
-        <el-row :gutter="20">
-          <el-col :span="14">
-            <el-form-item>
-              <el-button
-                color="#171719"
-                type="primary"
-                icon="search"
-                @click="getCurrentPage"
-                >搜索</el-button
-              >
-              <el-button icon="refresh" @click="clear">清空</el-button>
-            </el-form-item>
-          </el-col>
-
-          <el-col :span="10" style="text-align: right">
-            <el-form-item>
-              <el-button
-                color="#171719"
-                type="success"
-                icon="plus"
-                @click="newTask"
-                >新建任务</el-button
-              >
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-form-item>
+          <el-button
+            color="#171719"
+            type="primary"
+            icon="search"
+            @click="getCurrentPage"
+            >搜索</el-button
+          >
+          <el-button icon="refresh" @click="clear">清空</el-button>
+        </el-form-item>
       </el-form>
       <el-table
+        :row-class-name="tableRowClassName"
         :data="currentPage"
         style="
           width: 100%;
@@ -558,21 +482,35 @@ const allLength = ref(0);
           prop="expectEndDate"
           label="期望完成时间"
         ></el-table-column>
-        <el-table-column prop="statusName" label="任务状态"></el-table-column>
-        <el-table-column prop="endDate" label="操作">
+        <el-table-column prop="endTime" label="交付时间">
           <template #default="scope">
-            <el-button
-              v-if="!scope.row.workers?.length && !scope.row.predictDuration"
-              color="#171719"
-              :disabled="!canExamineTask(scope.row)"
-              @click="updateTask(scope.row)"
-              >分配</el-button
-            >
-            <el-button
-              v-if="scope.row.workers?.length && scope.row.predictDuration"
-              color="#171719"
-              disabled
-              >已分配</el-button
+            <span>{{ scope.row.endTime ? scope.row.endTime : "-" }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="updateContent" label="期望交付时间修改日志">
+          <template #default="scope">
+            <span>{{
+              scope.row.updateContent ? scope.row.updateContent : "无修改记录"
+            }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="updateRemark" label="修改备注">
+          <template #default="scope">
+            <span>{{
+              scope.row.updateRemark ? scope.row.updateRemark : "无备注"
+            }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="statusName" label="任务状态">
+          <template #default="scope">
+            <span
+              @click="doCommunicate(scope.row)"
+              :class="[
+                scope.row.statusName == '待沟通'
+                  ? 'underline cursor-pointer'
+                  : ''
+              ]"
+              >{{ scope.row.statusName ? scope.row.statusName : "-" }}</span
             >
           </template>
         </el-table-column>
@@ -588,38 +526,40 @@ const allLength = ref(0);
       layout="total, sizes, prev, pager, next, jumper"
       :total="allLength"
     />
-    <el-dialog
-      v-model="dialogFormVisible"
-      :title="actionType == 'new' ? '添加新任务' : '修改任务'"
-      width="800"
-    >
-      <AddTask
-        v-if="dialogFormVisible"
-        @finish="getCurrentPage"
-        @close="dialogFormVisible = false"
-        :actionType="actionType"
-        :taskData="taskData"
-      />
-    </el-dialog>
-    <el-dialog v-model="dialogDeleteVisible" title="" width="500">
-      <span>确定删除该任务吗？</span>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="dialogDeleteVisible = false">取消</el-button>
-          <el-button
-            type="primary"
-            @click="
-              dialogDeleteVisible = false;
-              deleteCateFun();
-            "
-          >
-            确定
-          </el-button>
-        </div>
-      </template>
+    <el-dialog v-model="updateDialogStatus" width="500px" title="更新任务状态">
+      <el-form
+        :rules="{
+          expectEndDate: [
+            { required: true, message: '选择时间范围', trigger: 'blur' }
+          ]
+        }"
+        ref="formRef"
+        :model="updateCommunicateData"
+        label-width="auto"
+        style="max-width: 600px"
+      >
+        <el-form-item label="新的期望完成时间" prop="expectEndDate">
+          <div class="block">
+            <el-date-picker
+              v-model="updateCommunicateData.expectEndDate"
+              type="date"
+              placeholder="选择期望结束日期"
+            />
+          </div>
+        </el-form-item>
+        <el-form-item label="修改备注" prop="workText">
+          <el-input v-model="updateCommunicateData.updateRemark" />
+        </el-form-item>
+        <el-button
+          @click="updateCommunicate"
+          style="margin-left: 230px"
+          color="#171719"
+        >
+          确定更新
+        </el-button>
+      </el-form>
     </el-dialog>
     <TaskDetailModal
-      @refresh="getCurrentPage"
       @closeModal="taskDetailModal.isVisible = false"
       v-if="taskDetailModal.isVisible"
       :taskDetail="taskDetailModal.taskDetail"
@@ -683,13 +623,7 @@ const allLength = ref(0);
 }
 </style>
 <style>
-.el-tabs__nav-prev {
-  width: 40px;
-  transform: scale(2) translate(-7px, 2px);
-}
-
-.el-tabs__nav-next {
-  width: 40px;
-  transform: scale(2) translate(7px, 2px);
+.el-table .warning-row {
+  --el-table-tr-bg-color: var(--el-color-warning-light-9);
 }
 </style>

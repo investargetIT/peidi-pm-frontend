@@ -1,5 +1,5 @@
 <h1>vue-pure-admin精简版（非国际化版本）</h1>
-
+ scp -r dist/* root@121.43.145.161:/media/www/pm
 [![license](https://img.shields.io/github/license/pure-admin/vue-pure-admin.svg)](LICENSE)
 
 **中文** | [English](./README.en-US.md)
