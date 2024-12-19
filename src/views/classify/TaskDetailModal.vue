@@ -21,9 +21,7 @@
       ></el-option>
     </el-select>
     <div class="task-detail-header">
-      <el-tag :type="privortyMap[taskData.priorityId]">{{
-        taskData.priorityName
-      }}</el-tag>
+      <Level :level="taskData.priorityName" />
       <span style="font-size: 20px; font-weight: 600">{{
         taskData.title
       }}</span>
@@ -266,6 +264,8 @@ import {
   ElButton,
   dayjs
 } from "element-plus";
+import Level from "../../components/Common/level.vue";
+
 import { privortyMap } from "../common/common";
 import {
   getTaskRecord,

@@ -13,6 +13,26 @@
 
   /* switch关闭状态下的color 需要时可取用 */
   --pure-switch-off-color: #a6a6a6;
+  --el-font-size-base: 12px !important;
+
+  /* 假设Element Plus默认基础字体大小是14px，缩小10% */
+  --el-font-size-small: 12px !important;
+
+  /* 对应小字体尺寸变量也进行相应缩小 */
+  --el-font-size-large: 12px !important;
+
+  /* 对应大字体尺寸变量同样缩小 */
+  --el-font-size-extra-large: 16px !important;
+
+  /* 其他相关字体尺寸变量依次类推 */
+}
+
+.el-table {
+  font-size: 12px !important;
+}
+
+.el-select__wrapper {
+  font-size: 12px !important;
 }
 
 /* 灰色模式 */

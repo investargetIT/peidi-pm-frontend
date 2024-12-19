@@ -26,6 +26,7 @@ import {
 import axios from "axios";
 import { extractInfo, extractEmplId } from "./utils";
 import { canExamineTask } from "../../utils/permission";
+import Level from "../../components/Common/level.vue";
 
 ddAuthFun();
 
@@ -165,7 +166,7 @@ const getCurrentPage = () => {
           { userId: extractInfo(item.workTypeName).workerMasterId }
         ];
       });
-      console.log("currentPage", currentPage.value);
+      console.log("currentPage1", currentPage.value);
     }
   });
 };
@@ -521,7 +522,11 @@ const allLength = ref(0);
             <span>{{ extractInfo(scope.row.taskTypeName).name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="priorityName" label="优先级"></el-table-column>
+        <el-table-column prop="priorityName" label="优先级">
+          <template #default="scope">
+            <Level :level="scope.row.priorityName" />
+          </template>
+        </el-table-column>
         <el-table-column prop="title" label="任务主题">
           <template #default="scope">
             <span
