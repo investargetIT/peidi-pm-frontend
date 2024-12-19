@@ -141,6 +141,11 @@
           :accept="'*'"
           :before-upload="beforeUpload"
           :on-success="uploadSuccess"
+          :on-preview="
+            val => {
+              chaohuiDownload(val?.row?.name || val.name);
+            }
+          "
           :auto-upload="true"
           list-type="text"
         >
@@ -155,9 +160,17 @@
           >
         </div>
 
-        <el-tag class="mr-4" type="primary" v-for="item in taskData.links">{{
-          item
-        }}</el-tag>
+        <el-tag
+          class="mr-4"
+          type="primary"
+          @click="
+            () => {
+              console.log('dddddd');
+            }
+          "
+          v-for="item in taskData.links"
+          >{{ item }}</el-tag
+        >
         <p class="text-center m-8" v-if="!taskData.links.length">
           暂无关联链接
         </p>
@@ -528,7 +541,24 @@ const taskForm = ref({
 const workRecords = ref([]);
 getTaskRecordFun();
 </script>
+<style scoped>
+.helpers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-left: 4px;
+  margin-top: 4px;
+}
 
+.help-item {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  cursor: pointer;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+}
+</style>
 <style>
 .task-detail-header {
   display: flex;

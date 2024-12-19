@@ -116,6 +116,8 @@ export const chaohuilogin = () => {
 
 // 下载
 export const chaohuiDownload = filename => {
+  console.log("filename", filename);
+
   Axios.get(
     `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${filename}&_sid=${sid}`,
     {

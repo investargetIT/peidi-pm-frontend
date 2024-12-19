@@ -595,6 +595,11 @@ const beforeUpload = () => {
           :before-upload="beforeUpload"
           :on-success="uploadSuccess"
           :auto-upload="true"
+          :on-preview="
+            val => {
+              chaohuiDownload(val?.row?.name || val.name);
+            }
+          "
           list-type="text"
         >
           <el-button>选择文件</el-button>
