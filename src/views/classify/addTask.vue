@@ -122,7 +122,7 @@ const choosePerson = type => {
         }
         // alert("dd successs: " + JSON.stringify(data));
       },
-      onFail: function (err) {}
+      onFail: function (err) { }
     });
   } catch (error) {
     alert("dd error1: " + error);
@@ -272,6 +272,27 @@ const updateTaskFun = async () => {
     }
   });
 };
+function uniqueByFileNameWithMaxTimestamp(arr) {
+  const result = [];
+  const fileMap = new Map();
+  for (const item of arr) {
+    const lastUnderscoreIndex = item.lastIndexOf('_');
+    const fileName = item.slice(0, lastUnderscoreIndex);
+    const timestamp = Number(item.slice(lastUnderscoreIndex + 1).split('.')[0]);
+    if (fileMap.has(fileName)) {
+      const existingTimestamp = fileMap.get(fileName);
+      if (timestamp > existingTimestamp) {
+        fileMap.set(fileName, timestamp);
+      }
+    } else {
+      fileMap.set(fileName, timestamp);
+    }
+  }
+  for (const [fileName, timestamp] of fileMap.entries()) {
+    result.push(`${fileName}_${timestamp}.jpg`);
+  }
+  return result;
+}
 const addNewTask = async () => {
   if (!formRef.value) {
     return;
@@ -279,7 +300,7 @@ const addNewTask = async () => {
   await formRef.value.validate((valid, fields) => {
     if (valid) {
       newTask({
-        attachments: getFileName(newTaskData.value.attachments),
+        attachments: uniqueByFileNameWithMaxTimestamp(getFileName(newTaskData.value.attachments)),
         businessUnitId: newTaskData.value.businessUnitId,
         contacters: newTaskData.value.contacters.map(item => {
           return {
@@ -377,8 +398,11 @@ testAllIPs().then(res => {
 const uploadSuccess = res => {
   loading.value = false;
   console.log("uploadSuccess", res, newTaskData.value.attachments);
-  console.log("getFileName", getFileName(newTaskData.value.attachments));
-
+  // console.log("getFileName", uniqueByName(newTaskData.value.attachments));
+  newTaskData.value.attachments.map(item => {
+    item.realFileName = item.raw.name;
+  })
+  // 如果有多个同名的item，那么取最新的
   const { success, error } = res;
 };
 
@@ -396,48 +420,60 @@ const getFileName = arr => {
 };
 
 const loading = ref(false);
-const beforeUpload = () => {
-  loading.value = true;
+const beforeUpload = (file) => {
+  console.log('123');
+
+  // const { name } = file;
+  // const dotIndex = name.lastIndexOf('.');
+  // const fileNameWithoutExtension = name.slice(0, dotIndex);
+  // const fileExtension = name.slice(dotIndex);
+  // console.log('1234');
+
+  // const newFileName = `${fileNameWithoutExtension}_${Date.now()}${fileExtension}`;
+  // console.log('1111', newFileName, file.name);
+  // uploadFile
   return true;
 };
+const uploadRef = ref(null)
+const handleChange = (file) => {
+  const { name, type, size, lastModified } = file;
+  const dotIndex = file.name.lastIndexOf('.');
+  const fileNameWithoutExtension = file.name.slice(0, dotIndex);
+  const fileExtension = file.name.slice(dotIndex);
+  let fileName = `${fileNameWithoutExtension}_${Date.now()}${fileExtension}` // 如果可以上传多个文件，这里需要用fileList.forEach()处理
+  let f = new File([file.raw], fileName, {
+    type: type,
+    lastModified: lastModified
+  });
+  f.uid = file.uid; // new File 没有uid属性，会导致组件底层报错，这里手动加上
+  file.raw = f;  // 用f替换file的数据
+  uploadRef.value.submit();
+  // loading.value = true;
+  console.log(file.raw)
+}
+
+const uploadFile = () => {
+
+}
 </script>
 
 <template>
   <div class="container1">
-    <el-form
-      label-position="top"
-      label-width="auto"
-      v-loading="loading"
-      element-loading-text="上传中。。。"
-      ref="formRef"
-      :rules="taskRules"
-      :model="newTaskData"
-    >
+    <el-form label-position="top" label-width="auto" v-loading="loading" element-loading-text="上传中。。。" ref="formRef"
+      :rules="taskRules" :model="newTaskData">
       <p style="margin-bottom: 10px; font-size: 28px; font-weight: 800">
         {{ isNew ? "新建" : "修改" }}任务
       </p>
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="任务主题" prop="taskTheme">
-            <el-input
-              :disabled="isEdit"
-              v-model="newTaskData.taskTheme"
-              autocomplete="off"
-            />
+            <el-input :disabled="isEdit" v-model="newTaskData.taskTheme" autocomplete="off" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="业务单元" prop="businessUnitId">
-            <el-select
-              :disabled="isEdit"
-              v-model="newTaskData.businessUnitId"
-              placeholder="请选择业务单元"
-            >
-              <el-option
-                v-for="item in taskUnitMap"
-                :label="item.value"
-                :value="item.id"
-              />
+            <el-select :disabled="isEdit" v-model="newTaskData.businessUnitId" placeholder="请选择业务单元">
+              <el-option v-for="item in taskUnitMap" :label="item.value" :value="item.id" />
             </el-select>
           </el-form-item>
         </el-col>
@@ -445,45 +481,20 @@ const beforeUpload = () => {
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="任务类型" prop="taskTypeId">
-            <el-select
-              :disabled="isEdit"
-              v-model="newTaskData.taskTypeId"
-              placeholder="选择任务类型"
-            >
-              <el-option
-                v-for="item in taskTypeMap"
-                :label="item.value"
-                :value="item.id"
-              />
+            <el-select :disabled="isEdit" v-model="newTaskData.taskTypeId" placeholder="选择任务类型">
+              <el-option v-for="item in taskTypeMap" :label="item.value" :value="item.id" />
             </el-select>
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item class="flex" label="工作类型" prop="workTypeId">
-            <el-select
-              :disabled="isEdit"
-              class="flex-1"
-              v-model="newTaskData.workTypeId"
-              @change="workTypeChange"
-              placeholder="选择工作类型"
-            >
-              <el-option
-                v-for="item in workTypeMap"
-                :label="item.showValue"
-                :value="item.id"
-              />
+            <el-select :disabled="isEdit" class="flex-1" v-model="newTaskData.workTypeId" @change="workTypeChange"
+              placeholder="选择工作类型">
+              <el-option v-for="item in workTypeMap" :label="item.showValue" :value="item.id" />
             </el-select>
-            <div
-              v-if="downloadFileName.length"
-              class="flex w-[400px] mt-1 ml-1"
-            >
-              <el-button
-                :disabled="isEdit"
-                v-for="item in downloadFileName"
-                @click="chaohuiDownload(item)"
-                type="primary"
-                class="w-[200px] underline overflow-hidden whitespace-nowrap text-ellipsis"
-              >
+            <div v-if="downloadFileName.length" class="flex w-[400px] mt-1 ml-1">
+              <el-button :disabled="isEdit" v-for="item in downloadFileName" @click="chaohuiDownload(item)"
+                type="primary" class="w-[200px] underline overflow-hidden whitespace-nowrap text-ellipsis">
                 ({{ item }})
               </el-button>
             </div>
@@ -492,62 +503,35 @@ const beforeUpload = () => {
       </el-row>
       <el-row :gutter="20">
         <el-col :span="12">
-          <el-form-item
-            label="任务优先级(当天任务只有一个高优先级)"
-            prop="priorityId"
-          >
-            <el-select
-              :disabled="isEdit"
-              v-model="newTaskData.priorityId"
-              placeholder="选择任务优先级"
-            >
-              <el-option
-                v-for="item in priMap"
-                :label="item.value"
-                :value="item.id"
-              />
+          <el-form-item label="任务优先级(当天任务只有一个高优先级)" prop="priorityId">
+            <el-select :disabled="isEdit" v-model="newTaskData.priorityId" placeholder="选择任务优先级">
+              <el-option v-for="item in priMap" :label="item.value" :value="item.id" />
             </el-select>
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="期望结束日期" prop="expectEndDate">
-            <el-date-picker
-              class="!w-full"
-              :disabled="isEdit"
-              v-model="newTaskData.expectEndDate"
-              type="date"
-              placeholder="选择期望结束日期"
-            />
+            <el-date-picker class="!w-full" :disabled="isEdit" v-model="newTaskData.expectEndDate" type="date"
+              placeholder="选择期望结束日期" />
           </el-form-item>
         </el-col>
       </el-row>
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="预估工时" prop="predictDuration">
-            <el-input
-              :disabled="isNew"
-              v-model="newTaskData.predictDuration"
-              autocomplete="off"
-            />
+            <el-input :disabled="isNew" v-model="newTaskData.predictDuration" autocomplete="off" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="交付时间" prop="endTime">
-            <el-date-picker
-              class="!w-full"
-              :disabled="isNew"
-              v-model="newTaskData.endTime"
-              type="date"
-              placeholder="选择交付时间"
-            />
+            <el-date-picker class="!w-full" :disabled="isNew" v-model="newTaskData.endTime" type="date"
+              placeholder="选择交付时间" />
           </el-form-item>
         </el-col>
       </el-row>
       <el-form-item label="对接人" prop="contacters">
         <!-- <el-input v-model="newTaskData.contacters" autocomplete="off" /> -->
-        <el-button :disabled="isEdit" @click="choosePerson('contacters')"
-          >选择对接人</el-button
-        >
+        <el-button :disabled="isEdit" @click="choosePerson('contacters')">选择对接人</el-button>
         <div class="helpers">
           <p v-for="(item, index) in newTaskData.contacters" class="help-item">
             {{ item.name }}
@@ -560,9 +544,7 @@ const beforeUpload = () => {
       <el-row :gutter="20">
         <el-col :span="20">
           <el-form-item label="承接人" prop="workers">
-            <el-button :disabled="isNew" @click="choosePerson('workers')"
-              >选择承接人</el-button
-            >
+            <el-button :disabled="isNew" @click="choosePerson('workers')">选择承接人</el-button>
             <div class="helpers">
               <p v-for="(item, index) in newTaskData.workers" class="help-item">
                 {{ item.name }}
@@ -575,53 +557,31 @@ const beforeUpload = () => {
         </el-col>
       </el-row>
       <el-form-item label="任务描述" prop="description">
-        <el-input
-          :disabled="isEdit"
-          type="textarea"
-          v-model="newTaskData.description"
-          autocomplete="off"
-        />
+        <el-input :disabled="isEdit" type="textarea" v-model="newTaskData.description" autocomplete="off" />
       </el-form-item>
       <el-form-item label="附件上传" prop="attachments">
-        <el-upload
-          v-model:file-list="newTaskData.attachments"
-          class="upload-demo"
-          :action="postUrl"
+        <el-upload ref="uploadRef" v-model:file-list="newTaskData.attachments" class="upload-demo w-full" :action="postUrl"
           :data="{
             path: default_upload_url,
             create_parents: false
-          }"
-          :accept="'*'"
-          :before-upload="beforeUpload"
-          :on-success="uploadSuccess"
-          :auto-upload="true"
-          :on-preview="
-            val => {
-              chaohuiDownload(val?.row?.name || val.name);
+          }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :before-upload="beforeUpload"
+          :on-success="uploadSuccess" :auto-upload="false" :on-preview="val => {
+  console.log('val', val);
+            
+  chaohuiDownload(val.realFileName || val?.row?.name || val.name);
             }
-          "
-          list-type="text"
-        >
+            " list-type="text">
           <el-button>选择文件</el-button>
         </el-upload>
       </el-form-item>
       <el-form-item label="链接上传" prop="links">
-        <el-input
-          style="margin-bottom: 10px"
-          v-model="isInputUrl"
-          autocomplete="off"
-        >
+        <el-input style="margin-bottom: 10px" v-model="isInputUrl" autocomplete="off">
           <template #append>
             <el-button @click="addUploadUrls"> 添加 </el-button>
           </template>
         </el-input>
         <div class="flex gap-2">
-          <el-tag
-            @close="deleteUrl(index)"
-            v-for="(tag, index) in newTaskData.links"
-            :key="tag"
-            closable
-          >
+          <el-tag @close="deleteUrl(index)" v-for="(tag, index) in newTaskData.links" :key="tag" closable>
             {{ tag }}
           </el-tag>
         </div>
