@@ -564,21 +564,27 @@ const allLength = ref(0);
           label="期望完成时间"
         ></el-table-column>
         <el-table-column prop="statusName" label="任务状态"></el-table-column>
-        <el-table-column prop="endDate" label="操作">
+        <el-table-column fixed="right" prop="endDate" label="操作">
           <template #default="scope">
-            <el-button
-              v-if="!scope.row.workers?.length && !scope.row.predictDuration"
-              color="#171719"
-              :disabled="!canExamineTask(scope.row)"
-              @click="updateTask(scope.row)"
-              >分配</el-button
-            >
-            <el-button
-              v-if="scope.row.workers?.length && scope.row.predictDuration"
-              color="#171719"
-              disabled
-              >已分配</el-button
-            >
+            <div class="flex">
+              <el-button
+                v-if="!scope.row.workers?.length && !scope.row.predictDuration"
+                color="#171719"
+                :disabled="!canExamineTask(scope.row)"
+                @click="updateTask(scope.row)"
+                >分配</el-button
+              >
+              <el-button
+                v-if="scope.row.workers?.length && scope.row.predictDuration"
+                color="#171719"
+                disabled
+                >已分配</el-button
+              >
+
+              <el-button :disabled="scope.row.statusName != '待处理'">
+                关闭
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>

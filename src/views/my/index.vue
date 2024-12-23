@@ -523,6 +523,13 @@ const allLength = ref(0);
             >
           </template>
         </el-table-column>
+        <el-table-column label="操作">
+          <template #default="scope">
+            <el-button :disabled="scope.row.statusName != '待处理'">
+              关闭
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
     </el-card>
     <el-pagination
