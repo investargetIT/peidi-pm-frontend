@@ -272,35 +272,17 @@ const updateTaskFun = async () => {
     }
   });
 };
-function uniqueByFileNameWithMaxTimestamp(arr) {
-  const result = [];
-  const fileMap = new Map();
-  for (const item of arr) {
-    const lastUnderscoreIndex = item.lastIndexOf('_');
-    const fileName = item.slice(0, lastUnderscoreIndex);
-    const timestamp = Number(item.slice(lastUnderscoreIndex + 1).split('.')[0]);
-    if (fileMap.has(fileName)) {
-      const existingTimestamp = fileMap.get(fileName);
-      if (timestamp > existingTimestamp) {
-        fileMap.set(fileName, timestamp);
-      }
-    } else {
-      fileMap.set(fileName, timestamp);
-    }
-  }
-  for (const [fileName, timestamp] of fileMap.entries()) {
-    result.push(`${fileName}_${timestamp}.jpg`);
-  }
-  return result;
-}
+
 const addNewTask = async () => {
+  console.log('uniqueByFileNameWithMaxTimestamp(getFileName(newTaskData.value.attachments)),', (getFileName(newTaskData.value.attachments)));
+  
   if (!formRef.value) {
     return;
   }
   await formRef.value.validate((valid, fields) => {
     if (valid) {
       newTask({
-        attachments: uniqueByFileNameWithMaxTimestamp(getFileName(newTaskData.value.attachments)),
+        attachments: (getFileName(newTaskData.value.attachments)),
         businessUnitId: newTaskData.value.businessUnitId,
         contacters: newTaskData.value.contacters.map(item => {
           return {
@@ -395,6 +377,28 @@ testAllIPs().then(res => {
   }
 });
 
+function filterByRealFileNameTimestamp(arr) {
+  const result = [];
+  const nameMap = new Map();
+  for (const item of arr) {
+    const { name, realFileName } = item;
+    const lastUnderscoreIndex = realFileName.lastIndexOf('_');
+    const timestamp = Number(realFileName.slice(lastUnderscoreIndex + 1));
+    if (nameMap.has(name)) {
+      const existingItem = nameMap.get(name);
+      const existingTimestamp = Number(existingItem.realFileName.slice(existingItem.realFileName.lastIndexOf('_') + 1));
+      if (timestamp > existingTimestamp) {
+        nameMap.set(name, item);
+      }
+    } else {
+      nameMap.set(name, item);
+    }
+  }
+  for (const item of nameMap.values()) {
+    result.push(item);
+  }
+  return result;
+}
 const uploadSuccess = res => {
   loading.value = false;
   console.log("uploadSuccess", res, newTaskData.value.attachments);
@@ -402,6 +406,8 @@ const uploadSuccess = res => {
   newTaskData.value.attachments.map(item => {
     item.realFileName = item.raw.name;
   })
+  newTaskData.value.attachments = filterByRealFileNameTimestamp(newTaskData.value.attachments);
+  
   // 如果有多个同名的item，那么取最新的
   const { success, error } = res;
 };
