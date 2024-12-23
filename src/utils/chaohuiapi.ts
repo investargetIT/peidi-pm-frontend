@@ -58,7 +58,7 @@ const testIPWithJsonp = ip => {
           port: port,
           message: `is not accessible, error: ${error.message}`
         });
-        reject(error);
+        reject({ error, ip });
       });
   });
 };
@@ -69,21 +69,44 @@ export const testAllIPs = async () => {
     fullscreen: true,
     text: "上传地址查询中。。。"
   });
-  for (const ip of ipsName) {
-    try {
-      await testIPWithJsonp(ip.url);
-    } catch (error) {
-      // 单个IP测试出错可以在这里做额外处理，比如记录日志等，此处暂不做复杂处理
-      // pdgfkj12345678
-      if (error.statusText != "Request Timeout") {
-        ipThis = ip.name;
-        uploadUrl = `http://${ip.url}:6001`;
-        console.log("ssss");
-        loadingInstance1.close();
-        return chaohuilogin();
-      }
-    }
-  }
+  // for (const ip of ipsName) {
+  //   try {
+  //     await testIPWithJsonp(ip.url);
+  //   } catch (error) {
+  //     // 单个IP测试出错可以在这里做额外处理，比如记录日志等，此处暂不做复杂处理
+  //     // pdgfkj12345678
+  //     if (error.statusText != "Request Timeout") {
+  //       ipThis = ip.name;
+  //       uploadUrl = `http://${ip.url}:6001`;
+  //       console.log("ssss");
+  //       loadingInstance1.close();
+  //       return chaohuilogin();
+  //     }
+  //   }
+  // }
+  return new Promise((resolve, reject) => {
+    Promise.race([
+      testIPWithJsonp(ipsName[0].url),
+      testIPWithJsonp(ipsName[1].url),
+      testIPWithJsonp(ipsName[2].url)
+    ])
+      .then(res => {
+        console.log("Promise race", res);
+      })
+      .catch(err => {
+        console.log("ddsqqqqqq");
+
+        console.log("Promise race", err);
+        const { ip, error } = err;
+        if (error.statusText != "Request Timeout") {
+          // uploadUrl = `http://${ip}:6001`;
+          uploadUrl = `http://192.168.2.52:3000`;
+          console.log("ssss");
+          loadingInstance1.close();
+          resolve(chaohuilogin());
+        }
+      });
+  });
 };
 
 // 登陆
