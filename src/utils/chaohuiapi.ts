@@ -1,6 +1,7 @@
 import Axios from "axios";
 import { ElLoading } from "element-plus";
 export const default_upload_url = "/web_packages/test/uploadFile";
+import { message } from "@/utils/message";
 
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 const port = 5000;
@@ -34,7 +35,7 @@ const testIPWithJsonp = ip => {
       `http://${ip}:${port}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`,
       {
         callbackName: "callback", // 自定义回调函数名，需和服务端配合
-        timeout: 5000 // 设置超时时间（单位毫秒）
+        timeout: 2000 // 设置超时时间（单位毫秒）
       }
     )
       .then(response => {
@@ -51,7 +52,7 @@ const testIPWithJsonp = ip => {
       })
       .catch(error => {
         // 如果出现错误，认为不可访问，记录错误信息
-        console.log("ddddsss");
+        console.log("ddddsss",error);
 
         testResults.push({
           ip: ip,
@@ -69,9 +70,13 @@ export const testAllIPs = async () => {
   return new Promise((resolve, reject) => {
     let localIp = localStorage.getItem('ipThis')
     if (localIp) {
+      console.log('has localIp',localIp);
+      
       uploadUrl = `http://${localIp}:6001`;
       resolve(chaohuilogin());
     }else{
+      console.log('no localIp',localIp);
+
     const loadingInstance1 = ElLoading.service({
       fullscreen: true,
       text: "上传地址查询中。。。"
@@ -87,15 +92,23 @@ export const testAllIPs = async () => {
       .catch(err => {
         console.log("ddsqqqqqq");
 
-        console.log("Promise race", err);
+        console.log("Promise race err", err);
         const { ip, error } = err;
-        localStorage.setItem('ipThis',ip)
         if (error.statusText != "Request Timeout") {
+          localStorage.setItem('ipThis',ip)
           uploadUrl = `http://${ip}:6001`;
           // uploadUrl = `http://192.168.2.52:3000`;
           console.log("ssss");
           loadingInstance1.close();
           resolve(chaohuilogin());
+        }
+      })
+      .finally(() => {
+        console.log('finally',localStorage.getItem('ipThis'));
+        
+        loadingInstance1.close();
+        if (!localStorage.getItem('ipThis')) {
+        message("peidi局域网连接失败,上传无法使用", { type: "error" });
         }
       });
     }
@@ -106,7 +119,10 @@ export const testAllIPs = async () => {
 export const chaohuilogin = () => {
   // debugger;
   console.log("ddddd");
-
+    const loadingInstance1 = ElLoading.service({
+      fullscreen: true,
+      text: "上传地址查询中。。。"
+    });
   return new Promise((resolve, reject) => {
     Axios.get(
       `${uploadUrl}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`
@@ -125,17 +141,19 @@ export const chaohuilogin = () => {
       })
       .catch(err => {
         // reject(err)
-        console.log("err", err);
+        console.log("chaohuilogin err", err);
         localStorage.removeItem('ipThis');
         testAllIPs();
-      });
+      })
+          .finally(() => {
+      loadingInstance1.close();
+    })
   });
 };
 
 // 下载
 export const chaohuiDownload = filename => {
   console.log("filename", filename ,  `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${filename}&_sid=${sid}`);
-
   Axios.get(
     `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${filename}&_sid=${sid}`,
     {
@@ -155,5 +173,5 @@ export const chaohuiDownload = filename => {
     .catch(err => {
               localStorage.removeItem('ipThis');
         testAllIPs();
-    });
+    })
 };

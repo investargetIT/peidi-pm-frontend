@@ -589,6 +589,9 @@ const disabledDate = (time) => {
 const uploadFile = () => {
 
 }
+const handleError = () => {
+  message("上传失败", { type: "error" });
+}
 </script>
 
 <template>
@@ -709,7 +712,7 @@ const uploadFile = () => {
           :action="postUrl" :data="{
             path: default_upload_url,
             create_parents: false
-          }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :before-upload="beforeUpload"
+          }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-error="handleError" :before-upload="beforeUpload"
           :on-success="uploadSuccess" :auto-upload="false" :on-preview="val => {
   console.log('val', val);
             

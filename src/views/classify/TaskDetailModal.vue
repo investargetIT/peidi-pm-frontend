@@ -102,11 +102,11 @@
           <el-button type="primary">选择文件</el-button>
         </el-upload> -->
         <el-upload ref="uploadRef" v-model:file-list="taskData.attachments" class="upload-demo123 upload-demo w-full"
-          :action="postUrl" :data="{
+          :action="postUrl" :on-error="handleError" :data="{
             path: default_upload_url,
             create_parents: false
-          }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-remove="removeFule" :before-upload="beforeUpload"
-          :on-success="uploadSuccess" :auto-upload="false" :on-preview="val => {
+          }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-remove="removeFule"
+          :before-upload="beforeUpload" :on-success="uploadSuccess" :auto-upload="false" :on-preview="val => {
             chaohuiDownload(val.realFileName || val?.row?.name || val.name);
           }
             " list-type="text">
@@ -241,6 +241,11 @@ testAllIPs().then(res => {
     postUrl.value = res.postUrl;
   }
 });
+
+const handleError = () => {
+  message("上传失败", { type: "error" });
+  loading.value = false;
+}
 const jjj = ref(true);
 const formRef = ref(null);
 const showWorkRecord = ref(false);
