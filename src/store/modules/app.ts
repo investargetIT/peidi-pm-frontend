@@ -13,9 +13,7 @@ export const useAppStore = defineStore({
   state: (): appType => ({
     sidebar: {
       opened:
-        storageLocal().getItem<StorageConfigs>(
-          `${responsiveStorageNameSpace()}layout`
-        )?.sidebarStatus ?? getConfig().SidebarStatus,
+      false,
       withoutAnimation: false,
       isClickCollapse: false
     },

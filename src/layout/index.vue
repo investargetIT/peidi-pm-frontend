@@ -100,12 +100,12 @@ useResizeObserver(appWrapperRef, entries => {
   if (width > 0 && width <= 760) {
     toggle("mobile", false);
     isAutoCloseSidebar = true;
-  } else if (width > 760 && width <= 990) {
+  } else if (width > 760 && width <= 1990) {
     if (isAutoCloseSidebar) {
       toggle("desktop", false);
       isAutoCloseSidebar = false;
     }
-  } else if (width > 990 && !set.sidebar.isClickCollapse) {
+  } else if (width > 1990 && !set.sidebar.isClickCollapse) {
     toggle("desktop", true);
     isAutoCloseSidebar = true;
   } else {

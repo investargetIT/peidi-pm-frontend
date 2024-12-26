@@ -68,6 +68,15 @@ export const getUserInfo = code => {
   );
 };
 
+// 拿到部门信息
+export const getDeptInfo = code => {
+    return http.request(
+    "get",
+    `https://user.peidigroup.cn/ding/department?deptId=${code}`,
+    {}
+  );
+}
+
 // 注册
 export const register = data => {
   return http.request(

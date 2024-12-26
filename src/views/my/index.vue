@@ -25,7 +25,7 @@ import {
 } from "../../api/pmApi";
 import axios from "axios";
 import { extractInfo } from "../classify/utils";
-import myTask from "./myTask.vue";
+import AddTask from "../classify/addTask.vue";
 import {
   ElDialog,
   ElCard,
@@ -39,6 +39,8 @@ import {
 } from "element-plus";
 import { updateExpectData } from "../../utils/permission";
 import Level from "../../components/Common/level.vue";
+import { useRoute } from 'vue-router'
+const route = useRoute()
 
 ddAuthFun();
 
@@ -197,6 +199,9 @@ const rules = ref({
 
 // 定义数据
 const activeTab = ref("creator");
+if (route.query.tabName == 'worker') {
+  activeTab.value = 'worker'
+}
 const form = ref({
   status: "",
   priority: "",
@@ -272,9 +277,11 @@ const clear = () => {
   };
 };
 
-let actionType = "new";
+
 const updateMyTask = val => {
-  actionType = "isEdit";
+  if (val.statusName == '已关闭') {
+    return
+  }
   taskData.value = val;
   dialogFormVisible.value = true;
 };
@@ -349,6 +356,20 @@ const tableRowClassName = ({ row, rowIndex }) => {
   return "";
 };
 
+const closeTask = (val) => {
+  updateTask({
+    ...val,
+    statusId: 70
+  })
+    .then(res => {
+      const { code, data } = res;
+      if (code == 200) {
+        message("修改任务信息成功", { type: "success" });
+        getCurrentPage();
+      }
+    })
+}
+
 const allLength = ref(0);
 </script>
 
@@ -359,22 +380,17 @@ const allLength = ref(0);
         <el-tab-pane v-for="item in workTypeEnum" :label="item.showValue" :name="item.id"></el-tab-pane>
       </el-tabs> -->
       <div class="w-full h-[50px] bg-[#f2f2f3] flex p-2 justify-between mb-6">
-        <div
-          @click="activeTab = 'creator'"
-          :class="[
+        <div @click="activeTab = 'creator'" :class="[
             'cursor-pointer',
             'text-center',
             'leading-[35px]',
             'w-[50%]',
             'h-full',
             activeTab == 'creator' ? 'bg-white' : ''
-          ]"
-        >
+          ]">
           我发起的任务
         </div>
-        <div
-          @click="activeTab = 'worker'"
-          :class="[
+        <div @click="activeTab = 'worker'" :class="[
             'cursor-pointer',
             'text-center',
             'leading-[35px]',
@@ -382,28 +398,19 @@ const allLength = ref(0);
             'w-[50%]',
             'h-full',
             activeTab == 'worker' ? 'bg-white' : ''
-          ]"
-        >
+          ]">
           分配给我的任务
         </div>
       </div>
       <el-form :inline="true" :model="form">
         <el-form-item style="width: 20%" label="任务状态">
           <el-select v-model="form.status" placeholder="任务状态">
-            <el-option
-              v-for="item in taskStatus"
-              :label="item.value"
-              :value="item.id"
-            ></el-option>
+            <el-option v-for="item in taskStatus" :label="item.value" :value="item.id"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item style="width: 20%" label="优先级">
           <el-select v-model="form.priority" placeholder="优先级">
-            <el-option
-              v-for="item in priorityEnum"
-              :label="item.value"
-              :value="item.id"
-            ></el-option>
+            <el-option v-for="item in priorityEnum" :label="item.value" :value="item.id"></el-option>
           </el-select>
         </el-form-item>
         <!-- <el-form-item style="width: 30%;" label="任务类型">
@@ -415,35 +422,22 @@ const allLength = ref(0);
           <el-input v-model="form.topic" placeholder="主题/描述内容"></el-input>
         </el-form-item>
         <el-form-item style="width: 15%">
-          <el-input
-            v-model="form.description"
-            placeholder="描述内容"
-          ></el-input>
+          <el-input v-model="form.description" placeholder="描述内容"></el-input>
         </el-form-item>
         <el-form-item>
-          <el-button
-            color="#171719"
-            type="primary"
-            icon="search"
-            @click="getCurrentPage"
-            >搜索</el-button
-          >
+          <el-button color="#171719" type="primary" icon="search" @click="getCurrentPage">搜索</el-button>
           <el-button icon="refresh" @click="clear">清空</el-button>
         </el-form-item>
       </el-form>
-      <el-table
-        :row-class-name="tableRowClassName"
-        :data="currentPage"
-        style="
+      <el-table :row-class-name="tableRowClassName" :data="currentPage" style="
           width: 100%;
           color: #000;
           border: 1px solid #eee;
           border-radius: 8px;
-        "
-      >
-        <el-table-column prop="workTypeName" label="工作类型">
+        ">
+        <el-table-column prop="workTypeName" label="工作内容">
           <template #default="scope">
-            <span>{{ extractInfo(scope.row.taskTypeName).name }}</span>
+            <span>{{ (scope.row.workContent) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="priorityName" label="优先级">
@@ -453,143 +447,90 @@ const allLength = ref(0);
         </el-table-column>
         <el-table-column prop="title" label="任务主题">
           <template #default="scope">
-            <span
-              class="clickable-topic"
-              @click="
+            <span class="clickable-topic" @click="
                 activeTab == 'worker'
                   ? handleTopicClick(scope.row)
                   : updateMyTask(scope.row)
-              "
-              >{{ scope.row.title }}</span
-            >
+              ">{{ scope.row.title }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="contacters" label="对接人">
           <template #default="scope">
             <span>{{
               scope.row.contacters?.length
-                ? getAllName(scope.row.contacters)
-                : "-"
-            }}</span>
+              ? getAllName(scope.row.contacters)
+              : "-"
+              }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="workers" label="承接人">
           <template #default="scope">
             <span>{{
               scope.row.workers?.length ? getAllName(scope.row.workers) : "-"
-            }}</span>
+              }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="predictDuration" label="预计工时">
           <template #default="scope">
             <span>{{
               scope.row.predictDuration ? scope.row.predictDuration : "-"
-            }}</span>
+              }}</span>
           </template>
         </el-table-column>
-        <el-table-column
-          prop="expectEndDate"
-          label="期望完成时间"
-        ></el-table-column>
+        <el-table-column prop="expectEndDate" label="期望完成时间"></el-table-column>
         <el-table-column prop="endTime" label="交付时间">
           <template #default="scope">
             <span>{{ scope.row.endTime ? scope.row.endTime : "-" }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="updateContent" label="期望交付时间修改日志">
-          <template #default="scope">
-            <span>{{
-              scope.row.updateContent ? scope.row.updateContent : "无修改记录"
-            }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="updateRemark" label="修改备注">
-          <template #default="scope">
-            <span>{{
-              scope.row.updateRemark ? scope.row.updateRemark : "无备注"
-            }}</span>
-          </template>
-        </el-table-column>
         <el-table-column prop="statusName" label="任务状态">
           <template #default="scope">
-            <span
-              @click="doCommunicate(scope.row)"
-              :class="[
+            <span @click="doCommunicate(scope.row)" :class="[
                 scope.row.statusName == '待沟通'
                   ? 'underline cursor-pointer'
                   : ''
-              ]"
-              >{{ scope.row.statusName ? scope.row.statusName : "-" }}</span
-            >
+              ]">{{ scope.row.statusName ? scope.row.statusName : "-" }}</span>
           </template>
         </el-table-column>
         <el-table-column label="操作">
           <template #default="scope">
-            <el-button :disabled="scope.row.statusName != '待处理'">
+            <el-button @click="closeTask(scope.row)" :disabled="scope.row.statusName != '待处理'">
               关闭
             </el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
-    <el-pagination
-      class="pagination"
-      v-model:current-page="currentPageNum"
-      @current-change="changeCurrentPage"
-      v-model:page-size="pageSize"
-      :page-sizes="pageSizeArr"
-      @size-change="handleSizeChange"
-      layout="total, sizes, prev, pager, next, jumper"
-      :total="allLength"
-    />
+    <el-pagination class="pagination" v-model:current-page="currentPageNum" @current-change="changeCurrentPage"
+      v-model:page-size="pageSize" :page-sizes="pageSizeArr" @size-change="handleSizeChange"
+      layout="total, sizes, prev, pager, next, jumper" :total="allLength" />
     <el-dialog v-model="updateDialogStatus" width="500px" title="更新任务状态">
-      <el-form
-        :rules="{
+      <el-form :rules="{
           expectEndDate: [
             { required: true, message: '选择时间范围', trigger: 'blur' }
           ]
-        }"
-        ref="formRef"
-        :model="updateCommunicateData"
-        label-width="auto"
-        style="max-width: 600px"
-      >
+        }" ref="formRef" :model="updateCommunicateData" label-width="auto" style="max-width: 600px">
         <el-form-item label="新的期望完成时间" prop="expectEndDate">
           <div class="block">
-            <el-date-picker
-              v-model="updateCommunicateData.expectEndDate"
-              type="date"
-              placeholder="选择期望结束日期"
-            />
+            <el-date-picker v-model="updateCommunicateData.expectEndDate" type="date" placeholder="选择期望结束日期" />
           </div>
         </el-form-item>
         <el-form-item label="修改备注" prop="workText">
           <el-input v-model="updateCommunicateData.updateRemark" />
         </el-form-item>
-        <el-button
-          @click="updateCommunicate"
-          style="margin-left: 230px"
-          color="#171719"
-        >
+        <el-button @click="updateCommunicate" style="margin-left: 230px" color="#171719">
           确定更新
         </el-button>
       </el-form>
     </el-dialog>
-    <TaskDetailModal
-      @closeModal="taskDetailModal.isVisible = false"
-      v-if="taskDetailModal.isVisible"
-      :taskDetail="taskDetailModal.taskDetail"
-      :taskStatus="taskStatus"
-    >
+    <TaskDetailModal @closeModal="taskDetailModal.isVisible = false" v-if="taskDetailModal.isVisible"
+      :taskDetail="taskDetailModal.taskDetail" :taskStatus="taskStatus">
     </TaskDetailModal>
     <el-dialog v-model="dialogFormVisible" title="修改任务" width="800">
-      <myTask
-        v-if="dialogFormVisible"
-        @finish="getCurrentPage"
-        @close="dialogFormVisible = false"
-        actionType="edit"
-        :taskData="taskData"
-      />
+      <!-- <myTask v-if="dialogFormVisible" @finish="getCurrentPage" @close="dialogFormVisible = false" actionType="edit"
+        :taskData="taskData" /> -->
+      <AddTask v-if="dialogFormVisible" @finish="getCurrentPage" @close="dialogFormVisible = false" :actionType="'my'"
+         :taskData="taskData" />
     </el-dialog>
   </div>
 </template>

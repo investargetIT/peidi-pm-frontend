@@ -19,6 +19,8 @@ import darkIcon from "@/assets/svg/dark.svg?component";
 import Lock from "@iconify-icons/ri/lock-fill";
 import User from "@iconify-icons/ri/user-3-fill";
 import * as dd from "dingtalk-jsapi";
+import { useRoute } from 'vue-router'
+const route = useRoute()
 
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 const DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD = "Aa123456";
@@ -37,8 +39,10 @@ dataThemeChange(overallStyle.value);
 const { title } = useNav();
 initDingH5RemoteDebug();
 const ruleForm = reactive({
-  username: "taijp@peidibrand.com",
-  password: "Aa123456"
+  // username: "taijp@peidibrand.com",
+  // password: "Aa123456"
+    username: "",
+  password: ""
 });
 const onLogin = async (formEl: FormInstance | undefined) => {
   if (!formEl) return;
@@ -53,11 +57,18 @@ const onLogin = async (formEl: FormInstance | undefined) => {
         .then(res => {
           if (res.success) {
             // 获取后端路由
-            return initRouter().then(() => {
-              router.push(getTopMenu(true).path).then(() => {
-                message("登录成功", { type: "success" });
+            if (route.query.tabName == 'worker') {
+              return initRouter().then(() => {
+                router.push({ path: '/my/index', query: { tabName: 'worker' } });
               });
-            });
+
+            }else{
+              return initRouter().then(() => {
+                router.push(getTopMenu(true).path).then(() => {
+                  message("登录成功", { type: "success" });
+                });
+              });
+            }
           } else {
             message("登录失败", { type: "error" });
           }
@@ -81,7 +92,7 @@ const ddLogin = () => {
           if (res.success) {
             const { data: ddUserInfo } = res;
             console.log("ddUserInfo", ddUserInfo);
-            alert(JSON.stringify(ddUserInfo));
+            // alert(JSON.stringify(ddUserInfo));
             localStorage.setItem("ddUserInfo", JSON.stringify(ddUserInfo));
             const { org_email, name } = ddUserInfo;
             if (org_email) {

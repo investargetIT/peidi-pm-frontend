@@ -7,9 +7,11 @@ import {
   newTask,
   getEnum,
   getPriorty,
-  updateTask
+  updateTask,
+  getTaskTypeApi
 } from "../../api/pmApi";
-import { removeDuplicates, extractEmplId, extractInfo } from "./utils";
+import { getDeptInfo } from "../../api/upload";
+import { removeDuplicates, extractEmplId, extractInfo , splitTaskType } from "./utils";
 import { jsonp } from "vue-jsonp";
 import {
   testAllIPs,
@@ -18,6 +20,80 @@ import {
 } from "../../utils/chaohuiapi";
 import Axios from "axios";
 import { message } from "@/utils/message";
+const workContentMap = ref([])
+
+getTaskTypeApi({})
+.then(res => {
+  const { code, data } = res;
+  if (code == 200) {
+    data.map(item => {
+      if (item.level == 1) {
+        workTypeMap.value.push(JSON.parse(JSON.stringify(item)))
+      }
+      if (item.level == 2) {
+        workContentMap.value.push(JSON.parse(JSON.stringify(item)))
+      }
+    })
+    console.log('workTypeMap.value', workTypeMap.value);
+    console.log('workContentMap.value', workContentMap.value);
+    if (isEdit || isMy) {
+      newTaskData.value = {
+        ...newTaskData.value,
+        ...taskData
+      };
+      newTaskData.value.attachments = newTaskData.value.attachments
+        ? newTaskData.value.attachments
+        : [];
+      let newArr:any = [];
+      if (newTaskData.value.attachments) {
+        newTaskData.value.attachments.map(item => {
+          if (!item.response) {
+            newArr.push({
+              raw: {
+                name: item
+              },
+              response: {
+                success: true
+              },
+              name: item,
+              status: "success",
+              uid: Date.now()
+            }); 
+          }else{
+            newArr.push({
+              ...item
+            })
+          }
+        });
+      }
+      newTaskData.value.attachments = JSON.parse(JSON.stringify(newArr));
+      console.log('newTaskData.value.attachments', newTaskData.value.attachments);
+      
+      newTaskData.value.contacters.map(item => {
+        item.name = item.userName;
+        item.emplId = item.userId;
+      });
+      newTaskData.value.taskTheme = taskData.title;
+      // 判断当前workTypeId level1 or level2
+      const isLevel1 = workTypeMap.value.find(item => item.id == newTaskData.value.workTypeId)
+      const isLevel2 = workContentMap.value.find(item => item.id == newTaskData.value.workTypeId)
+      console.log('isLevel1', isLevel1, 'isLevel2', isLevel2);
+      
+      if (isLevel1) {
+        newTaskData.value.workTypeId = Number(newTaskData.value.workTypeId)
+        workTypeChange(true);
+      }
+      if (isLevel2) {
+        newTaskData.value.workContentId = Number(newTaskData.value.workTypeId);
+        newTaskData.value.workTypeId = workTypeMap.value.find(item => item.level1 == isLevel2.level1).id
+        workTypeChange(true);
+      }
+      console.log('newTaskData.value', newTaskData.value);
+    }
+  }
+})
+
+
 
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 defineOptions({
@@ -28,9 +104,21 @@ const { actionType, taskData } = defineProps(["actionType", "taskData"]);
 let ddUserInfo = localStorage.getItem("ddUserInfo");
 if (ddUserInfo) {
   ddUserInfo = JSON.parse(ddUserInfo);
+  const { dept_id_list } = ddUserInfo;
+  if (dept_id_list[0]) {
+    getDeptInfo(dept_id_list[0])
+      .then(res => {
+        const { code , data } = res;
+        if (code == 200) {
+          const { name }  = data;
+          newTaskData.value.businessUnit = name;
+        }
+      })
+  }
 }
 const isNew = actionType == "new";
-const isEdit = actionType == "edit";
+const isEdit = actionType == "edit"
+const isMy = actionType == 'my';
 console.log("taskData", taskData);
 
 const taskUnitMap: any = ref([]);
@@ -59,23 +147,27 @@ getEnum({
   const { code, data } = res;
   if (code == 200) {
     taskTypeMap.value = data;
+    taskTypeMap.value.map( item => {
+      item.priorityLevel1Id = splitTaskType(item.value).priority;
+      item.value = splitTaskType(item.value).value;
+    })
   }
 });
 
 const workTypeMap = ref([]);
 
-getEnum({
-  type: "workType"
-}).then(res => {
-  const { code, data } = res;
-  if (code == 200) {
-    workTypeMap.value = data;
-    workTypeMap.value.map(item => {
-      item.showValue = extractInfo(item.value).name || "";
-      item.workerMasterId = extractInfo(item.value).workerMasterId || "";
-    });
-  }
-});
+// getEnum({
+//   type: "workType"
+// }).then(res => {
+//   const { code, data } = res;
+//   if (code == 200) {
+//     workTypeMap.value = data;
+//     workTypeMap.value.map(item => {
+//       item.showValue = extractInfo(item.value).name || "";
+//       item.workerMasterId = extractInfo(item.value).workerMasterId || "";
+//     });
+//   }
+// });
 
 const priMap = ref([]);
 
@@ -85,7 +177,7 @@ getEnum({
   const { code, data } = res;
   if (code == 200) {
     priMap.value = data;
-    getCanHigh();
+    // getCanHigh();
   }
 });
 
@@ -138,7 +230,9 @@ const newTaskDataDefault = {
   // 类型
   taskTypeId: "",
   // 工作类型
-  workTypeId: "",
+  workTypeId: '',
+  // 工作内容
+  workContentId : '',
   // 紧急程度
   taskUrgency: "",
   // 优先级
@@ -152,7 +246,7 @@ const newTaskDataDefault = {
   // 负责人
   contacters: [],
   // 业务单元id
-  businessUnitId: "",
+  businessUnit: "",
   // 协作人
   workers: [],
   // 预估工时
@@ -166,25 +260,15 @@ const newTaskDataDefault = {
   links: []
 };
 const newTaskData = ref(JSON.parse(JSON.stringify(newTaskDataDefault)));
-if (isEdit) {
-  newTaskData.value = {
-    ...newTaskData.value,
-    ...taskData
-  };
-  newTaskData.value.attachments = newTaskData.value.attachments
-    ? newTaskData.value.attachments
-    : [];
-  newTaskData.value.contacters.map(item => {
-    item.name = item.userName;
-    item.emplId = item.userId;
-  });
-  newTaskData.value.taskTheme = taskData.title;
-}
+
 const resetData = () => {
   newTaskData.value = JSON.parse(JSON.stringify(newTaskDataDefault));
   downloadFileName.value = [];
 };
 const delteHelper = index => {
+  if (isMy) {
+    return
+  }
   newTaskData.value.workers.splice(index, 1);
 };
 
@@ -207,25 +291,28 @@ const deleteUrl = index => {
 
 const uploadUrl = ref("");
 const taskRules = {
-  taskTheme: [{ required: true, message: "输入任务主题", trigger: "blur" }],
-  businessUnitId: [
-    { required: true, message: "输入业务单元", trigger: "blur" }
+  taskTheme: [{ required: isMy || isNew, message: "输入任务主题", trigger: "blur" }],
+  businessUnit: [
+    { required: isMy || isNew, message: "输入业务单元", trigger: "blur" }
   ],
-  taskTypeId: [{ required: true, message: "输入任务类型", trigger: "blur" }],
-  workTypeId: [{ required: true, message: "输入工作类型", trigger: "blur" }],
-  priorityId: [{ required: true, message: "输入任务优先级", trigger: "blur" }],
+  taskTypeId: [{ required: isMy || isNew, message: "输入任务类型", trigger: "blur" }],
+  workTypeId: [{ required: isMy || isNew, message: "输入工作类型", trigger: "blur" }],
+  priorityId: [{ required: isMy || isNew, message: "输入任务优先级", trigger: "blur" }],
   expectEndDate: [
-    { required: true, message: "选择期望完成时间", trigger: "blur" }
+    { required: isMy || isNew, message: "选择期望完成时间", trigger: "blur" }
   ],
   predictDuration: [
     { required: isEdit, message: "输入预估工时", trigger: "blur" }
   ],
   endTime: [{ required: isEdit, message: "输入交付时间", trigger: "blur" }],
-  contacters: [{ required: true, message: "选择对接人", trigger: "blur" }],
+  contacters: [{ required: isMy || isNew, message: "选择对接人", trigger: "blur" }],
   workers: [{ required: isEdit, message: "选择承接人", trigger: "blur" }],
-  description: [{ required: true, message: "输入任务描述", trigger: "blur" }],
+  description: [{ required: isMy || isNew, message: "输入任务描述", trigger: "blur" }],
   attachments: [{ required: false, message: "附件上传", trigger: "change" }],
-  links: [{ required: false, message: "链接上传", trigger: "change" }]
+  links: [{ required: false, message: "链接上传", trigger: "change" }],
+  workContentId: [
+    { required: isEdit, message: "选择工作内容", trigger: "blur" }
+  ]
 };
 const formRef = ref(null);
 const updateTaskFun = async () => {
@@ -233,11 +320,12 @@ const updateTaskFun = async () => {
     return;
   }
   await formRef.value.validate((valid, fields) => {
+    console.log('newTaskData.value.attachments', newTaskData.value.attachments);
     if (valid) {
       updateTask({
         id: Number(newTaskData.value.id),
         attachments: getFileName(newTaskData.value.attachments),
-        businessUnitId: newTaskData.value.businessUnitId,
+        businessUnit: newTaskData.value.businessUnit,
         contacters: newTaskData.value.contacters.map(item => {
           return {
             userName: item.name,
@@ -254,7 +342,7 @@ const updateTaskFun = async () => {
         // "statusId": newTaskData.value.statusId,
         taskTypeId: newTaskData.value.taskTypeId,
         title: newTaskData.value.taskTheme,
-        workTypeId: newTaskData.value.workTypeId,
+        workTypeId: newTaskData.value.workContentId || newTaskData.value.workTypeId,
         workerIds: newTaskData.value.workers.map(item => {
           return {
             userName: item.name,
@@ -272,10 +360,15 @@ const updateTaskFun = async () => {
     }
   });
 };
-
-const addNewTask = async () => {
-  console.log('uniqueByFileNameWithMaxTimestamp(getFileName(newTaskData.value.attachments)),', (getFileName(newTaskData.value.attachments)));
+const changePri = () => {
+  console.log('newTaskData.value.taskTypeId', taskTypeMap.value, newTaskData.value.taskTypeId);
   
+  let item = taskTypeMap.value.find(item => item.id == newTaskData.value.taskTypeId)
+  if (item.priorityLevel1Id) {
+    newTaskData.value.priorityId = Number(item.priorityLevel1Id);
+  }
+}
+const addNewTask = async () => {
   if (!formRef.value) {
     return;
   }
@@ -283,7 +376,7 @@ const addNewTask = async () => {
     if (valid) {
       newTask({
         attachments: (getFileName(newTaskData.value.attachments)),
-        businessUnitId: newTaskData.value.businessUnitId,
+        businessUnit: newTaskData.value.businessUnit,
         contacters: newTaskData.value.contacters.map(item => {
           return {
             userName: item.name,
@@ -300,7 +393,7 @@ const addNewTask = async () => {
         // "statusId": newTaskData.value.statusId,
         taskTypeId: newTaskData.value.taskTypeId,
         title: newTaskData.value.taskTheme,
-        workTypeId: newTaskData.value.workTypeId
+        workTypeId: newTaskData.value.workContentId || newTaskData.value.workTypeId
         // "workers": newTaskData.value.workers
       }).then(res => {
         const { code, data } = res;
@@ -357,18 +450,42 @@ const getCanHigh = () => {
   });
 };
 const downloadFileName = ref([]);
-const workTypeChange = () => {
-  const workValue = workTypeMap.value.find(
-    item => item.id == newTaskData.value.workTypeId
-  ).value;
-  console.log("workValue", workValue);
-  if (workValue) {
-    let download = extractInfo(workValue).filename;
-    downloadFileName.value = download;
-  } else {
-    downloadFileName.value = [];
+const workContentList = ref([])
+const workTypeChange = (val = false) => {
+  // 当前的level1是
+  if (!val) {
+    newTaskData.value.workContentId = ''; 
   }
+  let level1Name = workTypeMap.value.find(item => item.id === newTaskData.value.workTypeId).level1;
+  let newlevel2 = [];
+  // debugger;
+  workContentMap.value.map(
+    item => {
+      if (item.level == 2 && item.level1 == level1Name) {
+        newlevel2.push(JSON.parse(JSON.stringify(item)))
+      }
+    }
+  );
+  console.log('newlevel2', newlevel2);
+  
+  workContentList.value = newlevel2;
+  // console.log("workValue", workValue);
+  // if (workValue) {
+  //   let download = extractInfo(workValue).filename;
+  //   downloadFileName.value = download;
+  // } else {
+  //   downloadFileName.value = [];
+  // }
 };
+const workContentChange = () => {
+  let item = workContentList.value.find(item => item.id == newTaskData.value.workContentId)
+  if (item.id && item.priority) {
+    newTaskData.value.priorityId = item.priority;
+  }
+  if (item.id && item.mark) {
+    downloadFileName.value = item.mark.split('&')
+  }
+}
 
 testAllIPs().then(res => {
   if (res.sid) {
@@ -406,7 +523,7 @@ const uploadSuccess = res => {
   newTaskData.value.attachments.map(item => {
     item.realFileName = item.raw.name;
   })
-  newTaskData.value.attachments = filterByRealFileNameTimestamp(newTaskData.value.attachments);
+  // newTaskData.value.attachments = filterByRealFileNameTimestamp(newTaskData.value.attachments);
   
   // 如果有多个同名的item，那么取最新的
   const { success, error } = res;
@@ -442,6 +559,10 @@ const beforeUpload = (file) => {
 };
 const uploadRef = ref(null)
 const handleChange = (file) => {
+  console.log('hhhhhh',JSON.stringify(file));
+  if (file.response) {
+    return
+  }
   const { name, type, size, lastModified } = file;
   const dotIndex = file.name.lastIndexOf('.');
   const fileNameWithoutExtension = file.name.slice(0, dotIndex);
@@ -458,6 +579,12 @@ const handleChange = (file) => {
   console.log(file.raw)
 }
 
+const disabledDate = (time) => {
+    if (newTaskData.value.expectEndDate) {
+      return time.getTime() > new Date(newTaskData.value.expectEndDate).getTime();
+    }
+    return false;
+  }
 const uploadFile = () => {
 
 }
@@ -477,40 +604,49 @@ const uploadFile = () => {
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="业务单元" prop="businessUnitId">
-            <el-select :disabled="isEdit" v-model="newTaskData.businessUnitId" placeholder="请选择业务单元">
-              <el-option v-for="item in taskUnitMap" :label="item.value" :value="item.id" />
-            </el-select>
+          <el-form-item label="业务单元" prop="businessUnit">
+            <el-input disabled v-model="newTaskData.businessUnit"></el-input>
           </el-form-item>
         </el-col>
       </el-row>
       <el-row :gutter="20">
-        <el-col :span="12">
+        <el-col :span="8">
           <el-form-item label="任务类型" prop="taskTypeId">
-            <el-select :disabled="isEdit" v-model="newTaskData.taskTypeId" placeholder="选择任务类型">
+            <el-select :disabled="isEdit" v-model="newTaskData.taskTypeId" @change="changePri" placeholder="选择任务类型">
               <el-option v-for="item in taskTypeMap" :label="item.value" :value="item.id" />
             </el-select>
           </el-form-item>
         </el-col>
-        <el-col :span="12">
+        <el-col :span="8">
           <el-form-item class="flex" label="工作类型" prop="workTypeId">
             <el-select :disabled="isEdit" class="flex-1" v-model="newTaskData.workTypeId" @change="workTypeChange"
               placeholder="选择工作类型">
-              <el-option v-for="item in workTypeMap" :label="item.showValue" :value="item.id" />
+              <el-option v-for="item in workTypeMap" :label="item.level1" :value="item.id" />
             </el-select>
-            <div v-if="downloadFileName.length" class="flex w-[400px] mt-1 ml-1">
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item class="flex" label="工作内容" prop="workContentId">
+            <el-select :disabled="!newTaskData.workTypeId" class="flex-1" v-model="newTaskData.workContentId"
+              placeholder="选择工作内容" @change="workContentChange">
+              <el-option v-for="item in workContentList" :label="item.level2" :value="item.id" />
+            </el-select>
+            <div v-if="downloadFileName.length" class="flex w-full mt-1 ml-1 flex-row-reverse space-x-2 gap-2">
               <el-button :disabled="isEdit" v-for="item in downloadFileName" @click="chaohuiDownload(item)"
-                type="primary" class="w-[200px] underline overflow-hidden whitespace-nowrap text-ellipsis">
+                type="primary" class=" underline overflow-hidden whitespace-nowrap text-ellipsis">
                 ({{ item }})
               </el-button>
             </div>
           </el-form-item>
         </el-col>
       </el-row>
+      <el-row>
+
+      </el-row>
       <el-row :gutter="20">
         <el-col :span="12">
-          <el-form-item label="任务优先级(当天任务只有一个高优先级)" prop="priorityId">
-            <el-select :disabled="isEdit" v-model="newTaskData.priorityId" placeholder="选择任务优先级">
+          <el-form-item label="任务优先级" prop="priorityId">
+            <el-select :disabled="!isEdit" v-model="newTaskData.priorityId" placeholder="选择任务优先级">
               <el-option v-for="item in priMap" :label="item.value" :value="item.id" />
             </el-select>
           </el-form-item>
@@ -525,13 +661,15 @@ const uploadFile = () => {
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="预估工时" prop="predictDuration">
-            <el-input :disabled="isNew" v-model="newTaskData.predictDuration" autocomplete="off" />
+            <el-input :disabled="isNew || isMy" v-model="newTaskData.predictDuration" autocomplete="off" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="交付时间" prop="endTime">
-            <el-date-picker class="!w-full" :disabled="isNew" v-model="newTaskData.endTime" type="date"
-              placeholder="选择交付时间" />
+            <el-date-picker class="!w-full" :disabled-date="disabledDate" :disabled="isNew || isMy"
+              v-model="newTaskData.endTime" type="date" placeholder="选择交付时间" />
+            <!-- <el-date-picker class="!w-full" :disabled-date="disabledDate" :disabled="isEdit"
+              v-model="newTaskData.endTime" type="date" placeholder="选择交付时间" /> -->
           </el-form-item>
         </el-col>
       </el-row>
@@ -550,7 +688,7 @@ const uploadFile = () => {
       <el-row :gutter="20">
         <el-col :span="20">
           <el-form-item label="承接人" prop="workers">
-            <el-button :disabled="isNew" @click="choosePerson('workers')">选择承接人</el-button>
+            <el-button :disabled="isNew || isMy" @click="choosePerson('workers')">选择承接人</el-button>
             <div class="helpers">
               <p v-for="(item, index) in newTaskData.workers" class="help-item">
                 {{ item.name }}
@@ -566,8 +704,8 @@ const uploadFile = () => {
         <el-input :disabled="isEdit" type="textarea" v-model="newTaskData.description" autocomplete="off" />
       </el-form-item>
       <el-form-item label="附件上传" prop="attachments">
-        <el-upload ref="uploadRef" v-model:file-list="newTaskData.attachments" class="upload-demo w-full" :action="postUrl"
-          :data="{
+        <el-upload ref="uploadRef" v-model:file-list="newTaskData.attachments" class="upload-demo w-full"
+          :action="postUrl" :data="{
             path: default_upload_url,
             create_parents: false
           }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :before-upload="beforeUpload"

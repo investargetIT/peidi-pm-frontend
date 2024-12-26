@@ -21,7 +21,9 @@ import {
   getStatusEnum,
   getPriorityEnum,
   getWorkTypeEnum,
-  getTaskTypeEnum
+  getTaskTypeEnum,
+  getTaskTypeApi,
+  updateTask
 } from "../../api/pmApi";
 import axios from "axios";
 import { extractInfo, extractEmplId } from "./utils";
@@ -30,6 +32,41 @@ import Level from "../../components/Common/level.vue";
 
 ddAuthFun();
 
+const closeTask = (val) => {
+  updateTask({
+    ...val,
+    statusId : 70
+  })
+  .then(res => {
+    const { code , data } = res;
+    if (code == 200) {
+      message("修改任务信息成功", { type: "success" });
+      getCurrentPage();
+    }
+  })
+}
+getTaskTypeApi({})
+.then(res => {
+  const { code, data } = res;
+  if (code == 200) {
+    data.map(item => {
+      // if (item.level == 1) {
+      //   workTypeMap.value.push(JSON.parse(JSON.stringify(item)))
+      // }
+      if (item.level == 1) {
+        workTypeEnum.value.push(JSON.parse(JSON.stringify(item)))
+      }
+    })
+    workTypeEnum.value.map(item => {
+      item.showValue = item.level1;
+      item.workerAds = [item.userId];
+    });
+    console.log('workTypeEnum.value', workTypeEnum.value);
+    
+    activeTab.value = workTypeEnum.value[0].id
+    getCurrentPage();
+  }
+})
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 let ddUserInfo = localStorage.getItem("ddUserInfo");
 if (ddUserInfo) {
@@ -51,16 +88,6 @@ getPriorityEnum().then(res => {
 });
 
 const workTypeEnum = ref([]);
-getWorkTypeEnum().then(res => {
-  workTypeEnum.value = res;
-  workTypeEnum.value.map(item => {
-    item.showValue = extractInfo(item.value).name;
-    item.workerAds = extractInfo(item.value).workerMasterId;
-    console.log("item.showValue", item.value, item.showValue, item.workerAds);
-  });
-  getCurrentPage();
-});
-
 const taskTypeEnum = ref([]);
 getTaskTypeEnum().then(res => {
   taskTypeEnum.value = res;
@@ -93,9 +120,9 @@ const getCurrentPage = () => {
   // 添加worktype的筛选
   if (activeTab.value) {
     searchArr.push({
-      searchName: "workTypeId",
-      searchType: "equals",
-      searchValue: activeTab.value
+      searchName: "workTypeName",
+      searchType: "like",
+      searchValue: workTypeEnum.value.find(item => item.id == activeTab.value).level1
     });
   }
   // 添加任务优先级筛选
@@ -279,7 +306,7 @@ const rules = ref({
 });
 
 // 定义数据
-const activeTab = ref(9);
+const activeTab = ref('');
 const form = ref({
   status: "",
   priority: "",
@@ -326,7 +353,9 @@ const tableData = ref([
 
 const handleTopicClick = row => {
   console.log("row", row);
-
+  if (row.statusName == '已关闭') {
+    return
+  }
   taskDetailModal.value.taskDetail = row;
   taskDetailModal.value.isVisible = true;
 };
@@ -364,7 +393,7 @@ const newTask = () => {
 };
 
 const taskData = ref(null);
-const updateTask = data => {
+const updateTaskFun = data => {
   actionType = "edit";
   let newArr: any = [];
   if (data.attachments) {
@@ -403,70 +432,38 @@ const allLength = ref(0);
   <div class="container">
     <el-card style="width: 100%" class="box-card">
       <el-tabs v-model="activeTab" @tab-click="handleTabClick">
-        <el-tab-pane
-          v-for="item in workTypeEnum"
-          :label="item.showValue"
-          :name="item.id"
-        ></el-tab-pane>
+        <el-tab-pane v-for="item in workTypeEnum" :label="item.showValue" :name="item.id"></el-tab-pane>
       </el-tabs>
       <el-form :inline="true" :model="form">
         <el-form-item style="width: 30%" label="任务状态">
           <el-select v-model="form.status" placeholder="任务状态">
-            <el-option
-              v-for="item in taskStatus"
-              :label="item.value"
-              :value="item.id"
-            ></el-option>
+            <el-option v-for="item in taskStatus" :label="item.value" :value="item.id"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item style="width: 30%" label="优先级">
           <el-select v-model="form.priority" placeholder="优先级">
-            <el-option
-              v-for="item in priorityEnum"
-              :label="item.value"
-              :value="item.id"
-            ></el-option>
+            <el-option v-for="item in priorityEnum" :label="item.value" :value="item.id"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item style="width: 30%" label="任务类型">
           <el-select v-model="form.workType" placeholder="任务类型">
-            <el-option
-              v-for="item in taskTypeEnum"
-              :label="item.value"
-              :value="item.id"
-            ></el-option>
+            <el-option v-for="item in taskTypeEnum" :label="item.value" :value="item.id"></el-option>
           </el-select>
         </el-form-item>
         <br />
         <el-form-item style="width: 30%" label="对接人">
-          <el-tag
-            v-for="tag in form.requester"
-            :key="tag"
-            :disable-transitions="false"
-          >
+          <el-tag v-for="tag in form.requester" :key="tag" :disable-transitions="false">
             {{ tag.name }}
           </el-tag>
-          <el-button
-            class="button-new-tag"
-            size="default"
-            @click="choosePerson('contacter')"
-          >
+          <el-button class="button-new-tag" size="default" @click="choosePerson('contacter')">
             + 对接人
           </el-button>
         </el-form-item>
         <el-form-item style="width: 30%" label="承接人">
-          <el-tag
-            v-for="tag in form.assignee"
-            :key="tag"
-            :disable-transitions="false"
-          >
+          <el-tag v-for="tag in form.assignee" :key="tag" :disable-transitions="false">
             {{ tag.name }}
           </el-tag>
-          <el-button
-            class="button-new-tag"
-            size="default"
-            @click="choosePerson('worker')"
-          >
+          <el-button class="button-new-tag" size="default" @click="choosePerson('worker')">
             + 承接人
           </el-button>
         </el-form-item>
@@ -474,52 +471,34 @@ const allLength = ref(0);
           <el-input v-model="form.topic" placeholder="主题"></el-input>
         </el-form-item>
         <el-form-item style="width: 15%" label="描述内容">
-          <el-input
-            v-model="form.description"
-            placeholder="描述内容"
-          ></el-input>
+          <el-input v-model="form.description" placeholder="描述内容"></el-input>
         </el-form-item>
         <br />
 
         <el-row :gutter="20">
           <el-col :span="14">
             <el-form-item>
-              <el-button
-                color="#171719"
-                type="primary"
-                icon="search"
-                @click="getCurrentPage"
-                >搜索</el-button
-              >
+              <el-button color="#171719" type="primary" icon="search" @click="getCurrentPage">搜索</el-button>
               <el-button icon="refresh" @click="clear">清空</el-button>
             </el-form-item>
           </el-col>
 
           <el-col :span="10" style="text-align: right">
             <el-form-item>
-              <el-button
-                color="#171719"
-                type="success"
-                icon="plus"
-                @click="newTask"
-                >新建任务</el-button
-              >
+              <!-- <el-button color="#171719" type="success" icon="plus" @click="newTask">新建任务</el-button> -->
             </el-form-item>
           </el-col>
         </el-row>
       </el-form>
-      <el-table
-        :data="currentPage"
-        style="
+      <el-table :data="currentPage" style="
           width: 100%;
           color: #000;
           border: 1px solid #eee;
           border-radius: 8px;
-        "
-      >
-        <el-table-column prop="workTypeName" label="工作类型">
+        ">
+        <el-table-column prop="workContent" label="工作内容">
           <template #default="scope">
-            <span>{{ extractInfo(scope.row.taskTypeName).name }}</span>
+            <span>{{ (scope.row.workContent) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="priorityName" label="优先级">
@@ -529,59 +508,43 @@ const allLength = ref(0);
         </el-table-column>
         <el-table-column prop="title" label="任务主题">
           <template #default="scope">
-            <span
-              class="clickable-topic"
-              @click="handleTopicClick(scope.row)"
-              >{{ scope.row.title }}</span
-            >
+            <span class="clickable-topic" @click="handleTopicClick(scope.row)">{{ scope.row.title }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="contacters" label="对接人">
           <template #default="scope">
             <span>{{
               scope.row.contacters?.length
-                ? getAllName(scope.row.contacters)
-                : "-"
-            }}</span>
+              ? getAllName(scope.row.contacters)
+              : "-"
+              }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="workers" label="承接人">
           <template #default="scope">
             <span>{{
               scope.row.workers?.length ? getAllName(scope.row.workers) : "-"
-            }}</span>
+              }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="predictDuration" label="预计工时">
           <template #default="scope">
             <span>{{
               scope.row.predictDuration ? scope.row.predictDuration : "-"
-            }}</span>
+              }}</span>
           </template>
         </el-table-column>
-        <el-table-column
-          prop="expectEndDate"
-          label="期望完成时间"
-        ></el-table-column>
+        <el-table-column prop="expectEndDate" label="期望完成时间"></el-table-column>
         <el-table-column prop="statusName" label="任务状态"></el-table-column>
         <el-table-column fixed="right" prop="endDate" label="操作">
           <template #default="scope">
             <div class="flex">
-              <el-button
-                v-if="!scope.row.workers?.length && !scope.row.predictDuration"
-                color="#171719"
-                :disabled="!canExamineTask(scope.row)"
-                @click="updateTask(scope.row)"
-                >分配</el-button
-              >
-              <el-button
-                v-if="scope.row.workers?.length && scope.row.predictDuration"
-                color="#171719"
-                disabled
-                >已分配</el-button
-              >
+              <el-button size="small" v-if="!scope.row.workers?.length && !scope.row.predictDuration" color="#171719"
+                :disabled="!canExamineTask(scope.row) || scope.row.statusName == '已关闭'" @click="updateTaskFun(scope.row)">分配</el-button>
+              <el-button size="small" v-if="scope.row.workers?.length && scope.row.predictDuration" color="#171719"
+                disabled>已分配</el-button>
 
-              <el-button :disabled="scope.row.statusName != '待处理'">
+              <el-button size="small" @click="closeTask(scope.row)" :disabled="scope.row.statusName != '待处理' || (scope.row.workers?.length && scope.row.predictDuration)">
                 关闭
               </el-button>
             </div>
@@ -589,53 +552,29 @@ const allLength = ref(0);
         </el-table-column>
       </el-table>
     </el-card>
-    <el-pagination
-      class="pagination"
-      v-model:current-page="currentPageNum"
-      @current-change="changeCurrentPage"
-      v-model:page-size="pageSize"
-      :page-sizes="pageSizeArr"
-      @size-change="handleSizeChange"
-      layout="total, sizes, prev, pager, next, jumper"
-      :total="allLength"
-    />
-    <el-dialog
-      v-model="dialogFormVisible"
-      :title="actionType == 'new' ? '添加新任务' : '修改任务'"
-      width="800"
-    >
-      <AddTask
-        v-if="dialogFormVisible"
-        @finish="getCurrentPage"
-        @close="dialogFormVisible = false"
-        :actionType="actionType"
-        :taskData="taskData"
-      />
+    <el-pagination class="pagination" v-model:current-page="currentPageNum" @current-change="changeCurrentPage"
+      v-model:page-size="pageSize" :page-sizes="pageSizeArr" @size-change="handleSizeChange"
+      layout="total, sizes, prev, pager, next, jumper" :total="allLength" />
+    <el-dialog v-model="dialogFormVisible" :title="actionType == 'new' ? '添加新任务' : '修改任务'" width="800">
+      <AddTask v-if="dialogFormVisible" @finish="getCurrentPage" @close="dialogFormVisible = false"
+        :actionType="actionType" :taskData="taskData" />
     </el-dialog>
     <el-dialog v-model="dialogDeleteVisible" title="" width="500">
       <span>确定删除该任务吗？</span>
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="dialogDeleteVisible = false">取消</el-button>
-          <el-button
-            type="primary"
-            @click="
+          <el-button type="primary" @click="
               dialogDeleteVisible = false;
               deleteCateFun();
-            "
-          >
+            ">
             确定
           </el-button>
         </div>
       </template>
     </el-dialog>
-    <TaskDetailModal
-      @refresh="getCurrentPage"
-      @closeModal="taskDetailModal.isVisible = false"
-      v-if="taskDetailModal.isVisible"
-      :taskDetail="taskDetailModal.taskDetail"
-      :taskStatus="taskStatus"
-    >
+    <TaskDetailModal @refresh="getCurrentPage" @closeModal="taskDetailModal.isVisible = false"
+      v-if="taskDetailModal.isVisible" :taskDetail="taskDetailModal.taskDetail" :taskStatus="taskStatus">
     </TaskDetailModal>
   </div>
 </template>

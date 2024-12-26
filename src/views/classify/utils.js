@@ -32,3 +32,11 @@ export function extractInfo(str) {
     workerMasterId: workerMasterId
   };
 }
+
+export function splitTaskType(val){
+  let arr = val.split('&');
+  return {
+    value : arr[0],
+    priority : arr[1]
+  }
+}

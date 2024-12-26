@@ -183,3 +183,11 @@ export const updateTaskRecord = data => {
     data
   });
 };
+
+
+// 获取任务类型 API
+export const getTaskTypeApi = params => {
+  return http.request("get", baseUrlApi("/task-manage/enum"), {
+    params
+  });
+};

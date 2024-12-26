@@ -65,26 +65,17 @@ const testIPWithJsonp = ip => {
 
 // 导入这个方法，导入后会自动登陆chaohui
 export const testAllIPs = async () => {
-  const loadingInstance1 = ElLoading.service({
-    fullscreen: true,
-    text: "上传地址查询中。。。"
-  });
-  // for (const ip of ipsName) {
-  //   try {
-  //     await testIPWithJsonp(ip.url);
-  //   } catch (error) {
-  //     // 单个IP测试出错可以在这里做额外处理，比如记录日志等，此处暂不做复杂处理
-  //     // pdgfkj12345678
-  //     if (error.statusText != "Request Timeout") {
-  //       ipThis = ip.name;
-  //       uploadUrl = `http://${ip.url}:6001`;
-  //       console.log("ssss");
-  //       loadingInstance1.close();
-  //       return chaohuilogin();
-  //     }
-  //   }
-  // }
+
   return new Promise((resolve, reject) => {
+    let localIp = localStorage.getItem('ipThis')
+    if (localIp) {
+      uploadUrl = `http://${localIp}:6001`;
+      resolve(chaohuilogin());
+    }else{
+    const loadingInstance1 = ElLoading.service({
+      fullscreen: true,
+      text: "上传地址查询中。。。"
+    });
     Promise.race([
       testIPWithJsonp(ipsName[0].url),
       testIPWithJsonp(ipsName[1].url),
@@ -98,14 +89,16 @@ export const testAllIPs = async () => {
 
         console.log("Promise race", err);
         const { ip, error } = err;
+        localStorage.setItem('ipThis',ip)
         if (error.statusText != "Request Timeout") {
-          // uploadUrl = `http://${ip}:6001`;
-          uploadUrl = `http://192.168.2.52:3000`;
+          uploadUrl = `http://${ip}:6001`;
+          // uploadUrl = `http://192.168.2.52:3000`;
           console.log("ssss");
           loadingInstance1.close();
           resolve(chaohuilogin());
         }
       });
+    }
   });
 };
 
@@ -133,13 +126,15 @@ export const chaohuilogin = () => {
       .catch(err => {
         // reject(err)
         console.log("err", err);
+        localStorage.removeItem('ipThis');
+        testAllIPs();
       });
   });
 };
 
 // 下载
 export const chaohuiDownload = filename => {
-  console.log("filename", filename);
+  console.log("filename", filename ,  `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${filename}&_sid=${sid}`);
 
   Axios.get(
     `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${filename}&_sid=${sid}`,
@@ -157,5 +152,8 @@ export const chaohuiDownload = filename => {
       document.body.removeChild(link);
       URL.revokeObjectURL(objectURL); // 释放临时URL对象
     })
-    .catch(err => {});
+    .catch(err => {
+              localStorage.removeItem('ipThis');
+        testAllIPs();
+    });
 };

@@ -125,3 +125,23 @@ export const updateExpectData = data => {
   // return isInArr(userId, [{ userId }])
   return isCreator(userId, creator) || isInArr(userId, creatorAds);
 };
+
+
+// 是否可以修改优先级
+export const updatePrivorty = data => {
+  //  workerAds
+  let ddUserInfo = localStorage.getItem("ddUserInfo");
+  if (ddUserInfo) {
+    ddUserInfo = JSON.parse(ddUserInfo);
+  } else {
+    return false;
+  }
+  let userId = ddUserInfo?.userid;
+  const { contacters, contacterAds, creator, creatorAds, workers, workerAds } =
+    data;
+  // return isInArr(userId, contacterAds)
+  console.log("canExamineTask", userId, workerAds);
+  // 测试是自己
+  // return isInArr(userId, [{ userId }])
+  return isInArr(userId, workerAds);
+}

@@ -15,7 +15,7 @@ export const ddAuthFun = () => {
     } = res;
     if (sign && timeStamp) {
       dd.config({
-        agentId: "3313977729", // 必填，微应用ID
+        agentId: "3317230753", // 必填，微应用ID
         corpId: DINGTALK_CORP_ID, //必填，企业ID
         timeStamp, // 必填，生成签名的时间戳
         nonceStr, // 必填，自定义固定字符串。
