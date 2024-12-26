@@ -146,6 +146,22 @@ export const getTaskTypeEnum = () => {
   });
 };
 
+// 获取白名单枚举 adminUser
+export const getAdminUserEnum = () => {
+  return new Promise((resolve, reject) => {
+    http
+      .request("get", baseUrlApi("/common/enum"), {
+        params: {
+          type: "adminUser"
+        }
+      })
+      .then(res => {
+        const { data } = res;
+        resolve(data);
+      });
+  });
+};
+
 // 修改任务
 // /pm/task-manage/update
 export const updateTask = data => {

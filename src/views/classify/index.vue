@@ -23,7 +23,8 @@ import {
   getWorkTypeEnum,
   getTaskTypeEnum,
   getTaskTypeApi,
-  updateTask
+  updateTask,
+  getAdminUserEnum
 } from "../../api/pmApi";
 import axios from "axios";
 import { extractInfo, extractEmplId } from "./utils";
@@ -45,7 +46,38 @@ const closeTask = (val) => {
     }
   })
 }
-getTaskTypeApi({})
+// 获取白名单用户
+const adminUser = ref([]);
+getAdminUserEnum().then(res => {
+  adminUser.value = res;
+});
+// 判断当前钉钉用户是否是管理员
+const isAdmin = () => {
+  let flag = false;
+  adminUser.value.map(item => {
+    if (item.id == ddUserInfo?.userid) {
+      flag = true;
+    }
+  });
+  return flag;
+};
+let ddUserInfo = localStorage.getItem("ddUserInfo");
+if (ddUserInfo) {
+  ddUserInfo = JSON.parse(ddUserInfo);
+}
+const nonceStr = "pmUsed";
+// 判断当前是否是管理员，加上是否是管理员的判断
+let params = {};
+if (isAdmin()) {
+  params = {}
+}else{
+  params.searchStr = JSON.stringify([{
+    searchName: "deptId",
+    searchType: "equals",
+    searchValue: ddUserInfo?.dept_id_list[0]
+  }]);
+}
+getTaskTypeApi(params)
 .then(res => {
   const { code, data } = res;
   if (code == 200) {
@@ -68,10 +100,6 @@ getTaskTypeApi({})
   }
 })
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
-let ddUserInfo = localStorage.getItem("ddUserInfo");
-if (ddUserInfo) {
-  ddUserInfo = JSON.parse(ddUserInfo);
-}
 setTimeout(() => {
   initDingH5RemoteDebug();
 }, 100);
@@ -92,7 +120,6 @@ const taskTypeEnum = ref([]);
 getTaskTypeEnum().then(res => {
   taskTypeEnum.value = res;
 });
-const nonceStr = "pmUsed";
 
 // const tableData = ref([]);
 
