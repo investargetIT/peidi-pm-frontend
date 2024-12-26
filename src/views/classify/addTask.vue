@@ -2,6 +2,7 @@
 import { ref, watch } from "vue";
 import * as dd from "dingtalk-jsapi";
 import { initDingH5RemoteDebug } from "dingtalk-h5-remote-debug";
+import cardDetail from "./cardDetail.vue";
 import {
   omsGetShops,
   newTask,
@@ -20,6 +21,7 @@ import {
 } from "../../utils/chaohuiapi";
 import Axios from "axios";
 import { message } from "@/utils/message";
+
 const workContentMap = ref([])
 
 getTaskTypeApi({})
@@ -67,9 +69,13 @@ getTaskTypeApi({})
         });
       }
       newTaskData.value.attachments = JSON.parse(JSON.stringify(newArr));
-      console.log('newTaskData.value.attachments', newTaskData.value.attachments);
+      console.log('newTaskData.value.attachments', newTaskData.value);
       
       newTaskData.value.contacters.map(item => {
+        item.name = item.userName;
+        item.emplId = item.userId;
+      });
+      newTaskData.value.workers.map(item => {
         item.name = item.userName;
         item.emplId = item.userId;
       });
@@ -592,6 +598,7 @@ const uploadFile = () => {
 const handleError = () => {
   message("上传失败", { type: "error" });
 }
+
 </script>
 
 <template>
@@ -623,8 +630,8 @@ const handleError = () => {
         </el-col>
         <el-col :span="8">
           <el-form-item class="flex" label="工作类型" prop="workTypeId">
-            <el-select :disabled="isEdit" class="flex-1" v-model="newTaskData.workTypeId" @change="workTypeChange(false)"
-              placeholder="选择工作类型">
+            <el-select :disabled="isEdit" class="flex-1" v-model="newTaskData.workTypeId"
+              @change="workTypeChange(false)" placeholder="选择工作类型">
               <el-option v-for="item in workTypeMap" :label="item.level1" :value="item.id" />
             </el-select>
           </el-form-item>
@@ -712,8 +719,8 @@ const handleError = () => {
           :action="postUrl" :data="{
             path: default_upload_url,
             create_parents: false
-          }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-error="handleError" :before-upload="beforeUpload"
-          :on-success="uploadSuccess" :auto-upload="false" :on-preview="val => {
+          }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-error="handleError"
+          :before-upload="beforeUpload" :on-success="uploadSuccess" :auto-upload="false" :on-preview="val => {
   console.log('val', val);
             
   chaohuiDownload(val.realFileName || val?.row?.name || val.name);

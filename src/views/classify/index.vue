@@ -30,9 +30,19 @@ import axios from "axios";
 import { extractInfo, extractEmplId } from "./utils";
 import { canExamineTask } from "../../utils/permission";
 import Level from "../../components/Common/level.vue";
+import { useRouter, useRoute } from "vue-router";
+import CardDetail from "./cardDetail.vue";
 
+const route = useRoute()
 ddAuthFun();
-
+// 判断carddetail是否展示
+const isShowCardDetail = ref(false);
+// 判断当前url上是否有detailId, 有的话就展示cardDetail,同时获取到detailId, 传递给cardDetail
+const detailId = ref("");
+if (route.query.detailId) {
+  isShowCardDetail.value = true;
+  detailId.value = route.query.detailId;
+}
 const closeTask = (val) => {
   updateTask({
     ...val,
@@ -74,7 +84,7 @@ if (isAdmin()) {
   params.searchStr = JSON.stringify([{
     searchName: "deptId",
     searchType: "equals",
-    searchValue: ddUserInfo?.dept_id_list[0]
+    searchValue:  ddUserInfo?.dept_id_list[0]
   }]);
 }
 getTaskTypeApi(params)
@@ -95,7 +105,7 @@ getTaskTypeApi(params)
     });
     console.log('workTypeEnum.value', workTypeEnum.value);
     
-    activeTab.value = workTypeEnum.value[0].id
+    activeTab.value = workTypeEnum.value[0]?.id
     getCurrentPage();
   }
 })
@@ -586,7 +596,7 @@ const allLength = ref(0);
       layout="total, sizes, prev, pager, next, jumper" :total="allLength" />
     <el-dialog v-model="dialogFormVisible" :title="actionType == 'new' ? '添加新任务' : '修改任务'" width="800">
       <AddTask v-if="dialogFormVisible" @finish="getCurrentPage" @close="dialogFormVisible = false"
-        :actionType="actionType" :taskData="taskData" :examine="true"/>
+        :actionType="actionType" :taskData="taskData" :examine="true" />
     </el-dialog>
     <el-dialog v-model="dialogDeleteVisible" title="" width="500">
       <span>确定删除该任务吗？</span>
@@ -605,6 +615,7 @@ const allLength = ref(0);
     <TaskDetailModal @refresh="getCurrentPage" @closeModal="taskDetailModal.isVisible = false"
       v-if="taskDetailModal.isVisible" :taskDetail="taskDetailModal.taskDetail" :taskStatus="taskStatus">
     </TaskDetailModal>
+    <CardDetail v-if="isShowCardDetail" @examine="updateTaskFun" @closeTask="closeTask" @close="isShowCardDetail =false" :detailId="detailId" />
   </div>
 </template>
 
