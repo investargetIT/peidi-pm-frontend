@@ -620,7 +620,7 @@ const uploadFile = () => {
         </el-col>
         <el-col :span="8">
           <el-form-item class="flex" label="工作类型" prop="workTypeId">
-            <el-select :disabled="isEdit" class="flex-1" v-model="newTaskData.workTypeId" @change="workTypeChange"
+            <el-select :disabled="isEdit" class="flex-1" v-model="newTaskData.workTypeId" @change="workTypeChange(false)"
               placeholder="选择工作类型">
               <el-option v-for="item in workTypeMap" :label="item.level1" :value="item.id" />
             </el-select>
