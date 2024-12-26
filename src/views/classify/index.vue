@@ -190,7 +190,7 @@ const getCurrentPage = () => {
       currentPage.value = res?.data?.records || [];
       currentPage.value.map(item => {
         item.workerAds = [
-          { userId: extractInfo(item.workTypeName).workerMasterId }
+          { userId: workTypeEnum.value.find(item => item.id == activeTab.value).userId }
         ];
       });
       console.log("currentPage1", currentPage.value);
@@ -540,11 +540,13 @@ const allLength = ref(0);
           <template #default="scope">
             <div class="flex">
               <el-button size="small" v-if="!scope.row.workers?.length && !scope.row.predictDuration" color="#171719"
-                :disabled="!canExamineTask(scope.row) || scope.row.statusName == '已关闭'" @click="updateTaskFun(scope.row)">分配</el-button>
+                :disabled="!canExamineTask(scope.row) || scope.row.statusName == '已关闭'"
+                @click="updateTaskFun(scope.row)">分配</el-button>
               <el-button size="small" v-if="scope.row.workers?.length && scope.row.predictDuration" color="#171719"
                 disabled>已分配</el-button>
 
-              <el-button size="small" @click="closeTask(scope.row)" :disabled="scope.row.statusName != '待处理' || (scope.row.workers?.length && scope.row.predictDuration)">
+              <el-button size="small" @click="closeTask(scope.row)"
+                :disabled="scope.row.statusName != '待处理' || (scope.row.workers?.length && scope.row.predictDuration)">
                 关闭
               </el-button>
             </div>
@@ -557,7 +559,7 @@ const allLength = ref(0);
       layout="total, sizes, prev, pager, next, jumper" :total="allLength" />
     <el-dialog v-model="dialogFormVisible" :title="actionType == 'new' ? '添加新任务' : '修改任务'" width="800">
       <AddTask v-if="dialogFormVisible" @finish="getCurrentPage" @close="dialogFormVisible = false"
-        :actionType="actionType" :taskData="taskData" />
+        :actionType="actionType" :taskData="taskData" :examine="true"/>
     </el-dialog>
     <el-dialog v-model="dialogDeleteVisible" title="" width="500">
       <span>确定删除该任务吗？</span>

@@ -100,7 +100,7 @@ defineOptions({
   name: "addTask"
 });
 const emit = defineEmits(["close", "finish"]);
-const { actionType, taskData } = defineProps(["actionType", "taskData"]);
+const { actionType, taskData, examine } = defineProps(["actionType", "taskData", "examine"]);
 let ddUserInfo = localStorage.getItem("ddUserInfo");
 if (ddUserInfo) {
   ddUserInfo = JSON.parse(ddUserInfo);
@@ -348,7 +348,8 @@ const updateTaskFun = async () => {
             userName: item.name,
             userId: item.emplId
           };
-        })
+        }),
+        isExamine: examine
       }).then(res => {
         const { code, data } = res;
         if (code == 200) {

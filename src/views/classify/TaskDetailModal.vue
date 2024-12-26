@@ -105,7 +105,7 @@
           :action="postUrl" :data="{
             path: default_upload_url,
             create_parents: false
-          }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :before-upload="beforeUpload"
+          }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-remove="removeFule" :before-upload="beforeUpload"
           :on-success="uploadSuccess" :auto-upload="false" :on-preview="val => {
             chaohuiDownload(val.realFileName || val?.row?.name || val.name);
           }
@@ -261,6 +261,13 @@ const beforeUpload = () => {
   return true;
 };
 
+const removeFule = () => {
+  setTimeout(() => {
+    console.log('remove', taskData.value.attachments.length);
+    updateTaskInfo();
+  }, 300);
+}
+
 const uploadSuccess = res => {
   loading.value = false;
   taskData.value.attachments.map(item => {
@@ -289,7 +296,7 @@ const updateTaskInfo = val => {
   updateTask({
     ...taskData.value,
     attachments: getFileName(taskData.value.attachments),
-    workerIds: newTaskData.value.workers.map(item => {
+    workerIds: taskData.value.workers.map(item => {
       return {
         userName: item.name,
         userId: item.emplId
