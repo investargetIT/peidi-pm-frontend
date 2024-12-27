@@ -2,7 +2,7 @@
   <el-dialog v-model="jjj" class="relative" :before-close="close" title="任务详情" width="1000px">
     <el-select v-if="taskData.statusId" @change="updateTaskInfo" class="!absolute right-6 top-14 !w-[150px]"
       v-model="taskData.statusId" :disabled="!canUpdateTaskStatus(taskData)" placeholder="任务状态">
-      <el-option v-for="item in taskStatus" :label="item.value" :value="item.id"></el-option>
+      <el-option v-for="item in taskStatus" :disabled="canChangeStatus(item)" :label="item.value" :value="item.id"></el-option>
     </el-select>
     <div class="task-detail-header">
       <Level :level="taskData.priorityName" />
@@ -235,6 +235,19 @@ const handleChange = (file) => {
   uploadRef.value.submit();
   // loading.value = true;
   console.log(file.raw)
+}
+
+const canChangeStatus = (item) => {
+  if (item.id < taskData.value.statusId){
+    return true;
+  }
+  if (item.value == '已关闭') {
+    return true;
+  }
+  // 如果是待处理，那么可以修改为任何状态
+  if (item.value == '待处理') {
+    return false;
+  }
 }
 testAllIPs().then(res => {
   if (res.sid) {
