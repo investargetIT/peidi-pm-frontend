@@ -28,7 +28,7 @@ import {
 } from "../../api/pmApi";
 import axios from "axios";
 import { extractInfo, extractEmplId } from "./utils";
-import { canExamineTask } from "../../utils/permission";
+import { canExamineTask, canCloseTask } from "../../utils/permission";
 import Level from "../../components/Common/level.vue";
 import { useRouter, useRoute } from "vue-router";
 import CardDetail from "./cardDetail.vue";
@@ -583,7 +583,7 @@ const allLength = ref(0);
                 disabled>已分配</el-button>
 
               <el-button size="small" @click="closeTask(scope.row)"
-                :disabled="scope.row.statusName != '待处理' || (scope.row.workers?.length && scope.row.predictDuration)">
+                :disabled="scope.row.statusName != '待处理' || !(canCloseTask(scope.row)) || (scope.row.workers?.length && scope.row.predictDuration)">
                 关闭
               </el-button>
             </div>

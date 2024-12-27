@@ -494,7 +494,7 @@ const allLength = ref(0);
         </el-table-column>
         <el-table-column label="操作">
           <template #default="scope">
-            <el-button @click="closeTask(scope.row)" :disabled="scope.row.statusName != '待处理'">
+            <el-button @click="closeTask(scope.row)" :disabled="scope.row.statusName != '待处理' || (scope.row.workers?.length && scope.row.predictDuration)">
               关闭
             </el-button>
           </template>

@@ -31,6 +31,25 @@ export const canViewTask = data => {
   );
 };
 
+// 当前登陆人是否可以关闭任务
+export const canCloseTask = data => {
+  // creator workerAds
+    let ddUserInfo = localStorage.getItem("ddUserInfo");
+  if (ddUserInfo) {
+    ddUserInfo = JSON.parse(ddUserInfo);
+  } else {
+    return false;
+  }
+  let userId = ddUserInfo?.userid;
+  const { contacters, contacterAds, creator, creatorAds, workers, workerAds } =
+    data;
+  // return isInArr(userId, contacterAds)
+  console.log("canExamineTask", userId, workerAds);
+  // 测试是自己
+  // return isInArr(userId, [{ userId }])
+  return isInArr(userId, workerAds) || isCreator(userId, creator);
+}
+
 // 当前登陆人是否可以审核任务
 export const canExamineTask = data => {
   // workerAds
