@@ -303,8 +303,8 @@ const updateTaskInfo = val => {
     attachments: getFileName(taskData.value.attachments),
     workerIds: taskData.value.workers.map(item => {
       return {
-        userName: item.name,
-        userId: item.emplId
+        userName: item.name || item.userName,
+        userId: item.emplId || item.userId
       };
     }),
 

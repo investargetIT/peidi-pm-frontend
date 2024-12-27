@@ -367,12 +367,15 @@ const updateTaskFun = async () => {
     }
   });
 };
+let typePri = 0;
+let contentPrii = 0;
 const changePri = () => {
   console.log('newTaskData.value.taskTypeId', taskTypeMap.value, newTaskData.value.taskTypeId);
   
   let item = taskTypeMap.value.find(item => item.id == newTaskData.value.taskTypeId)
   if (item.priorityLevel1Id) {
-    newTaskData.value.priorityId = Number(item.priorityLevel1Id);
+    typePri = Number(item.priorityLevel1Id);
+    newTaskData.value.priorityId = Math.max(typePri, contentPrii);
   }
 }
 const addNewTask = async () => {
@@ -462,6 +465,8 @@ const workTypeChange = (val = false) => {
   // 当前的level1是
   if (!val) {
     newTaskData.value.workContentId = ''; 
+    downloadFileName.value = [];
+
   }
   let level1Name = workTypeMap.value.find(item => item.id === newTaskData.value.workTypeId).level1;
   let newlevel2 = [];
@@ -487,7 +492,9 @@ const workTypeChange = (val = false) => {
 const workContentChange = () => {
   let item = workContentList.value.find(item => item.id == newTaskData.value.workContentId)
   if (item.id && item.priority) {
-    newTaskData.value.priorityId = item.priority;
+    contentPrii = Number(item.priority);
+
+    newTaskData.value.priorityId = Math.max(typePri, contentPrii);
   }
   if (item.id && item.mark) {
     downloadFileName.value = item.mark.split('&')
