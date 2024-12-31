@@ -723,6 +723,9 @@ const handleError = () => {
       </el-form-item>
       <el-form-item label="附件上传" prop="attachments">
         <el-upload ref="uploadRef" v-model:file-list="newTaskData.attachments" class="upload-demo w-full"
+        :class="{
+  'not-show-delete': newTaskData.statusName == '已完成'
+        }"
           :action="postUrl" :data="{
             path: default_upload_url,
             create_parents: false
@@ -733,7 +736,7 @@ const handleError = () => {
   chaohuiDownload(val.realFileName || val?.row?.name || val.name);
             }
             " list-type="text">
-          <el-button>选择文件</el-button>
+          <el-button :disabled="newTaskData.statusName == '已完成'">选择文件</el-button>
         </el-upload>
       </el-form-item>
       <el-form-item label="链接上传" prop="links">
@@ -785,5 +788,15 @@ const handleError = () => {
   cursor: pointer;
   border: 1px solid #aaa;
   border-radius: 8px;
+}
+</style>
+<style>
+.not-show-delete{
+  .el-icon--close{
+    display: none !important;
+  }
+  .el-icon--close-tip{
+    display: none !important;
+  }
 }
 </style>

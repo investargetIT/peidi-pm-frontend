@@ -2,7 +2,8 @@
   <el-dialog v-model="jjj" class="relative" :before-close="close" title="任务详情" width="1000px">
     <el-select v-if="taskData.statusId" @change="updateTaskInfo" class="!absolute right-6 top-14 !w-[150px]"
       v-model="taskData.statusId" :disabled="!canUpdateTaskStatus(taskData)" placeholder="任务状态">
-      <el-option v-for="item in taskStatus" :disabled="canChangeStatus(item)" :label="item.value" :value="item.id"></el-option>
+      <el-option v-for="item in taskStatus" :disabled="canChangeStatus(item)" :label="item.value"
+        :value="item.id"></el-option>
     </el-select>
     <div class="task-detail-header">
       <Level :level="taskData.priorityName" />
@@ -102,7 +103,9 @@
           <el-button type="primary">选择文件</el-button>
         </el-upload> -->
         <el-upload ref="uploadRef" v-model:file-list="taskData.attachments" class="upload-demo123 upload-demo w-full"
-          :action="postUrl" :on-error="handleError" :data="{
+          :class="{
+  'not-show-delete': taskData.statusName == '已完成'
+          }" :action="postUrl" :on-error="handleError" :data="{
             path: default_upload_url,
             create_parents: false
           }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-remove="removeFule"
@@ -110,7 +113,7 @@
             chaohuiDownload(val.realFileName || val?.row?.name || val.name);
           }
             " list-type="text">
-          <el-button>选择文件</el-button>
+          <el-button :disabled="taskData.statusName == '已完成'">选择文件</el-button>
         </el-upload>
       </el-tab-pane>
       <el-tab-pane label="关联链接" name="relatedLink">
@@ -586,6 +589,18 @@ getTaskRecordFun();
 .upload-demo123 {
   .el-upload {
     transform: translate(880px, -26px);
+  }
+}
+
+</style>
+<style>
+.not-show-delete {
+  .el-icon--close {
+    display: none !important;
+  }
+
+  .el-icon--close-tip {
+    display: none !important;
   }
 }
 </style>
