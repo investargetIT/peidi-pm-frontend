@@ -33,9 +33,9 @@
       </p>
       <template #footer>
         <div class=" w-full flex">
-          <el-button color="#171719" v-if="detail.statusName == '待处理'" @click="examine">分配任务</el-button>
-          <el-button color="#171719" v-if="detail.statusName != '待处理'" @click="examine">已分配</el-button>
-          <el-button :disabled="detail.statusName != '待处理'" @click="close">关闭任务</el-button>
+          <el-button color="#171719" v-if="!detail.workers?.length" @click="examine">分配任务</el-button>
+          <el-button color="#171719" v-if="detail.workers?.length" :disabled="true">已分配</el-button>
+          <el-button :disabled="detail.workers?.length" @click="close">关闭任务</el-button>
         </div>
       </template>
     </el-card>
