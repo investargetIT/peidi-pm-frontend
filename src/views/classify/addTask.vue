@@ -671,8 +671,8 @@ const handleError = () => {
         </el-col>
         <el-col :span="12">
           <el-form-item label="期望结束日期" prop="expectEndDate">
-            <el-date-picker class="!w-full" :disabled="isEdit" v-model="newTaskData.expectEndDate" type="date"
-              placeholder="选择期望结束日期" />
+            <el-date-picker class="!w-full" :disabled="isEdit" v-model="newTaskData.expectEndDate" format="YYYY/MM/DD"
+              value-format="YYYY-MM-DD" type="date" placeholder="选择期望结束日期" />
           </el-form-item>
         </el-col>
       </el-row>
@@ -684,8 +684,8 @@ const handleError = () => {
         </el-col>
         <el-col :span="12">
           <el-form-item label="交付时间" prop="endTime">
-            <el-date-picker class="!w-full" :disabled-date="disabledDate" :disabled="isNew || isMy"
-              v-model="newTaskData.endTime" type="date" placeholder="选择交付时间" />
+            <el-date-picker class="!w-full" :disabled-date="disabledDate" :disabled="isNew || isMy" format="YYYY/MM/DD"
+              value-format="YYYY-MM-DD" v-model="newTaskData.endTime" type="date" placeholder="选择交付时间" />
             <!-- <el-date-picker class="!w-full" :disabled-date="disabledDate" :disabled="isEdit"
               v-model="newTaskData.endTime" type="date" placeholder="选择交付时间" /> -->
           </el-form-item>
