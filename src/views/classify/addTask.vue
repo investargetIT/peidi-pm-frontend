@@ -722,11 +722,9 @@ const handleError = () => {
         <el-input :disabled="isEdit" type="textarea" v-model="newTaskData.description" autocomplete="off" />
       </el-form-item>
       <el-form-item label="附件上传" prop="attachments">
-        <el-upload ref="uploadRef" v-model:file-list="newTaskData.attachments" class="upload-demo w-full"
-        :class="{
+        <el-upload ref="uploadRef" v-model:file-list="newTaskData.attachments" class="upload-demo w-full" :class="{
   'not-show-delete': newTaskData.statusName == '已完成'
-        }"
-          :action="postUrl" :data="{
+        }" :disabled="newTaskData.statusName == '已完成'" :action="postUrl" :data="{
             path: default_upload_url,
             create_parents: false
           }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-error="handleError"

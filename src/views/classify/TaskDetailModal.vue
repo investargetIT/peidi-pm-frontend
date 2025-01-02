@@ -102,8 +102,8 @@
         >
           <el-button type="primary">选择文件</el-button>
         </el-upload> -->
-        <el-upload ref="uploadRef" v-model:file-list="taskData.attachments" class="upload-demo123 upload-demo w-full"
-          :class="{
+        <el-upload ref="uploadRef" :disabled="taskData.statusName == '已完成'" v-model:file-list="taskData.attachments"
+          class="upload-demo123 upload-demo w-full" :class="{
   'not-show-delete': taskData.statusName == '已完成'
           }" :action="postUrl" :on-error="handleError" :data="{
             path: default_upload_url,
