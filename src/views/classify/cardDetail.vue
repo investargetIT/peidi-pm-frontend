@@ -52,6 +52,8 @@ import {
   getOneTask,
   updateTask
 } from "../../api/pmApi";
+import { useRouter } from 'vue-router';
+const router = useRouter();
 const jjj = ref(true)
 const { visible, detailId } = defineProps(['visible', 'detailId'])
 const emit = defineEmits(['closeTask', 'close','examine'])
@@ -62,6 +64,15 @@ getOneTask({
   const { code, data } = res;
   if (code == 200) {
     detail.value = data;
+    if (detail.value?.statusName != '待处理') {
+      // 把当前url的detailId的参数给去掉
+      const query = { ...router.currentRoute.value.query };
+      delete query.detailId;
+      router.replace({ query });
+      emit('close')
+    }
+  }else{
+    emit('close')
   }
 });
 
