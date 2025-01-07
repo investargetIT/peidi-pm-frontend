@@ -324,7 +324,7 @@ const updateTaskInfo = val => {
         userId: item.emplId || item.userId
       };
     }),
-
+    updateUser: { userName: ddUserInfo.name, userId: ddUserInfo.userid }
   }).then(res => {
     const { code } = res;
     if (code == 200) {
