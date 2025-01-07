@@ -134,6 +134,7 @@ if (ddUserInfo) {
 const isNew = actionType == "new";
 const isEdit = actionType == "edit"
 const isMy = actionType == 'my';
+
 console.log("taskData", taskData);
 
 const taskUnitMap: any = ref([]);
@@ -280,6 +281,14 @@ const resetData = () => {
   newTaskData.value = JSON.parse(JSON.stringify(newTaskDataDefault));
   downloadFileName.value = [];
 };
+if (isNew) {
+  newTaskData.value.contacters = [
+    {
+      name: ddUserInfo.name,
+      emplId: ddUserInfo.userid
+    }
+  ]
+}
 const delteHelper = index => {
   if (isMy) {
     return
