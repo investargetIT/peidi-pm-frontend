@@ -435,17 +435,23 @@ const updateTaskFun = data => {
   let newArr: any = [];
   if (data.attachments) {
     data.attachments.map(item => {
-      newArr.push({
-        raw: {
-          name: item
-        },
-        response: {
-          success: true
-        },
-        name: item,
-        status: "success",
-        uid: Date.now()
-      });
+      if (!item.response) {
+        newArr.push({
+          raw: {
+            name: item
+          },
+          response: {
+            success: true
+          },
+          name: item,
+          status: "success",
+          uid: Date.now()
+        });
+      } else {
+        newArr.push({
+          ...item
+        })
+      }
     });
   }
   data.attachments = JSON.parse(JSON.stringify(newArr));
