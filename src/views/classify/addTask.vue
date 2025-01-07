@@ -21,6 +21,8 @@ import {
 } from "../../utils/chaohuiapi";
 import Axios from "axios";
 import { message } from "@/utils/message";
+import { ElLoading } from "element-plus";
+
 
 const workContentMap = ref([])
 
@@ -328,6 +330,10 @@ const updateTaskFun = async () => {
   await formRef.value.validate((valid, fields) => {
     console.log('newTaskData.value.attachments', newTaskData.value.attachments);
     if (valid) {
+      const loadingInstance1 = ElLoading.service({
+        fullscreen: true,
+        text: "更新中..."
+      });
       updateTask({
         id: Number(newTaskData.value.id),
         attachments: getFileName(newTaskData.value.attachments),
@@ -363,7 +369,9 @@ const updateTaskFun = async () => {
           emit("finish");
           emit("close");
         }
-      });
+      }).finally(() => {
+        loadingInstance1.close()
+      })
     }
   });
 };
@@ -384,6 +392,10 @@ const addNewTask = async () => {
   }
   await formRef.value.validate((valid, fields) => {
     if (valid) {
+      const loadingInstance1 = ElLoading.service({
+        fullscreen: true,
+        text: "添加中..."
+      });
       newTask({
         attachments: (getFileName(newTaskData.value.attachments)),
         businessUnit: newTaskData.value.businessUnit,
@@ -413,7 +425,9 @@ const addNewTask = async () => {
           emit("finish");
           emit("close");
         }
-      });
+      }).finally(() => {
+        loadingInstance1.close();
+      })
     }
   });
 };
