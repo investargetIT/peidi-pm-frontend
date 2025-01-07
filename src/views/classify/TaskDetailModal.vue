@@ -1,87 +1,88 @@
 <template>
   <el-dialog v-model="jjj" class="relative" :before-close="close" title="任务详情" width="1000px">
-    <el-select v-if="taskData.statusId" @change="updateTaskInfo" class="!absolute right-6 top-14 !w-[150px]"
-      v-model="taskData.statusId" :disabled="!canUpdateTaskStatus(taskData)" placeholder="任务状态">
-      <el-option v-for="item in taskStatus" :disabled="canChangeStatus(item)" :label="item.value"
-        :value="item.id"></el-option>
-    </el-select>
-    <div class="task-detail-header">
-      <Level :level="taskData.priorityName" />
-      <span style="font-size: 20px; font-weight: 600">{{
-        taskData.title
-        }}</span>
-    </div>
-    <div class="task-detail-header">
-      <span class="task-created-updated">
-        创建于 {{ dayjs(taskData.createdAt).format("YYYY/MM/DD") }} 最近更新于
-        {{ dayjs(taskData.updateAt).format("YYYY/MM/DD") }}
-      </span>
-    </div>
-    <el-form v-if="taskData.contacters" :model="taskForm">
-      <el-row :gutter="20">
-        <el-col :span="12">
-          <el-form-item label="对接人">
-            <span>{{ taskData.contacters[0].userName }}</span>
-          </el-form-item></el-col>
-
-        <el-col :span="12">
-          <el-form-item label="承接人">
-            <span>{{
-              (taskData.workers &&
-              taskData.workers.length &&
-              taskData.workers[0]?.userName) ||
-              "无"
-              }}</span>
-          </el-form-item></el-col>
-      </el-row>
-      <el-row :gutter="20">
-        <el-col :span="12">
-          <el-form-item label="任务类型">
-            <span>{{ taskData.taskTypeName }}</span>
-          </el-form-item></el-col>
-
-        <el-col :span="12">
-          <el-form-item label="工作类型">
-            <span>{{ extractInfo(taskData.workTypeName).name }}</span>
-          </el-form-item></el-col>
-      </el-row>
-      <el-form-item label="预估工时">
-        <span>{{
-          taskData.predictDuration ? taskData.predictDuration : "无"
+    <div v-loading="loading" element-loading-text="上传中。。。">
+      <el-select v-if="taskData.statusId" @change="updateTaskInfo" class="!absolute right-6 top-14 !w-[150px]"
+        v-model="taskData.statusId" :disabled="!canUpdateTaskStatus(taskData)" placeholder="任务状态">
+        <el-option v-for="item in taskStatus" :disabled="canChangeStatus(item)" :label="item.value"
+          :value="item.id"></el-option>
+      </el-select>
+      <div class="task-detail-header">
+        <Level :level="taskData.priorityName" />
+        <span style="font-size: 20px; font-weight: 600">{{
+          taskData.title
           }}</span>
-      </el-form-item>
-    </el-form>
-    <el-tabs v-if="taskData.contacters" v-model="activeTab">
-      <el-tab-pane label="工作记录" name="workRecord">
-        <p class="title">工作记录</p>
-        <el-table height="250" :data="workRecords" style="width: 100%">
-          <el-table-column prop="content" label="工作内容"></el-table-column>
-          <el-table-column prop="timeRange" label="工作时间范围"></el-table-column>
-          <el-table-column prop="workerName" label="承接人"></el-table-column>
-          <el-table-column prop="createdAt" label="记录时间"></el-table-column>
-          <el-table-column width="180px" label="操作" class="flex">
-            <template class="flex" #default="scope">
-              <div class="flex">
-                <el-button @click="editRecordDetail(scope.row)" :disabled="!canUpdateTaskRecord(taskData)" size="small"
-                  type="default">修改</el-button>
-                <el-button @click="openRecordDetail(scope.row)" :disabled="!canUpdateTaskRecord(taskData)" size="small"
-                  type="default">详细</el-button>
-                <el-button @click="deleteTaskFun(scope.row)" :disabled="!canUpdateTaskRecord(taskData)" size="small"
-                  type="default">删除</el-button>
-              </div>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div class="task-record-button">
-          <el-button @click="
+      </div>
+      <div class="task-detail-header">
+        <span class="task-created-updated">
+          创建于 {{ dayjs(taskData.createdAt).format("YYYY/MM/DD") }} 最近更新于
+          {{ dayjs(taskData.updateAt).format("YYYY/MM/DD") }}
+        </span>
+      </div>
+      <el-form v-if="taskData.contacters" :model="taskForm">
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="对接人">
+              <span>{{ taskData.contacters[0].userName }}</span>
+            </el-form-item></el-col>
+
+          <el-col :span="12">
+            <el-form-item label="承接人">
+              <span>{{
+                (taskData.workers &&
+                  taskData.workers.length &&
+                  taskData.workers[0]?.userName) ||
+                "无"
+                }}</span>
+            </el-form-item></el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="任务类型">
+              <span>{{ taskData.taskTypeName }}</span>
+            </el-form-item></el-col>
+
+          <el-col :span="12">
+            <el-form-item label="工作类型">
+              <span>{{ extractInfo(taskData.workTypeName).name }}</span>
+            </el-form-item></el-col>
+        </el-row>
+        <el-form-item label="预估工时">
+          <span>{{
+            taskData.predictDuration ? taskData.predictDuration : "无"
+            }}</span>
+        </el-form-item>
+      </el-form>
+      <el-tabs v-if="taskData.contacters" v-model="activeTab">
+        <el-tab-pane label="工作记录" name="workRecord">
+          <p class="title">工作记录</p>
+          <el-table height="250" :data="workRecords" style="width: 100%">
+            <el-table-column prop="content" label="工作内容"></el-table-column>
+            <el-table-column prop="timeRange" label="工作时间范围"></el-table-column>
+            <el-table-column prop="workerName" label="承接人"></el-table-column>
+            <el-table-column prop="createdAt" label="记录时间"></el-table-column>
+            <el-table-column width="180px" label="操作" class="flex">
+              <template class="flex" #default="scope">
+                <div class="flex">
+                  <el-button @click="editRecordDetail(scope.row)" :disabled="!canUpdateTaskRecord(taskData)"
+                    size="small" type="default">修改</el-button>
+                  <el-button @click="openRecordDetail(scope.row)" :disabled="!canUpdateTaskRecord(taskData)"
+                    size="small" type="default">详细</el-button>
+                  <el-button @click="deleteTaskFun(scope.row)" :disabled="!canUpdateTaskRecord(taskData)" size="small"
+                    type="default">删除</el-button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="task-record-button">
+            <el-button @click="
               showWorkRecord = true;
-              openType = 'new';
+            openType = 'new';
             " :disabled="!canAddTaskRecord(taskData)" type="default">新增工作记录</el-button>
-        </div>
-      </el-tab-pane>
-      <el-tab-pane v-loading="loading" element-loading-text="上传中。。。" label="文件附件" name="fileAttachment">
-        <p class="title">文件附件</p>
-        <!-- <el-upload
+          </div>
+        </el-tab-pane>
+        <el-tab-pane label="文件附件" name="fileAttachment">
+          <p class="title">文件附件</p>
+          <!-- <el-upload
           v-model:file-list="taskData.attachments"
           class="upload-demo123"
           :action="postUrl"
@@ -102,36 +103,36 @@
         >
           <el-button type="primary">选择文件</el-button>
         </el-upload> -->
-        <el-upload ref="uploadRef" :disabled="taskData.statusName == '已完成'" v-model:file-list="taskData.attachments"
-          class="upload-demo123 upload-demo w-full" :class="{
-  'not-show-delete': taskData.statusName == '已完成'
-          }" :action="postUrl" :on-error="handleError" :data="{
+          <el-upload ref="uploadRef" :disabled="taskData.statusName == '已完成'" v-model:file-list="taskData.attachments"
+            class="upload-demo123 upload-demo w-full" :class="{
+              'not-show-delete': taskData.statusName == '已完成'
+            }" :action="postUrl" :on-error="handleError" :data="{
             path: default_upload_url,
             create_parents: false
           }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-remove="removeFule"
-          :before-upload="beforeUpload" :on-success="uploadSuccess" :auto-upload="false" :on-preview="val => {
-            chaohuiDownload(val.realFileName || val?.row?.name || val.name);
-          }
-            " list-type="text">
-          <el-button :disabled="taskData.statusName == '已完成'">选择文件</el-button>
-        </el-upload>
-      </el-tab-pane>
-      <el-tab-pane label="关联链接" name="relatedLink">
-        <div class="flex justify-between align-middle">
-          <p class="title">关联链接</p>
-          <el-button @click="newLinkModal = true" type="primary">新增链接</el-button>
-        </div>
+            :before-upload="beforeUpload" :on-success="uploadSuccess" :auto-upload="false" :on-preview="val => {
+              chaohuiDownload(val.realFileName || val?.row?.name || val.name);
+            }
+              " list-type="text">
+            <el-button :disabled="taskData.statusName == '已完成'">选择文件</el-button>
+          </el-upload>
+        </el-tab-pane>
+        <el-tab-pane label="关联链接" name="relatedLink">
+          <div class="flex justify-between align-middle">
+            <p class="title">关联链接</p>
+            <el-button @click="newLinkModal = true" type="primary">新增链接</el-button>
+          </div>
 
-        <el-tag class="mr-4" type="primary" @click="
-            () => {
+          <el-tag class="mr-4" type="primary" @click="() => {
               console.log('dddddd');
             }
-          " v-for="item in taskData.links">{{ item }}</el-tag>
-        <p class="text-center m-8" v-if="!taskData.links.length">
-          暂无关联链接
-        </p>
-      </el-tab-pane>
-    </el-tabs>
+            " v-for="item in taskData.links">{{ item }}</el-tag>
+          <p class="text-center m-8" v-if="!taskData.links.length">
+            暂无关联链接
+          </p>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
   </el-dialog>
   <el-dialog v-model="showWorkRecord" width="500px" :title="openType == 'new' ? '新增工作记录' : '编辑工作记录'">
     <el-form :rules="taskRules" ref="formRef" :model="workRecordData" label-width="auto" style="max-width: 600px">
@@ -236,7 +237,7 @@ const handleChange = (file) => {
   f.uid = file.uid; // new File 没有uid属性，会导致组件底层报错，这里手动加上
   file.raw = f;  // 用f替换file的数据
   uploadRef.value.submit();
-  // loading.value = true;
+  loading.value = true;
   console.log(file.raw)
 }
 

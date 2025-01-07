@@ -4,7 +4,7 @@ export const default_upload_url = "/web_packages/test/uploadFile";
 import { message } from "@/utils/message";
 
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
-const port = 5000;
+const port = 5001;
 const USERNAME = "夏琰";
 const PASSWORD = "X81y0122";
 let sid = "";
@@ -27,12 +27,12 @@ const ipsName = [
 import { jsonp } from "vue-jsonp";
 
 const testResults: any = [];
-let uploadUrl = "";
+let uploadUrl = "http://9vx396nm1505.vicp.fun:6001";
 
 const testIPWithJsonp = ip => {
   return new Promise((resolve, reject) => {
     jsonp(
-      `http://${ip}:${port}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`,
+      `https://${ip}:${port}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`,
       {
         callbackName: "callback", // 自定义回调函数名，需和服务端配合
         timeout: 2000 // 设置超时时间（单位毫秒）
@@ -68,50 +68,7 @@ const testIPWithJsonp = ip => {
 export const testAllIPs = async () => {
 
   return new Promise((resolve, reject) => {
-    let localIp = localStorage.getItem('ipThis')
-    if (localIp) {
-      console.log('has localIp',localIp);
-      
-      uploadUrl = `http://${localIp}:6001`;
-      resolve(chaohuilogin());
-    }else{
-      console.log('no localIp',localIp);
-
-    const loadingInstance1 = ElLoading.service({
-      fullscreen: true,
-      text: "上传地址查询中。。。"
-    });
-    Promise.race([
-      testIPWithJsonp(ipsName[0].url),
-      testIPWithJsonp(ipsName[1].url),
-      testIPWithJsonp(ipsName[2].url)
-    ])
-      .then(res => {
-        console.log("Promise race", res);
-      })
-      .catch(err => {
-        console.log("ddsqqqqqq");
-
-        console.log("Promise race err", err);
-        const { ip, error } = err;
-        if (error.statusText != "Request Timeout") {
-          localStorage.setItem('ipThis',ip)
-          uploadUrl = `http://${ip}:6001`;
-          // uploadUrl = `http://192.168.2.52:3000`;
-          console.log("ssss");
-          loadingInstance1.close();
-          resolve(chaohuilogin());
-        }
-      })
-      .finally(() => {
-        console.log('finally',localStorage.getItem('ipThis'));
-        
-        loadingInstance1.close();
-        if (!localStorage.getItem('ipThis')) {
-        message("peidi局域网连接失败,上传无法使用", { type: "error" });
-        }
-      });
-    }
+    resolve(chaohuilogin());
   });
 };
 
@@ -121,13 +78,14 @@ export const chaohuilogin = () => {
   console.log("ddddd");
     const loadingInstance1 = ElLoading.service({
       fullscreen: true,
-      text: "上传地址查询中。。。"
+      text: "局域网上传连接中。。。"
     });
   return new Promise((resolve, reject) => {
     Axios.get(
       `${uploadUrl}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`
     )
       .then(res => {
+        
         if (res?.data?.data?.sid) {
           sid = res?.data?.data?.sid;
           resolve({
@@ -137,13 +95,13 @@ export const chaohuilogin = () => {
         }
         // localStorage.setItem('QunHuiToken', res.data.data.sid)
         // resolve(res.data.data.sid)
-        console.log("res", res);
+        console.log("res-------", res);
       })
       .catch(err => {
         // reject(err)
         console.log("chaohuilogin err", err);
         localStorage.removeItem('ipThis');
-        testAllIPs();
+        // testAllIPs();
       })
           .finally(() => {
       loadingInstance1.close();

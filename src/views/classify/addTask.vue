@@ -589,7 +589,7 @@ const handleChange = (file) => {
   f.uid = file.uid; // new File 没有uid属性，会导致组件底层报错，这里手动加上
   file.raw = f;  // 用f替换file的数据
   uploadRef.value.submit();
-  // loading.value = true;
+  loading.value = true;
   console.log(file.raw)
 }
 
@@ -752,10 +752,10 @@ const handleError = () => {
     </el-form>
     <!-- <template #footer> -->
     <div class="dialog-footer">
-      <el-button type="primary" @click="isNew ? addNewTask() : updateTaskFun()">
+      <el-button type="primary" :disabled="loading" @click="isNew ? addNewTask() : updateTaskFun()">
         立即提交
       </el-button>
-      <el-button type="default" :disabled="isEdit" @click="resetData">
+      <el-button type="default" :disabled="isEdit || loading" @click="resetData">
         重置
       </el-button>
     </div>
