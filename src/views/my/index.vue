@@ -37,7 +37,7 @@ import {
   ElButton,
   dayjs
 } from "element-plus";
-import { updateExpectData } from "../../utils/permission";
+import { updateExpectData, isSuperAdmin } from "../../utils/permission";
 import Level from "../../components/Common/level.vue";
 import { useRoute } from 'vue-router'
 const route = useRoute()
@@ -52,7 +52,11 @@ if (ddUserInfo) {
 setTimeout(() => {
   initDingH5RemoteDebug();
 }, 100);
-
+const isSuperAdminUser = ref(false);
+isSuperAdmin()
+.then(res => {
+  isSuperAdminUser.value = res;
+})
 const taskStatus = ref([]);
 getStatusEnum().then(res => {
   taskStatus.value = res;
@@ -497,7 +501,7 @@ const allLength = ref(0);
         </el-table-column>
         <el-table-column label="操作">
           <template #default="scope">
-            <el-button @click="closeTask(scope.row)" :disabled="scope.row.statusName != '待处理' || (scope.row.workers?.length && scope.row.predictDuration)">
+            <el-button @click="closeTask(scope.row)" :disabled="!isSuperAdminUser && (scope.row.statusName != '待处理' || (scope.row.workers?.length && scope.row.predictDuration))">
               关闭
             </el-button>
           </template>

@@ -2,8 +2,8 @@
   <el-dialog v-model="jjj" class="relative" :before-close="close" title="任务详情" width="1000px">
     <div v-loading="loading" element-loading-text="上传中。。。">
       <el-select v-if="taskData.statusId" @change="updateTaskInfo" class="!absolute right-6 top-14 !w-[150px]"
-        v-model="taskData.statusId" :disabled="!canUpdateTaskStatus(taskData)" placeholder="任务状态">
-        <el-option v-for="item in taskStatus" :disabled="canChangeStatus(item)" :label="item.value"
+        v-model="taskData.statusId" :disabled="!isSuperAdminUser && !canUpdateTaskStatus(taskData)" placeholder="任务状态">
+        <el-option v-for="item in taskStatus" :disabled="!isSuperAdminUser && canChangeStatus(item)" :label="item.value"
           :value="item.id"></el-option>
       </el-select>
       <div class="task-detail-header">
@@ -63,11 +63,11 @@
             <el-table-column width="180px" label="操作" class="flex">
               <template class="flex" #default="scope">
                 <div class="flex">
-                  <el-button @click="editRecordDetail(scope.row)" :disabled="!canUpdateTaskRecord(taskData)"
+                  <el-button @click="editRecordDetail(scope.row)" :disabled="!isSuperAdminUser && !canUpdateTaskRecord(taskData)"
                     size="small" type="default">修改</el-button>
-                  <el-button @click="openRecordDetail(scope.row)" :disabled="!canUpdateTaskRecord(taskData)"
+                  <el-button @click="openRecordDetail(scope.row)" :disabled="!isSuperAdminUser && !canUpdateTaskRecord(taskData)"
                     size="small" type="default">详细</el-button>
-                  <el-button @click="deleteTaskFun(scope.row)" :disabled="!canUpdateTaskRecord(taskData)" size="small"
+                  <el-button @click="deleteTaskFun(scope.row)" :disabled="!isSuperAdminUser && !canUpdateTaskRecord(taskData)" size="small"
                     type="default">删除</el-button>
                 </div>
               </template>
@@ -77,7 +77,7 @@
             <el-button @click="
               showWorkRecord = true;
             openType = 'new';
-            " :disabled="!canAddTaskRecord(taskData)" type="default">新增工作记录</el-button>
+            " :disabled="!isSuperAdminUser && !canAddTaskRecord(taskData)" type="default">新增工作记录</el-button>
           </div>
         </el-tab-pane>
         <el-tab-pane label="文件附件" name="fileAttachment">
@@ -103,7 +103,7 @@
         >
           <el-button type="primary">选择文件</el-button>
         </el-upload> -->
-          <el-upload :before-remove="handleRemove" ref="uploadRef" :disabled="taskData.statusName == '已完成'"
+          <el-upload :before-remove="handleRemove" ref="uploadRef" :disabled="!isSuperAdminUser && taskData.statusName == '已完成'"
             v-model:file-list="taskData.attachments" class="upload-demo123 upload-demo w-full" :class="{
               'not-show-delete': taskData.statusName == '已完成'
             }" :action="postUrl" :on-error="handleError" :data="{
@@ -114,7 +114,7 @@
               chaohuiDownload(val.realFileName || val?.row?.name || val.name);
             }
               " list-type="text">
-            <el-button :disabled="taskData.statusName == '已完成'">选择文件</el-button>
+            <el-button :disabled="!isSuperAdminUser && taskData.statusName == '已完成'">选择文件</el-button>
           </el-upload>
         </el-tab-pane>
         <el-tab-pane label="关联链接" name="relatedLink">
@@ -217,7 +217,8 @@ import {
 import {
   canUpdateTaskStatus,
   canAddTaskRecord,
-  canUpdateTaskRecord
+  canUpdateTaskRecord,
+  isSuperAdmin
 } from "../../utils/permission";
 const postUrl = ref("");
 const uploadRef = ref(null)
@@ -229,6 +230,11 @@ const handleRemove = (uploadFile, uploadFiles) => {
     () => false
   )
 }
+const isSuperAdminUser = ref(false);
+isSuperAdmin()
+  .then(res => {
+    isSuperAdminUser.value = res;
+  })
 const handleChange = (file) => {
   console.log('hhhhhh', JSON.stringify(file));
   if (file.response) {

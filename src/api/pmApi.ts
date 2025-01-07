@@ -157,6 +157,11 @@ export const getAdminUserEnum = () => {
       })
       .then(res => {
         const { data } = res;
+        // resolve([{
+        //   id : 78,
+        //   type : 'adminUser',
+        //   value : '474805081221550528'
+        // }])
         resolve(data);
       });
   });

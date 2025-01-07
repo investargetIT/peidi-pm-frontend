@@ -28,7 +28,7 @@ import {
 } from "../../api/pmApi";
 import axios from "axios";
 import { extractInfo, extractEmplId } from "./utils";
-import { canExamineTask, canCloseTask } from "../../utils/permission";
+import { canExamineTask, canCloseTask, isSuperAdmin } from "../../utils/permission";
 import Level from "../../components/Common/level.vue";
 import { useRouter, useRoute } from "vue-router";
 import CardDetail from "./cardDetail.vue";
@@ -58,18 +58,18 @@ const closeTask = (val) => {
 }
 // 获取白名单用户
 const adminUser = ref([]);
-getAdminUserEnum().then(res => {
-  adminUser.value = res;
-});
 // 判断当前钉钉用户是否是管理员
 const isAdmin = () => {
-  let flag = false;
-  adminUser.value.map(item => {
-    if (item.id == ddUserInfo?.userid) {
-      flag = true;
-    }
+  getAdminUserEnum().then(res => {
+    adminUser.value = res;
+    let flag = false;
+    adminUser.value.map(item => {
+      if (item.value == ddUserInfo?.userid) {
+        flag = true;
+      }
+    });
+    return flag;
   });
-  return flag;
 };
 let ddUserInfo = localStorage.getItem("ddUserInfo");
 if (ddUserInfo) {
@@ -78,37 +78,42 @@ if (ddUserInfo) {
 const nonceStr = "pmUsed";
 // 判断当前是否是管理员，加上是否是管理员的判断
 let params = {};
-if (isAdmin()) {
-  params = {}
-}else{
-  params.searchStr = JSON.stringify([{
-    searchName: "deptId",
-    searchType: "equals",
-    searchValue:  ddUserInfo?.dept_id_list[0]
-  }]);
-}
-getTaskTypeApi(params)
-.then(res => {
-  const { code, data } = res;
-  if (code == 200) {
-    data.map(item => {
-      // if (item.level == 1) {
-      //   workTypeMap.value.push(JSON.parse(JSON.stringify(item)))
-      // }
-      if (item.level == 1) {
-        workTypeEnum.value.push(JSON.parse(JSON.stringify(item)))
-      }
-    })
-    workTypeEnum.value.map(item => {
-      item.showValue = item.level1;
-      item.workerAds = [item.userId];
-    });
-    console.log('workTypeEnum.value', workTypeEnum.value);
-    
-    activeTab.value = workTypeEnum.value[0]?.id
-    getCurrentPage();
-  }
-})
+const isSuperAdminUser = ref(false);
+ isSuperAdmin()
+ .then(res => {
+   if (res) {
+     params = {}
+   } else {
+     params.searchStr = JSON.stringify([{
+       searchName: "deptId",
+       searchType: "equals",
+       searchValue: ddUserInfo?.dept_id_list[0]
+     }]);
+   }
+   isSuperAdminUser.value =res;
+   getTaskTypeApi(params)
+     .then(res => {
+       const { code, data } = res;
+       if (code == 200) {
+         data.map(item => {
+           // if (item.level == 1) {
+           //   workTypeMap.value.push(JSON.parse(JSON.stringify(item)))
+           // }
+           if (item.level == 1) {
+             workTypeEnum.value.push(JSON.parse(JSON.stringify(item)))
+           }
+         })
+         workTypeEnum.value.map(item => {
+           item.showValue = item.level1;
+           item.workerAds = [item.userId];
+         });
+         console.log('workTypeEnum.value', workTypeEnum.value);
+
+         activeTab.value = workTypeEnum.value[0]?.id
+         getCurrentPage();
+       }
+     })
+ })
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 setTimeout(() => {
   initDingH5RemoteDebug();
@@ -225,11 +230,6 @@ const getCurrentPage = () => {
     if (res?.code) {
       allLength.value = res?.data?.total;
       currentPage.value = res?.data?.records || [];
-      currentPage.value.map(item => {
-        item.workerAds = [
-          { userId: workTypeEnum.value.find(item => item.id == activeTab.value).userId }
-        ];
-      });
       console.log("currentPage1", currentPage.value);
     }
   });
@@ -577,13 +577,13 @@ const allLength = ref(0);
           <template #default="scope">
             <div class="flex">
               <el-button size="small" v-if="!scope.row.workers?.length && !scope.row.predictDuration" color="#171719"
-                :disabled="!canExamineTask(scope.row) || scope.row.statusName == '已关闭'"
+                :disabled="!isSuperAdminUser &&(!canExamineTask(scope.row) || scope.row.statusName == '已关闭')"
                 @click="updateTaskFun(scope.row)">分配</el-button>
               <el-button size="small" v-if="scope.row.workers?.length && scope.row.predictDuration" color="#171719"
                 disabled>已分配</el-button>
 
               <el-button size="small" @click="closeTask(scope.row)"
-                :disabled="scope.row.statusName != '待处理' || !(canCloseTask(scope.row)) || (scope.row.workers?.length && scope.row.predictDuration)">
+                :disabled="!isSuperAdminUser && (scope.row.statusName != '待处理' || !(canCloseTask(scope.row)) || (scope.row.workers?.length && scope.row.predictDuration))">
                 关闭
               </el-button>
             </div>

@@ -1,3 +1,4 @@
+import { getAdminUserEnum } from "../api/pmApi";
 // 相关权限的判断
 const isInArr = (val, arr) => {
   const item = arr.find(item => item.userId == val);
@@ -8,6 +9,29 @@ const isInArr = (val, arr) => {
 const isCreator = (val, obj) => {
   return val == obj.userId;
 };
+
+
+// 判断当前用户是否是超级用户
+export const isSuperAdmin = async () => {
+  return new Promise(async (resolve) => {
+    let ddUserInfo = localStorage.getItem("ddUserInfo");
+    if (ddUserInfo) {
+      ddUserInfo = JSON.parse(ddUserInfo);
+    }
+    let superAdmin:any = [];
+    const res = await getAdminUserEnum();
+    superAdmin = res;
+    let flag = false;
+    console.log('superAdmin',superAdmin[0].id,ddUserInfo?.userid);
+    
+    superAdmin.map(item => {
+      if (item.value == ddUserInfo?.userid) {
+        flag = true;
+      }
+    });
+    resolve(flag);
+  } )
+}
 
 // 当前登陆人是否可以看任务
 export const canViewTask = data => {
