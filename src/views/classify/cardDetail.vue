@@ -64,7 +64,7 @@ getOneTask({
   const { code, data } = res;
   if (code == 200) {
     detail.value = data;
-    if (detail.value?.statusName != '待处理') {
+    if (detail.value?.workers?.length || detail.value?.statusName != '待处理') {
       // 把当前url的detailId的参数给去掉
       const query = { ...router.currentRoute.value.query };
       delete query.detailId;
