@@ -29,8 +29,8 @@
             <el-form-item label="承接人">
               <span>{{
                 (taskData.workers &&
-                  taskData.workers.length &&
-                  taskData.workers[0]?.userName) ||
+                taskData.workers.length &&
+                taskData.workers[0]?.userName) ||
                 "无"
                 }}</span>
             </el-form-item></el-col>
@@ -103,8 +103,8 @@
         >
           <el-button type="primary">选择文件</el-button>
         </el-upload> -->
-          <el-upload ref="uploadRef" :disabled="taskData.statusName == '已完成'" v-model:file-list="taskData.attachments"
-            class="upload-demo123 upload-demo w-full" :class="{
+          <el-upload :before-remove="handleRemove" ref="uploadRef" :disabled="taskData.statusName == '已完成'"
+            v-model:file-list="taskData.attachments" class="upload-demo123 upload-demo w-full" :class="{
               'not-show-delete': taskData.statusName == '已完成'
             }" :action="postUrl" :on-error="handleError" :data="{
             path: default_upload_url,
@@ -193,7 +193,8 @@ import {
   ElTable,
   ElTableColumn,
   ElButton,
-  dayjs
+  dayjs,
+  ElMessageBox
 } from "element-plus";
 import Level from "../../components/Common/level.vue";
 
@@ -220,6 +221,14 @@ import {
 } from "../../utils/permission";
 const postUrl = ref("");
 const uploadRef = ref(null)
+const handleRemove = (uploadFile, uploadFiles) => {
+  return ElMessageBox.confirm(
+    `确认删除该文件吗?`
+  ).then(
+    () => true,
+    () => false
+  )
+}
 const handleChange = (file) => {
   console.log('hhhhhh', JSON.stringify(file));
   if (file.response) {

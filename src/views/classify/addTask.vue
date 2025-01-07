@@ -21,11 +21,18 @@ import {
 } from "../../utils/chaohuiapi";
 import Axios from "axios";
 import { message } from "@/utils/message";
-import { ElLoading } from "element-plus";
+import { ElLoading, ElMessageBox } from "element-plus";
 
 
 const workContentMap = ref([])
-
+const handleRemove = (uploadFile, uploadFiles) => {
+  return ElMessageBox.confirm(
+    `确认删除该文件吗?`
+  ).then(
+    () => true,
+    () => false
+  )
+}
 getTaskTypeApi({})
 .then(res => {
   const { code, data } = res;
@@ -741,8 +748,9 @@ const handleError = () => {
         }" :disabled="newTaskData.statusName == '已完成'" :action="postUrl" :data="{
             path: default_upload_url,
             create_parents: false
-          }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-error="handleError"
-          :before-upload="beforeUpload" :on-success="uploadSuccess" :auto-upload="false" :on-preview="val => {
+          }" :before-remove="handleRemove" :with-credentials="false" :accept="'*'" :on-change="handleChange"
+          :on-error="handleError" :before-upload="beforeUpload" :on-success="uploadSuccess" :auto-upload="false"
+          :on-preview="val => {
   console.log('val', val);
             
   chaohuiDownload(val.realFileName || val?.row?.name || val.name);
