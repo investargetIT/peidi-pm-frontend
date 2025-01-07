@@ -201,7 +201,7 @@ const getCurrentPage = () => {
       searchValue: form.value.description
     });
   }
-  // 添加对接人
+  // 添加需求发起人
   if (form.value.requester) {
     searchArr.push({
       searchName: "contacter",
@@ -494,12 +494,12 @@ const allLength = ref(0);
           </el-select>
         </el-form-item>
         <br />
-        <el-form-item style="width: 30%" label="对接人">
+        <el-form-item style="width: 30%" label="需求发起人">
           <el-tag v-for="tag in form.requester" :key="tag" :disable-transitions="false">
             {{ tag.name }}
           </el-tag>
           <el-button class="button-new-tag" size="default" @click="choosePerson('contacter')">
-            + 对接人
+            + 需求发起人
           </el-button>
         </el-form-item>
         <el-form-item style="width: 30%" label="承接人">
@@ -554,7 +554,7 @@ const allLength = ref(0);
             <span class="clickable-topic" @click="handleTopicClick(scope.row)">{{ scope.row.title }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="contacters" label="对接人">
+        <el-table-column prop="contacters" label="需求发起人">
           <template #default="scope">
             <span>{{
               scope.row.contacters?.length

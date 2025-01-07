@@ -261,7 +261,7 @@ const taskRules = {
     { required: !isEdit, message: "输入预估工时", trigger: "blur" }
   ],
   endTime: [{ required: !isEdit, message: "输入交付时间", trigger: "blur" }],
-  contacters: [{ required: isEdit, message: "选择对接人", trigger: "blur" }],
+  contacters: [{ required: isEdit, message: "选择需求发起人", trigger: "blur" }],
   workers: [{ required: !isEdit, message: "选择承接人", trigger: "blur" }],
   description: [{ required: isEdit, message: "输入任务描述", trigger: "blur" }],
   attachments: [{ required: false, message: "附件上传", trigger: "change" }],
@@ -578,9 +578,9 @@ const beforeUpload = () => {
           </el-form-item>
         </el-col>
       </el-row>
-      <el-form-item label="对接人" prop="contacters">
+      <el-form-item label="需求发起人" prop="contacters">
         <!-- <el-input v-model="newTaskData.contacters" autocomplete="off" /> -->
-        <el-button @click="choosePerson('contacters')">选择对接人</el-button>
+        <el-button @click="choosePerson('contacters')">选择需求发起人</el-button>
         <div class="helpers">
           <p v-for="(item, index) in newTaskData.contacters" class="help-item">
             {{ item.name }}

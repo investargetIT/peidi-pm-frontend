@@ -21,7 +21,7 @@
       <el-form v-if="taskData.contacters" :model="taskForm">
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="对接人">
+            <el-form-item label="需求发起人">
               <span>{{ taskData.contacters[0].userName }}</span>
             </el-form-item></el-col>
 

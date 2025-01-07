@@ -20,7 +20,7 @@
         <span>{{ detail.workTypeName }}</span>
       </p>
       <p class=" mb-1">
-        <span class=" font-semibold mr-2">对接人:</span>
+        <span class=" font-semibold mr-2">需求发起人:</span>
         <span>{{ detail.contacters.map(item => item.userName).join('、') }}</span>
       </p>
       <p class=" mb-1">

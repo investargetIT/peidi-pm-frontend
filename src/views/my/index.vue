@@ -461,7 +461,7 @@ const allLength = ref(0);
               ">{{ scope.row.title }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="contacters" label="对接人">
+        <el-table-column prop="contacters" label="需求发起人">
           <template #default="scope">
             <span>{{
               scope.row.contacters?.length
