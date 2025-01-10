@@ -111,9 +111,10 @@ export const chaohuilogin = () => {
 
 // 下载
 export const chaohuiDownload = filename => {
-  console.log("filename", filename ,  `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${filename}&_sid=${sid}`);
+const encodedFilename = encodeURIComponent(filename);
+  console.log("filename", filename , encodedFilename ,  `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`);
   Axios.get(
-    `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${filename}&_sid=${sid}`,
+    `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`,
     {
       responseType: "blob"
     }
