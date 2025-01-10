@@ -339,6 +339,14 @@ const taskRules = {
   ]
 };
 const formRef = ref(null);
+const workTimeType = ref('1');
+const changeWorkTimeType = (val) => {
+  if (val == '1') {
+    newTaskData.value.predictDuration = 0;
+  } else {
+    newTaskData.value.predictDuration = 0;
+  }
+}
 const updateTaskFun = async () => {
   if (!formRef.value) {
     return;
@@ -365,7 +373,7 @@ const updateTaskFun = async () => {
         endTime: newTaskData.value.endTime,
         expectEndDate: newTaskData.value.expectEndDate,
         links: newTaskData.value.links,
-        predictDuration: newTaskData.value.predictDuration,
+        predictDuration: workTimeType.value == '2' ? (newTaskData.value.predictDuration * 8) : newTaskData.value.predictDuration,
         priorityId: newTaskData.value.priorityId,
         // "statusId": newTaskData.value.statusId,
         taskTypeId: newTaskData.value.taskTypeId,
@@ -709,7 +717,15 @@ const handleError = () => {
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="预估工时" prop="predictDuration">
-            <el-input :disabled="isNew || isMy" v-model="newTaskData.predictDuration" autocomplete="off" />
+            <el-input :disabled="isNew || isMy" type="number" v-model="newTaskData.predictDuration" autocomplete="off">
+              <template #append>
+                <el-select :disabled="isNew || isMy" class="notShowSufix" v-model="workTimeType"
+                  @change="changeWorkTimeType" placeholder="工时单位" style="width: 115px">
+                  <el-option label="小时" value="1" />
+                  <el-option label="天" value="2" />
+                </el-select>
+              </template>
+            </el-input>
           </el-form-item>
         </el-col>
         <el-col :span="12">
@@ -826,6 +842,11 @@ const handleError = () => {
   }
   .el-icon--close-tip{
     display: none !important;
+  }
+}
+.notShowSufix{
+  .el-input__suffix{
+    display: none;
   }
 }
 </style>

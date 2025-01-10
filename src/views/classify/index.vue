@@ -585,7 +585,7 @@ const allLength = ref(0);
               <el-button size="small" v-if="!scope.row.workers?.length && !scope.row.predictDuration" color="#171719"
                 :disabled="!isSuperAdminUser &&(!canExamineTask(scope.row) || scope.row.statusName == '已关闭')"
                 @click="updateTaskFun(scope.row)">分配</el-button>
-              <el-button size="small" v-if="scope.row.workers?.length && scope.row.predictDuration" color="#171719"
+              <el-button size="small" v-if="scope.row.workers?.length && scope.row.predictDuration" color="#E6A23C"
                 disabled>已分配</el-button>
 
               <el-button size="small" @click="closeTask(scope.row)"
