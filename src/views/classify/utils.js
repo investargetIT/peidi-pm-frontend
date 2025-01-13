@@ -14,7 +14,7 @@ export function removeDuplicates(arr) {
 export function extractEmplId(arr) {
   const result = [];
   for (const item of arr) {
-    result.push(item.emplId);
+    result.push(item.emplId || item.userId);
   }
   return result;
 }

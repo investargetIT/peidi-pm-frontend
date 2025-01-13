@@ -9,7 +9,7 @@ import {
 } from "@/api/user";
 import { ddAuthFun } from "../../utils/ddApi";
 import Cookies from "js-cookie";
-import { ref, watch } from "vue";
+import { ref, watch, h } from "vue";
 import * as dd from "dingtalk-jsapi";
 import { initDingH5RemoteDebug } from "dingtalk-h5-remote-debug";
 import AddTask from "./addTask.vue";
@@ -24,7 +24,8 @@ import {
   getTaskTypeEnum,
   getTaskTypeApi,
   updateTask,
-  getAdminUserEnum
+  getAdminUserEnum,
+  getTaskUnassigned
 } from "../../api/pmApi";
 import axios from "axios";
 import { extractInfo, extractEmplId } from "./utils";
@@ -115,6 +116,18 @@ const isSuperAdminUser = ref(false);
        }
      })
  })
+ const taskUnassigned = ref([]);
+const getTaskUnassignedFun = () => {
+  getTaskUnassigned({
+    workTypeId: activeTab.value
+  }).then(res => {
+    console.log("res", res);
+    if (res?.code == 200) {
+      taskUnassigned.value = res?.data || [];
+    }
+  });
+};
+
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 setTimeout(() => {
   initDingH5RemoteDebug();
@@ -345,6 +358,11 @@ const rules = ref({
 
 // 定义数据
 const activeTab = ref('');
+
+// 监听activeTab的变化，如果activeTab变化，就重新获取是否有待分配的任务
+watch(activeTab, () => {
+  getTaskUnassignedFun();
+});
 const form = ref({
   status: "",
   priority: "",
@@ -470,13 +488,22 @@ const getAllName = list => {
 };
 
 const allLength = ref(0);
+const renderTabLabel = (item) => {
+  
+  return taskUnassigned.value.includes(item.showValue)
+    ? h('span', { class: 'tab-label-inner' }, [
+      item.showValue,
+      h('el-badge', { value: '', class: 'mark-badge' })
+    ])
+    : item.showValue;
+};
 </script>
 
 <template>
   <div class="container">
     <el-card style="width: 100%" class="box-card">
       <el-tabs v-model="activeTab" @tab-click="handleTabClick">
-        <el-tab-pane v-for="item in workTypeEnum" :label="item.showValue" :name="item.id"></el-tab-pane>
+        <el-tab-pane v-for="item in workTypeEnum" :label="renderTabLabel(item)" :name="item.id"></el-tab-pane>
       </el-tabs>
       <el-form :inline="true" :model="form">
         <el-form-item style="width: 30%" label="任务状态">
@@ -581,7 +608,7 @@ const allLength = ref(0);
         <el-table-column prop="expectEndDate" label="期望完成时间"></el-table-column>
         <el-table-column prop="statusName" label="任务状态">
           <template #default="scope">
-            <TaskStatus :statusName="scope.row.statusName"/>
+            <TaskStatus :statusName="scope.row.statusName" />
           </template>
         </el-table-column>
         <el-table-column fixed="right" prop="endDate" label="操作">
@@ -606,7 +633,7 @@ const allLength = ref(0);
       v-model:page-size="pageSize" :page-sizes="pageSizeArr" @size-change="handleSizeChange"
       layout="total, sizes, prev, pager, next, jumper" :total="allLength" />
     <el-dialog v-model="dialogFormVisible" :title="actionType == 'new' ? '添加新任务' : '修改任务'" width="800">
-      <AddTask v-if="dialogFormVisible" @finish="getCurrentPage" @close="dialogFormVisible = false"
+      <AddTask v-if="dialogFormVisible" @finish="getCurrentPage" @close="dialogFormVisible = false; getTaskUnassignedFun();"
         :actionType="actionType" :taskData="taskData" :examine="true" />
     </el-dialog>
     <el-dialog v-model="dialogDeleteVisible" title="" width="500">
@@ -623,10 +650,10 @@ const allLength = ref(0);
         </div>
       </template>
     </el-dialog>
-    <TaskDetailModal @refresh="getCurrentPage" @closeModal="taskDetailModal.isVisible = false"
+    <TaskDetailModal @refresh="getCurrentPage" @closeModal="taskDetailModal.isVisible = false;"
       v-if="taskDetailModal.isVisible" :taskDetail="taskDetailModal.taskDetail" :taskStatus="taskStatus">
     </TaskDetailModal>
-    <CardDetail v-if="isShowCardDetail" @examine="updateTaskFun" @closeTask="closeTask" @close="isShowCardDetail =false"
+    <CardDetail v-if="isShowCardDetail" @examine="updateTaskFun" @closeTask="closeTask" @close="isShowCardDetail = false;"
       :detailId="detailId" />
   </div>
 </template>
@@ -638,6 +665,22 @@ const allLength = ref(0);
   gap: 4px;
   padding-left: 4px;
   margin-top: 4px;
+}
+.el-tabs__item{
+  position: relative;
+}
+.tab-label-inner{
+  position: relative;
+}
+.mark-badge {
+  background-color: red;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: block;
+  position: absolute;
+  right: -4px;
+  top: -2px;
 }
 
 .help-item {
@@ -693,5 +736,9 @@ const allLength = ref(0);
 .el-tabs__nav-next {
   width: 40px;
   transform: scale(2) translate(7px, 2px);
+}
+.el-tabs--bottom>.el-tabs__header .el-tabs__item:last-child,
+.el-tabs--top>.el-tabs__header .el-tabs__item:last-child {
+  padding-right: 20px;
 }
 </style>

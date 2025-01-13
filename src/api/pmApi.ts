@@ -212,3 +212,10 @@ export const getTaskTypeApi = params => {
     params
   });
 };
+
+// 获取是否有待分配的任务
+export const getTaskUnassigned = params => {
+  return http.request("get", baseUrlApi("/task-manage/hasExamine"), {
+    params
+  });
+};

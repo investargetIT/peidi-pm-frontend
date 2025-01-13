@@ -22,17 +22,22 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="需求发起人">
-              <span>{{ taskData.contacters[0].userName }}</span>
+              <span>{{ taskData.contacters.map(item => item.userName).join('、')}}</span>
             </el-form-item></el-col>
 
           <el-col :span="12">
             <el-form-item label="承接人">
-              <span>{{
-                (taskData.workers &&
-                taskData.workers.length &&
-                taskData.workers[0]?.userName) ||
-                "无"
-                }}</span>
+              <el-button v-if="canExamineTask(taskData) || isSuperAdminUser"
+                @click="choosePerson('workers')">选择承接人</el-button>
+              <div v-if="taskData.workers.length" class="helpers">
+                <p v-for="(item, index) in taskData.workers" class="help-item">
+                  {{ item.name || item.userName }}
+                  <el-icon @click="deleteHoster(index)">
+                    <Close />
+                  </el-icon>
+                </p>
+              </div>
+              <span v-if="taskData.workers?.length === 0">无</span>
             </el-form-item></el-col>
         </el-row>
         <el-row :gutter="20">
@@ -63,11 +68,14 @@
             <el-table-column width="180px" label="操作" class="flex">
               <template class="flex" #default="scope">
                 <div class="flex">
-                  <el-button @click="editRecordDetail(scope.row)" :disabled="!isSuperAdminUser && !canUpdateTaskRecord(taskData)"
-                    size="small" type="default">修改</el-button>
-                  <el-button @click="openRecordDetail(scope.row)" :disabled="!isSuperAdminUser && !canUpdateTaskRecord(taskData)"
-                    size="small" type="default">详细</el-button>
-                  <el-button @click="deleteTaskFun(scope.row)" :disabled="!isSuperAdminUser && !canUpdateTaskRecord(taskData)" size="small"
+                  <el-button @click="editRecordDetail(scope.row)"
+                    :disabled="!isSuperAdminUser && !canUpdateTaskRecord(taskData)" size="small"
+                    type="default">修改</el-button>
+                  <el-button @click="openRecordDetail(scope.row)"
+                    :disabled="!isSuperAdminUser && !canUpdateTaskRecord(taskData)" size="small"
+                    type="default">详细</el-button>
+                  <el-button @click="deleteTaskFun(scope.row)"
+                    :disabled="!isSuperAdminUser && !canUpdateTaskRecord(taskData)" size="small"
                     type="default">删除</el-button>
                 </div>
               </template>
@@ -103,8 +111,9 @@
         >
           <el-button type="primary">选择文件</el-button>
         </el-upload> -->
-          <el-upload :before-remove="handleRemove" ref="uploadRef" :disabled="!isSuperAdminUser && taskData.statusName == '已完成'"
-            v-model:file-list="taskData.attachments" class="upload-demo123 upload-demo w-full" :class="{
+          <el-upload :before-remove="handleRemove" ref="uploadRef"
+            :disabled="!isSuperAdminUser && taskData.statusName == '已完成'" v-model:file-list="taskData.attachments"
+            class="upload-demo123 upload-demo w-full" :class="{
               'not-show-delete': taskData.statusName == '已完成'
             }" :action="postUrl" :on-error="handleError" :data="{
             path: default_upload_url,
@@ -197,7 +206,6 @@ import {
   ElMessageBox
 } from "element-plus";
 import Level from "../../components/Common/level.vue";
-
 import { privortyMap } from "../common/common";
 import {
   getTaskRecord,
@@ -208,7 +216,9 @@ import {
   updateTask
 } from "../../api/pmApi";
 import { message } from "@/utils/message";
-import { extractInfo } from "./utils";
+import { extractInfo, extractEmplId } from "./utils";
+import * as dd from "dingtalk-jsapi";
+
 import {
   testAllIPs,
   default_upload_url,
@@ -218,7 +228,8 @@ import {
   canUpdateTaskStatus,
   canAddTaskRecord,
   canUpdateTaskRecord,
-  isSuperAdmin
+  isSuperAdmin,
+  canExamineTask
 } from "../../utils/permission";
 const postUrl = ref("");
 const uploadRef = ref(null)
@@ -230,6 +241,55 @@ const handleRemove = (uploadFile, uploadFiles) => {
     () => false
   )
 }
+const deleteHoster = index => {
+  // 如果有审核权限或者是超级管理员，那么可以删除
+  if (canExamineTask(taskData.value) || isSuperAdminUser.value) {
+    taskData.value.workers.splice(index, 1);
+    // 删除后如果长度>0，那么更新
+    if (taskData.value.workers.length > 0) {
+      updateTaskInfo();
+    }else{
+      // 提醒一下承接人不能为空
+      message('承接人不能为空', { type: 'error' });
+    }
+  }
+};
+const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
+
+const choosePerson = type => {
+  let data_this =
+    type == "contacter" ? taskData.value.creator
+ : taskData.value.workers;
+  // let test = [{ "avatar": "", "name": "台江鹏", "emplId": "474805081221550528" }];
+  // if (type == 'contacter') {
+  //   form.value.requester = (test)
+  // }
+  // if (type == 'worker') {
+  //   form.value.assignee = (test)
+  // }
+  // return
+  console.log("data_this", data_this);
+  dd.biz.contact.choose({
+    multiple: true, //是否多选：true多选 false单选； 默认true
+    users: extractEmplId(data_this), //默认选中的用户列表，员工userid；成功回调中应包含该信息
+    corpId: DINGTALK_CORP_ID, //企业id
+    max: 10, //人数限制，当multiple为true才生效，可选范围1-1500
+    onSuccess: function (data) {
+      console.log("data", data, type);
+      if (type == "contacter") {
+        form.value.requester = data;
+      }
+      if (type == "workers") {
+        console.log('hhhhhh');
+        taskData.value.workers = JSON.parse(JSON.stringify(data));
+        // 更新任务信息
+        updateTaskInfo();
+      }
+      // alert("dd successs: " + JSON.stringify(data));
+    },
+    onFail: function (err) { }
+  });
+};
 const isSuperAdminUser = ref(false);
 isSuperAdmin()
   .then(res => {
@@ -554,7 +614,7 @@ getTaskRecordFun();
   flex-wrap: wrap;
   gap: 4px;
   padding-left: 4px;
-  margin-top: 4px;
+  transform: translateY(-2px);
 }
 
 .help-item {
@@ -607,7 +667,22 @@ getTaskRecordFun();
     transform: translate(880px, -26px);
   }
 }
+.helpers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-left: 4px;
+  margin-top: 4px;
+}
 
+.help-item {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  cursor: pointer;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+}
 </style>
 <style>
 .not-show-delete {
