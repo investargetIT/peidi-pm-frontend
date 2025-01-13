@@ -351,6 +351,11 @@ const updateTaskFun = async () => {
   if (!formRef.value) {
     return;
   }
+  // 如果预计工时是0，那么不允许提交
+  if (newTaskData.value.predictDuration == 0) {
+    message("预计工时不能为0", { type: "error" });
+    return;
+  }
   await formRef.value.validate((valid, fields) => {
     console.log('newTaskData.value.attachments', newTaskData.value.attachments);
     if (valid) {

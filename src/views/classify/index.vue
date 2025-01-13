@@ -30,6 +30,7 @@ import axios from "axios";
 import { extractInfo, extractEmplId } from "./utils";
 import { canExamineTask, canCloseTask, isSuperAdmin } from "../../utils/permission";
 import Level from "../../components/Common/level.vue";
+import TaskStatus from "../../components/Common/taskStatus.vue";
 import { useRouter, useRoute } from "vue-router";
 import CardDetail from "./cardDetail.vue";
 
@@ -578,7 +579,11 @@ const allLength = ref(0);
           </template>
         </el-table-column>
         <el-table-column prop="expectEndDate" label="期望完成时间"></el-table-column>
-        <el-table-column prop="statusName" label="任务状态"></el-table-column>
+        <el-table-column prop="statusName" label="任务状态">
+          <template #default="scope">
+            <TaskStatus :statusName="scope.row.statusName"/>
+          </template>
+        </el-table-column>
         <el-table-column fixed="right" prop="endDate" label="操作">
           <template #default="scope">
             <div class="flex">
@@ -621,7 +626,8 @@ const allLength = ref(0);
     <TaskDetailModal @refresh="getCurrentPage" @closeModal="taskDetailModal.isVisible = false"
       v-if="taskDetailModal.isVisible" :taskDetail="taskDetailModal.taskDetail" :taskStatus="taskStatus">
     </TaskDetailModal>
-    <CardDetail v-if="isShowCardDetail" @examine="updateTaskFun" @closeTask="closeTask" @close="isShowCardDetail =false" :detailId="detailId" />
+    <CardDetail v-if="isShowCardDetail" @examine="updateTaskFun" @closeTask="closeTask" @close="isShowCardDetail =false"
+      :detailId="detailId" />
   </div>
 </template>
 
