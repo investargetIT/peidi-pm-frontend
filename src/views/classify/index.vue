@@ -169,6 +169,7 @@ const getAllCateFun = () => {
     }
   });
 };
+let sortStr = [{"sortName":"expectEndDate","sortType":"desc"}];
 
 const getCurrentPage = () => {
   console.log("form.value", form.value);
@@ -238,7 +239,8 @@ const getCurrentPage = () => {
     pageNo: Number(currentPageNum.value),
     pageSize: Number(pageSize.value),
     userId: ddUserInfo?.userid || "",
-    searchStr: JSON.stringify(searchArr)
+    searchStr: JSON.stringify(searchArr),
+    sortStr: JSON.stringify(sortStr)
   }).then(res => {
     console.log("res", res);
     if (res?.code) {
@@ -375,7 +377,7 @@ const form = ref({
 });
 
 watch(
-  [currentPageNum, pageSize, activeTab, form],
+  [currentPageNum, pageSize, activeTab, form, sortStr],
   () => {
     console.log("currentPageNum", currentPageNum.value);
     getCurrentPage();
@@ -487,6 +489,14 @@ const getAllName = list => {
   return name;
 };
 
+const handleSortChange = ({ prop, order }) => {
+  sortStr = [{
+    sortName: prop,
+    sortType: order === 'ascending' ? 'asc' : 'desc'
+  }]
+  getCurrentPage();
+};
+
 const allLength = ref(0);
 const renderTabLabel = (item) => {
   
@@ -566,7 +576,7 @@ const renderTabLabel = (item) => {
           color: #000;
           border: 1px solid #eee;
           border-radius: 8px;
-        ">
+        " @sort-change="handleSortChange">
         <el-table-column prop="workContent" label="工作内容">
           <template #default="scope">
             <span>{{ (scope.row.workContent) }}</span>
@@ -598,14 +608,14 @@ const renderTabLabel = (item) => {
               }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="predictDuration" label="预计工时">
+        <el-table-column prop="predictDuration" label="预计工时" sortable="custom">
           <template #default="scope">
             <span>{{
               scope.row.predictDuration ? scope.row.predictDuration : "-"
               }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="expectEndDate" label="期望完成时间"></el-table-column>
+        <el-table-column prop="expectEndDate" label="期望完成时间" sortable="custom"></el-table-column>
         <el-table-column prop="statusName" label="任务状态">
           <template #default="scope">
             <TaskStatus :statusName="scope.row.statusName" />
@@ -621,6 +631,7 @@ const renderTabLabel = (item) => {
                 disabled>已分配</el-button>
 
               <el-button size="small" @click="closeTask(scope.row)"
+                v-if="scope.row.statusName != '已关闭'"
                 :disabled="!isSuperAdminUser && (scope.row.statusName != '待处理' || !(canCloseTask(scope.row)) || (scope.row.workers?.length && scope.row.predictDuration))">
                 关闭
               </el-button>
@@ -633,8 +644,9 @@ const renderTabLabel = (item) => {
       v-model:page-size="pageSize" :page-sizes="pageSizeArr" @size-change="handleSizeChange"
       layout="total, sizes, prev, pager, next, jumper" :total="allLength" />
     <el-dialog v-model="dialogFormVisible" :title="actionType == 'new' ? '添加新任务' : '修改任务'" width="800">
-      <AddTask v-if="dialogFormVisible" @finish="getCurrentPage" @close="dialogFormVisible = false; getTaskUnassignedFun();"
-        :actionType="actionType" :taskData="taskData" :examine="true" />
+      <AddTask v-if="dialogFormVisible" @finish="getCurrentPage"
+        @close="dialogFormVisible = false; getTaskUnassignedFun();" :actionType="actionType" :taskData="taskData"
+        :examine="true" />
     </el-dialog>
     <el-dialog v-model="dialogDeleteVisible" title="" width="500">
       <span>确定删除该任务吗？</span>
@@ -653,8 +665,8 @@ const renderTabLabel = (item) => {
     <TaskDetailModal @refresh="getCurrentPage" @closeModal="taskDetailModal.isVisible = false;"
       v-if="taskDetailModal.isVisible" :taskDetail="taskDetailModal.taskDetail" :taskStatus="taskStatus">
     </TaskDetailModal>
-    <CardDetail v-if="isShowCardDetail" @examine="updateTaskFun" @closeTask="closeTask" @close="isShowCardDetail = false;"
-      :detailId="detailId" />
+    <CardDetail v-if="isShowCardDetail" @examine="updateTaskFun" @closeTask="closeTask"
+      @close="isShowCardDetail = false;" :detailId="detailId" />
   </div>
 </template>
 

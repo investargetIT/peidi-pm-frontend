@@ -43,7 +43,7 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="任务类型">
-              <span>{{ taskData.taskTypeName }}</span>
+              <span>{{ taskData.taskTypeName.split('&')[0] }}</span>
             </el-form-item></el-col>
 
           <el-col :span="12">
@@ -52,9 +52,9 @@
             </el-form-item></el-col>
         </el-row>
         <el-form-item label="预估工时">
-          <span>{{
-            taskData.predictDuration ? taskData.predictDuration : "无"
-            }}</span>
+          <el-input class=" !w-12 !text-center" @blur="updatePredictDuration" v-if="taskData.predictDuration !== null" type="number"
+            v-model="taskData.predictDuration" :disabled="!canExamineTask(taskData) && !isSuperAdminUser"></el-input>
+          <span v-if="taskData.predictDuration === null">无</span>
         </el-form-item>
       </el-form>
       <el-tabs v-if="taskData.contacters" v-model="activeTab">
@@ -255,7 +255,15 @@ const deleteHoster = index => {
   }
 };
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
-
+const updatePredictDuration = () => {
+  if (!taskData.value.predictDuration || taskData.value.predictDuration <= 0) {
+    message('预估工时不能为空或小于等于0',{
+      type: 'warning',
+    });
+    return;
+  }
+  updateTaskInfo();
+};
 const choosePerson = type => {
   let data_this =
     type == "contacter" ? taskData.value.creator
