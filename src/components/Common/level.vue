@@ -32,8 +32,8 @@ const { level } = defineProps(["level"]);
 }
 
 .middle {
-  color: #fff;
-  background-color: #171719;
+  color: #1a1818;
+  background-color: #d6d6e7;
 }
 
 .high {

@@ -51,11 +51,25 @@
               <span>{{ extractInfo(taskData.workTypeName).name }}</span>
             </el-form-item></el-col>
         </el-row>
-        <el-form-item label="预估工时">
-          <el-input class=" !w-12 !text-center" @blur="updatePredictDuration" v-if="taskData.predictDuration !== null" type="number"
-            v-model="taskData.predictDuration" :disabled="!canExamineTask(taskData) && !isSuperAdminUser"></el-input>
-          <span v-if="taskData.predictDuration === null">无</span>
-        </el-form-item>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="预估工时">
+              <el-input class=" !w-12 !text-center" @blur="updatePredictDuration"
+                v-if="taskData.predictDuration !== null" type="number" v-model="taskData.predictDuration"
+                :disabled="!canExamineTask(taskData) && !isSuperAdminUser"></el-input>
+              <span v-if="taskData.predictDuration === null">无</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="交付时间">
+              <el-date-picker @change="updateEndTime" v-if="taskData.endTime !== null" class="!w-[200px] !text-center"
+                :disabled-date="disabledDate" :disabled="!canExamineTask(taskData) && !isSuperAdminUser"
+                format="YYYY/MM/DD" value-format="YYYY-MM-DD" v-model="taskData.endTime" type="date"
+                placeholder="选择交付时间" />
+              <span v-if="taskData.endTime === null">无</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <el-tabs v-if="taskData.contacters" v-model="activeTab">
         <el-tab-pane label="工作记录" name="workRecord">
@@ -241,6 +255,12 @@ const handleRemove = (uploadFile, uploadFiles) => {
     () => false
   )
 }
+const disabledDate = (time) => {
+  if (taskData.value.expectEndDate) {
+    return time.getTime() > new Date(taskData.value.expectEndDate).getTime();
+  }
+  return false;
+}
 const deleteHoster = index => {
   // 如果有审核权限或者是超级管理员，那么可以删除
   if (canExamineTask(taskData.value) || isSuperAdminUser.value) {
@@ -262,6 +282,9 @@ const updatePredictDuration = () => {
     });
     return;
   }
+  updateTaskInfo();
+};
+const updateEndTime = () => {
   updateTaskInfo();
 };
 const choosePerson = type => {
