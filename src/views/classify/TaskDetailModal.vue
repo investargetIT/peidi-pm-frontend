@@ -70,6 +70,14 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-row>
+          <el-col :span="24">
+            <el-form-item label="任务描述">
+              <el-input type="textarea" v-model="taskData.description" :disabled="!canExamineTask(taskData) && !isSuperAdminUser"
+                autosize />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <el-tabs v-if="taskData.contacters" v-model="activeTab">
         <el-tab-pane label="工作记录" name="workRecord">

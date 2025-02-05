@@ -3,8 +3,11 @@
     v-model="jjj">
     <el-card v-if="detail.contacters">
       <template #header>
-        <div class="card-header">
+        <div class="card-header relative">
           <h3>任务详情</h3>
+          <el-icon @click="emit('close')" color="red" class=" cursor-pointer !absolute right-0 top-0 !w-8 !h-8">
+            <Close class="!w-6 !h-6" />
+          </el-icon>
         </div>
       </template>
       <p class=" mb-1">
@@ -33,7 +36,8 @@
       </p>
       <template #footer>
         <div class=" w-full flex">
-          <el-button color="#171719" v-if="!detail.workers?.length" :disabled="detail.statusName != '待处理'" @click="examine">分配任务</el-button>
+          <el-button color="#171719" v-if="!detail.workers?.length" :disabled="detail.statusName != '待处理'"
+            @click="examine">分配任务</el-button>
           <el-button color="#171719" v-if="detail.workers?.length" :disabled="true">已分配</el-button>
           <el-button :disabled="detail.workers?.length || detail.statusName != '待处理'" @click="close">关闭任务</el-button>
         </div>
@@ -99,6 +103,7 @@ const examine = () => {
 
 .card-header {
   /* Add your header styles here */
+  position: relative;
 }
 
 .card-body {
