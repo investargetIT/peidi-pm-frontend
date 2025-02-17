@@ -63,7 +63,7 @@
           <el-col :span="12">
             <el-form-item label="交付时间">
               <el-date-picker @change="updateEndTime" v-if="taskData.endTime !== null" class="!w-[200px] !text-center"
-                :disabled-date="disabledDate" :disabled="!canExamineTask(taskData) && !isSuperAdminUser"
+                :disabled-date="disabledDate" :disabled="!canExamineTask(taskData) && !updateExpectData(taskData) && !isSuperAdminUser"
                 format="YYYY/MM/DD" value-format="YYYY-MM-DD" v-model="taskData.endTime" type="date"
                 placeholder="选择交付时间" />
               <span v-if="taskData.endTime === null">无</span>
@@ -251,7 +251,8 @@ import {
   canAddTaskRecord,
   canUpdateTaskRecord,
   isSuperAdmin,
-  canExamineTask
+  canExamineTask,
+  updateExpectData
 } from "../../utils/permission";
 const postUrl = ref("");
 const uploadRef = ref(null)
