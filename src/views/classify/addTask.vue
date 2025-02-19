@@ -121,15 +121,26 @@ if (ddUserInfo) {
   ddUserInfo = JSON.parse(ddUserInfo);
   const { dept_id_list } = ddUserInfo;
   if (dept_id_list[0]) {
-    getDeptInfo(dept_id_list[0])
-      .then(res => {
-        const { code , data } = res;
-        if (code == 200) {
-          const { name }  = data;
-          newTaskData.value.businessUnit = name;
-        }
-      })
+    const loadingInstance1 = ElLoading.service({
+      fullscreen: true,
+      text: "获取业务单元中..."
+    });
+      getDeptInfo(dept_id_list[0])
+        .then(res => {
+          const { code, data } = res;
+          if (code == 200) {
+            const { name } = data;
+            newTaskData.value.businessUnit = name;
+          }
+        })
+        .finally(() => {
+          loadingInstance1.close();
+        });
+  }else{
+    message("localStorage 获取部门信息失败", { type: "error" });
   }
+}else{
+  message("localStorage 获取信息失败", { type: "error" });
 }
 const isNew = actionType == "new";
 const isEdit = actionType == "edit"
