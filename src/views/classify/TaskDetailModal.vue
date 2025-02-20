@@ -60,24 +60,35 @@
               <span v-if="taskData.predictDuration === null">无</span>
             </el-form-item>
           </el-col>
+
           <el-col :span="12">
             <el-form-item label="交付时间">
               <el-date-picker @change="updateEndTime" v-if="taskData.endTime !== null" class="!w-[200px] !text-center"
-                :disabled-date="disabledDate" :disabled="!canExamineTask(taskData) && !updateExpectData(taskData) && !isSuperAdminUser"
+                :disabled-date="disabledDate"
+                :disabled="!canExamineTask(taskData) && !updateExpectData(taskData) && !isSuperAdminUser"
                 format="YYYY/MM/DD" value-format="YYYY-MM-DD" v-model="taskData.endTime" type="date"
                 placeholder="选择交付时间" />
               <span v-if="taskData.endTime === null">无</span>
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row>
-          <el-col :span="24">
-            <el-form-item label="任务描述">
-              <el-input type="textarea" v-model="taskData.description" :disabled="!canExamineTask(taskData) && !isSuperAdminUser"
-                autosize />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-row v-if="taskData.difficulty">
+            <el-col :span="12">
+              <el-form-item label="任务等级">
+                <span>{{ taskData.difficulty }}</span>
+              </el-form-item>
+            </el-col>
+            </el-row> 
+
+
+            <el-row>
+              <el-col :span="24">
+                <el-form-item label="任务描述">
+                  <el-input type="textarea" v-model="taskData.description"
+                    :disabled="!canExamineTask(taskData) && !isSuperAdminUser" autosize />
+                </el-form-item>
+              </el-col>
+            </el-row>
       </el-form>
       <el-tabs v-if="taskData.contacters" v-model="activeTab">
         <el-tab-pane label="工作记录" name="workRecord">

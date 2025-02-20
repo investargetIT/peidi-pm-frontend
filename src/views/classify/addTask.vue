@@ -339,6 +339,7 @@ const taskRules = {
   predictDuration: [
     { required: isEdit, message: "输入预估工时", trigger: "blur" }
   ],
+  difficulty: [{ required: isEdit, message: "选择任务等级", trigger: "change" }],
   endTime: [{ required: isEdit, message: "输入交付时间", trigger: "blur" }],
   contacters: [{ required: isMy || isNew, message: "选择需求发起人", trigger: "blur" }],
   workers: [{ required: isEdit, message: "选择承接人", trigger: "blur" }],
@@ -401,7 +402,8 @@ const updateTaskFun = async () => {
             userId: item.emplId
           };
         }),
-        isExamine: examine
+        isExamine: examine,
+        difficulty: newTaskData.value.difficulty
       }).then(res => {
         const { code, data } = res;
         if (code == 200) {
@@ -716,10 +718,17 @@ const handleError = () => {
 
       </el-row>
       <el-row :gutter="20">
-        <el-col :span="12">
+        <el-col :span="6">
           <el-form-item label="任务优先级" prop="priorityId">
             <el-select :disabled="!isEdit" v-model="newTaskData.priorityId" placeholder="选择任务优先级">
               <el-option v-for="item in priMap" :label="item.value" :value="item.id" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="6">
+          <el-form-item label="任务等级" prop="difficulty">
+            <el-select :disabled="!isEdit" v-model="newTaskData.difficulty" placeholder="选择任务等级">
+              <el-option v-for="item in [1,2,3,4,5]" :label="item" :value="item" />
             </el-select>
           </el-form-item>
         </el-col>
