@@ -34,6 +34,7 @@ import Level from "../../components/Common/level.vue";
 import TaskStatus from "../../components/Common/taskStatus.vue";
 import { useRouter, useRoute } from "vue-router";
 import CardDetail from "./cardDetail.vue";
+import CloseTask from "./closeTask.vue";
 
 const route = useRoute()
 ddAuthFun();
@@ -45,18 +46,21 @@ if (route.query.detailId) {
   isShowCardDetail.value = true;
   detailId.value = route.query.detailId;
 }
+const closeData = ref({});
 const closeTask = (val) => {
-  updateTask({
-    ...val,
-    statusId : 70
-  })
-  .then(res => {
-    const { code , data } = res;
-    if (code == 200) {
-      message("修改任务信息成功", { type: "success" });
-      getCurrentPage();
-    }
-  })
+  closeModalShow.value = true;
+  closeData.value = JSON.parse(JSON.stringify(val));
+  // updateTask({
+  //   ...val,
+  //   statusId : 70
+  // })
+  // .then(res => {
+  //   const { code , data } = res;
+  //   if (code == 200) {
+  //     message("修改任务信息成功", { type: "success" });
+  //     getCurrentPage();
+  //   }
+  // })
 }
 // 获取白名单用户
 const adminUser = ref([]);
@@ -411,7 +415,7 @@ const tableData = ref([
 
 const handleTopicClick = row => {
   console.log("row", row);
-  if (row.statusName == '已关闭') {
+  if (row.statusName == '已关闭' || row.statusName == '待处理') {
     return
   }
   taskDetailModal.value.taskDetail = row;
@@ -507,6 +511,8 @@ const renderTabLabel = (item) => {
     ])
     : item.showValue;
 };
+
+const closeModalShow = ref(false);
 </script>
 
 <template>
@@ -621,17 +627,31 @@ const renderTabLabel = (item) => {
             <TaskStatus :statusName="scope.row.statusName" />
           </template>
         </el-table-column>
+        <el-table-column prop="closeDescriptionExt" label="关闭原因">
+          <template #default="scope">
+            <el-tooltip class="item cursor-pointer" effect="dark" v-if="scope.row.closeDescriptionExt"
+              :content="scope.row.closeDescriptionExt" placement="top">
+              <span>{{
+                scope.row.closeDescriptionExt?.length > 20
+                ? scope.row.closeDescriptionExt.slice(0, 20) + '...'
+                : scope.row.closeDescriptionExt
+                }}</span>
+            </el-tooltip>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column fixed="right" prop="endDate" label="操作">
           <template #default="scope">
             <div class="flex">
-              <el-button size="small" v-if="!scope.row.workers?.length && !scope.row.predictDuration" color="#171719"
+              <el-button size="small"
+                v-if="!scope.row.workers?.length && !scope.row.predictDuration && scope.row.statusName != '已关闭'"
+                color="#171719"
                 :disabled="!isSuperAdminUser &&(!canExamineTask(scope.row) || scope.row.statusName == '已关闭')"
                 @click="updateTaskFun(scope.row)">分配</el-button>
               <el-button size="small" v-if="scope.row.workers?.length && scope.row.predictDuration" color="#E6A23C"
                 disabled>已分配</el-button>
 
-              <el-button size="small" @click="closeTask(scope.row)"
-                v-if="scope.row.statusName != '已关闭'"
+              <el-button size="small" @click="closeTask(scope.row)" v-if="scope.row.statusName != '已关闭'"
                 :disabled="!isSuperAdminUser && (scope.row.statusName != '待处理' || !(canCloseTask(scope.row)) || (scope.row.workers?.length && scope.row.predictDuration))">
                 关闭
               </el-button>
@@ -655,7 +675,6 @@ const renderTabLabel = (item) => {
           <el-button @click="dialogDeleteVisible = false">取消</el-button>
           <el-button type="primary" @click="
               dialogDeleteVisible = false;
-              deleteCateFun();
             ">
             确定
           </el-button>
@@ -667,6 +686,8 @@ const renderTabLabel = (item) => {
     </TaskDetailModal>
     <CardDetail v-if="isShowCardDetail" @examine="updateTaskFun" @closeTask="closeTask"
       @close="isShowCardDetail = false;" :detailId="detailId" />
+    <CloseTask v-if="closeModalShow" v-model:closeModalShow="closeModalShow" :closeData="closeData"
+      @refresh="getCurrentPage" />
   </div>
 </template>
 

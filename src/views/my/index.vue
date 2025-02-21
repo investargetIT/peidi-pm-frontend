@@ -40,6 +40,7 @@ import {
 import { updateExpectData, isSuperAdmin } from "../../utils/permission";
 import Level from "../../components/Common/level.vue";
 import { useRoute } from 'vue-router'
+import CloseTask from "../classify/closeTask.vue";
 const route = useRoute()
 
 ddAuthFun();
@@ -252,7 +253,7 @@ const tableData = ref([
 
 const handleTopicClick = row => {
   console.log("row", row);
-  if (row.statusName == "已关闭") {
+  if (row.statusName == "已关闭" || row.statusName == "待处理") {
     return;
     
   }
@@ -286,7 +287,7 @@ const clear = () => {
 
 
 const updateMyTask = val => {
-  if (val.statusName == '已关闭') {
+  if (val.statusName == '已关闭' || val.statusName == '待处理') {
     return
   }
   taskData.value = val;
@@ -362,19 +363,12 @@ const tableRowClassName = ({ row, rowIndex }) => {
   }
   return "";
 };
+const closeData = ref({});
+const closeModalShow = ref(false);
 
 const closeTask = (val) => {
-  updateTask({
-    ...val,
-    statusId: 70
-  })
-    .then(res => {
-      const { code, data } = res;
-      if (code == 200) {
-        message("修改任务信息成功", { type: "success" });
-        getCurrentPage();
-      }
-    })
+  closeModalShow.value = true;
+  closeData.value = JSON.parse(JSON.stringify(val));
 }
 
 const allLength = ref(0);
@@ -499,9 +493,24 @@ const allLength = ref(0);
               ]">{{ scope.row.statusName ? scope.row.statusName : "-" }}</span>
           </template>
         </el-table-column>
+        <el-table-column prop="closeDescriptionExt" label="关闭原因">
+          <template #default="scope">
+            <el-tooltip class="item cursor-pointer" effect="dark" v-if="scope.row.closeDescriptionExt"
+              :content="scope.row.closeDescriptionExt" placement="top">
+              <span>{{
+                scope.row.closeDescriptionExt?.length > 20
+                  ? scope.row.closeDescriptionExt.slice(0, 20) + '...'
+                  : scope.row.closeDescriptionExt
+              }}</span>
+            </el-tooltip>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作">
           <template #default="scope">
-            <el-button @click="closeTask(scope.row)" :disabled="!isSuperAdminUser && (scope.row.statusName != '待处理' || (scope.row.workers?.length && scope.row.predictDuration))">
+            <el-button @click="closeTask(scope.row)"
+            v-if="scope.row.statusName != '已关闭'"
+              :disabled="!isSuperAdminUser && (scope.row.statusName != '待处理'  || (scope.row.workers?.length && scope.row.predictDuration))">
               关闭
             </el-button>
           </template>
@@ -537,8 +546,10 @@ const allLength = ref(0);
       <!-- <myTask v-if="dialogFormVisible" @finish="getCurrentPage" @close="dialogFormVisible = false" actionType="edit"
         :taskData="taskData" /> -->
       <AddTask v-if="dialogFormVisible" @finish="getCurrentPage" @close="dialogFormVisible = false" :actionType="'my'"
-         :taskData="taskData" />
+        :taskData="taskData" />
     </el-dialog>
+    <CloseTask v-if="closeModalShow" v-model:closeModalShow="closeModalShow" :closeData="closeData"
+      @refresh="getCurrentPage" />
   </div>
 </template>
 
