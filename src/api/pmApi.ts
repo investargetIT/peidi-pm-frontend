@@ -226,3 +226,24 @@ export const getTaskUnassigned = params => {
     params
   });
 };
+
+// 获取考核列表
+export const getExaminationList = params => {
+  return http.request("get", baseUrlApi("/kpi-examination/page"), {
+    params
+  });
+};
+
+// 更新考核
+export const updateExamination = data => {
+  return http.request("post", baseUrlApi("/kpi-examination/update"), {
+    data
+  });
+};
+
+//获取可修改用户
+export const getModifyUser = params => {
+  return http.request("get", baseUrlApi("/kpi-examination/manage"), {
+    params
+  });
+};
