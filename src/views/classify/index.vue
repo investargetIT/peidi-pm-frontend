@@ -414,8 +414,11 @@ const tableData = ref([
 ]);
 
 const handleTopicClick = row => {
-  console.log("row", row);
-  if (row.statusName == '已关闭' || row.statusName == '待处理') {
+  console.log("row", row, row.workers?.length);
+  if (row.statusName == '已关闭') {
+    return
+  }
+  if (!row.workers?.length) {
     return
   }
   taskDetailModal.value.taskDetail = row;
