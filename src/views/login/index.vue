@@ -57,7 +57,12 @@ const onLogin = async (formEl: FormInstance | undefined) => {
         .then(res => {
           if (res.success) {
             // 获取后端路由
-            if (route.query.tabName == 'worker') {
+            const redirectPath = localStorage.getItem('redirectPath') || '/';
+            if (redirectPath.includes('/examination')) {
+              return initRouter().then(() => {
+                router.push('/examination');
+              });
+            } else if (route.query.tabName == 'worker') {
               return initRouter().then(() => {
                 router.push({ path: '/my/index', query: { tabName: 'worker' } });
               });

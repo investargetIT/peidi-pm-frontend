@@ -265,10 +265,14 @@ const { VITE_HIDE_HOME } = import.meta.env;
 router.beforeEach((to: ToRouteType, _from, next) => {
   if (to.meta?.keepAlive) {
     handleAliveRoute(to, "add");
-    // 页面整体刷新和点击标签页刷新
     if (_from.name === undefined || _from.name === "Redirect") {
       handleAliveRoute(to);
     }
+  }
+  if (to.path === '/examination') {
+    localStorage.setItem('redirectPath', to.fullPath);
+  } else if (to.path !== '/login') {
+    localStorage.removeItem('redirectPath');
   }
   const userInfo = storageLocal().getItem<DataInfo<number>>(userKey);
   NProgress.start();
@@ -281,16 +285,13 @@ router.beforeEach((to: ToRouteType, _from, next) => {
       else document.title = item.meta.title as string;
     });
   }
-  /** 如果已经登录并存在登录信息后不能跳转到路由白名单，而是继续保持在当前页面 */
   function toCorrectRoute() {
     whiteList.includes(to.fullPath) ? next(_from.fullPath) : next();
   }
   if (Cookies.get(multipleTabsKey) && userInfo) {
-    // 无权限跳转403页面
     if (to.meta?.roles && !isOneOfArray(to.meta?.roles, userInfo?.roles)) {
       next({ path: "/error/403" });
     }
-    // 开启隐藏首页后在浏览器地址栏手动输入首页welcome路由则跳转到404页面
     if (VITE_HIDE_HOME === "true" && to.fullPath === "/classify") {
       next({ path: "/error/404" });
     }
