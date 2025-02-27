@@ -35,7 +35,7 @@ export type RefreshTokenResult = {
 };
 
 const baseOmsUrlApi = (url: string) => {
-  return `https://omsapi.peidigroup.cn${url}`;
+  return `https://api.peidigroup.cn/oms${url}`;
 };
 
 const baseUrlApi = (url: string, hasPm = true) => {

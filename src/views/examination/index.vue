@@ -210,8 +210,12 @@ const filterByMonth = () => {
 
 // 在获取数据后初始化过滤列表
 onMounted(() => {
+  // 获取当前月份并设置为默认选中
+  const currentMonth = new Date().getMonth() + 1
+  selectedMonth.value = currentMonth < 10 ? `0${currentMonth}` : `${currentMonth}`
+
   fetchExamList().then(() => {
-    filteredExamList.value = examList.value
+    filterByMonth() // 初始化时根据当前月份过滤
   })
 })
 </script>
