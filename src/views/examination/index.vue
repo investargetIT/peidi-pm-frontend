@@ -1,6 +1,16 @@
 <template>
   <div class="examination-list">
-    <el-table :data="examList" border style="width: 100%">
+    <!-- 修改月份选择器 -->
+    <el-select v-model="selectedMonth" placeholder="选择月份" @change="filterByMonth">
+      <el-option
+        v-for="month in months"
+        :key="month.value"
+        :label="month.label"
+        :value="month.value"
+      />
+    </el-select>
+    
+    <el-table :data="filteredExamList" border style="width: 100%">
       <el-table-column prop="userName" label="姓名" />
       <el-table-column prop="month" label="月份" />
       <el-table-column label="部门">
@@ -60,6 +70,23 @@ import { getExaminationList, getModifyUser, updateExamination } from '@/api/pmAp
 import { ElMessage } from 'element-plus'
 
 const examList = ref([])
+const selectedMonth = ref(null)
+// 修改 months 数组，使其值与 examList 中的 month 属性的月份部分匹配
+const months = ref([
+  { label: '1月', value: '01' },
+  { label: '2月', value: '02' },
+  { label: '3月', value: '03' },
+  { label: '4月', value: '04' },
+  { label: '5月', value: '05' },
+  { label: '6月', value: '06' },
+  { label: '7月', value: '07' },
+  { label: '8月', value: '08' },
+  { label: '9月', value: '09' },
+  { label: '10月', value: '10' },
+  { label: '11月', value: '11' },
+  { label: '12月', value: '12' }
+])
+const filteredExamList = ref([])
 
 // 自定义指令：自动聚焦
 const vFocus = {
@@ -94,8 +121,10 @@ const fetchExamList = async () => {
     }))
 
     // 过滤 examList，只保留在 userResult 中存在的 examinationTypeId
+    // 如果examinationTypeId的值是'all'，则保留所有数据
     const filteredExamList = examList.value.filter(exam => 
-      userResult.some(user => user.examinationTypeId == exam.examinationTypeId)
+      userResult.some(user => user.examinationTypeId == exam.examinationTypeId) || 
+      user.examinationTypeId === 'all'
     );
     examList.value = filteredExamList
     console.log(filteredExamList);
@@ -167,9 +196,23 @@ const handleSave = async (row, field) => {
   }
 }
 
-console.log('dddddsssss')
+// 过滤 examList 以匹配选定的月份
+const filterByMonth = () => {
+  if (selectedMonth.value !== null) {
+    filteredExamList.value = examList.value.filter(exam => {
+      const examMonth = exam.month.split('-')[1] // 提取月份部分
+      return examMonth === selectedMonth.value
+    })
+  } else {
+    filteredExamList.value = examList.value
+  }
+}
+
+// 在获取数据后初始化过滤列表
 onMounted(() => {
-  fetchExamList()
+  fetchExamList().then(() => {
+    filteredExamList.value = examList.value
+  })
 })
 </script>
 
