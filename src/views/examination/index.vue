@@ -30,16 +30,7 @@
       </el-table-column>
       <el-table-column prop="target" label="目标值">
         <template #default="{ row }">
-          <div v-if="row.isEditingTarget" class="edit-cell">
-            <el-input
-              v-model="row.target"
-              type="number"
-              step="0.01"
-              @blur="handleSave(row, 'target')"
-              v-focus
-            />
-          </div>
-          <div v-else class="cell-content" @dblclick="handleEdit(row, 'target')">
+          <div class="cell-content">
             {{ row.target }}
           </div>
         </template>
