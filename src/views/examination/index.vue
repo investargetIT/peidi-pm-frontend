@@ -92,6 +92,7 @@ const fetchExamList = async () => {
     const manageName = ddUserInfo.name
     // const manageName = '付阳'
     // const manageName = '范振吉'
+    // const manageName = '王家琦'
     console.log('manageName', manageName);
     
     // 调用 getModifyUser 并打印结果
@@ -113,7 +114,8 @@ const fetchExamList = async () => {
 
     // 过滤 examList，只保留在 userResult 中存在的 examinationTypeId
     // 如果examinationTypeId的值是'all'，则保留所有数据
-    const filteredExamList = examList.value.filter(exam => 
+    // 如果userResult是空数组，则不能查看任何数据
+    const filteredExamList = userResult.length === 0 ? [] : examList.value.filter(exam => 
       userResult.some(user => user.examinationTypeId == exam.examinationTypeId) || 
       user.examinationTypeId === 'all'
     );
