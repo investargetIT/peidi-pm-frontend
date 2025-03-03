@@ -102,7 +102,7 @@ const fetchExamList = async () => {
 
     const res = await getExaminationList({
       pageNo: 1,
-      pageSize: 100
+      pageSize: 1000
     })
     
     // 为每条数据添加编辑状态标记
