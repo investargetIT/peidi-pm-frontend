@@ -116,8 +116,8 @@ const fetchExamList = async () => {
     // 如果examinationTypeId的值是'all'，则保留所有数据
     // 如果userResult是空数组，则不能查看任何数据
     const filteredExamList = userResult.length === 0 ? [] : examList.value.filter(exam => 
-      userResult.some(user => user.examinationTypeId == exam.examinationTypeId) || 
-      user.examinationTypeId === 'all'
+      userResult.some(user => (user.examinationTypeId == exam.examinationTypeId || 
+      user.examinationTypeId === 'all'))
     );
     examList.value = filteredExamList
     console.log(filteredExamList);
