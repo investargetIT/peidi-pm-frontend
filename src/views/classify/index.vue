@@ -537,7 +537,7 @@ const closeModalShow = ref(false);
         </el-form-item>
         <el-form-item style="width: 30%" label="任务类型">
           <el-select v-model="form.workType" placeholder="任务类型">
-            <el-option v-for="item in taskTypeEnum" :label="item.value" :value="item.id"></el-option>
+            <el-option v-for="item in taskTypeEnum" :label="item.value?.split('&')[0]" :value="item.id"></el-option>
           </el-select>
         </el-form-item>
         <br />
