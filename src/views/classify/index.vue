@@ -212,6 +212,15 @@ const getCurrentPage = () => {
     });
   }
 
+  // 添加任务类型筛选
+  if (form.value.workType) {
+    searchArr.push({
+      searchName: "taskTypeId",
+      searchType: "equals",
+      searchValue: form.value.workType
+    });
+  }
+
   // 添加任务描述
   if (form.value.description) {
     searchArr.push({
@@ -531,7 +540,7 @@ const closeModalShow = ref(false);
           </el-select>
         </el-form-item>
         <el-form-item style="width: 30%" label="优先级">
-          <el-select v-model="form.priority" placeholder="优先级">
+          <el-select v-model="form.priority" placeholder="优先级" clearable>
             <el-option v-for="item in priorityEnum" :label="item.value" :value="item.id"></el-option>
           </el-select>
         </el-form-item>
