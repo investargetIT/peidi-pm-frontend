@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import * as dd from "dingtalk-jsapi";
 import { initDingH5RemoteDebug } from "dingtalk-h5-remote-debug";
 import cardDetail from "./cardDetail.vue";
@@ -23,7 +23,11 @@ import Axios from "axios";
 import { message } from "@/utils/message";
 import { ElLoading, ElMessageBox } from "element-plus";
 
-
+const isDesignWorkType = computed(() => {
+  const designWorkTypes = ["包装设计", "品牌设计", "集团设计"];
+  const selectedWorkType = workTypeMap.value.find(item => item.id === newTaskData.value.workTypeId);
+  return selectedWorkType && designWorkTypes.includes(selectedWorkType.level1);
+});
 const workContentMap = ref([])
 const handleRemove = (uploadFile, uploadFiles) => {
   return ElMessageBox.confirm(
@@ -325,16 +329,16 @@ const deleteUrl = index => {
 };
 
 const uploadUrl = ref("");
-const taskRules = {
+const taskRules = ref({
   taskTheme: [{ required: isMy || isNew, message: "输入任务主题", trigger: "blur" }],
   businessUnit: [
     { required: isMy || isNew, message: "输入业务单元", trigger: "blur" }
   ],
-  taskTypeId: [{ required: isMy || isNew, message: "输入任务类型", trigger: "blur" }],
+  taskTypeId: [{ required: isMy || isNew, message: "输入任务类型", trigger: "change" }],
   workTypeId: [{ required: isMy || isNew, message: "输入工作类型", trigger: "blur" }],
   priorityId: [{ required: isMy || isNew, message: "输入任务优先级", trigger: "blur" }],
   expectEndDate: [
-    { required: isMy || isNew, message: "选择期望完成时间", trigger: "blur" }
+    { required: isMy || isNew, message: isDesignWorkType.value ? "请与设计师沟通确保时间达成一致" : "选择期望完成时间", trigger: "blur" }
   ],
   predictDuration: [
     { required: isEdit, message: "输入预估工时", trigger: "blur" }
@@ -343,13 +347,13 @@ const taskRules = {
   endTime: [{ required: isEdit, message: "输入交付时间", trigger: "blur" }],
   contacters: [{ required: isMy || isNew, message: "选择需求发起人", trigger: "blur" }],
   workers: [{ required: isEdit, message: "选择承接人", trigger: "blur" }],
-  description: [{ required: isMy || isNew, message: "输入任务描述", trigger: "blur" }],
+  description: [{ required: isMy || isNew, message: "输入任务描述", trigger: "change" }],
   attachments: [{ required: false, message: "附件上传", trigger: "change" }],
   links: [{ required: false, message: "链接上传", trigger: "change" }],
   workContentId: [
     { required: isEdit, message: "选择工作内容", trigger: "blur" }
   ]
-};
+});
 const formRef = ref(null);
 const workTimeType = ref('1');
 const changeWorkTimeType = (val) => {
@@ -360,6 +364,7 @@ const changeWorkTimeType = (val) => {
   }
 }
 const updateTaskFun = async () => {
+  
   if (!formRef.value) {
     return;
   }
@@ -392,7 +397,6 @@ const updateTaskFun = async () => {
         links: newTaskData.value.links,
         predictDuration: workTimeType.value == '2' ? (newTaskData.value.predictDuration * 8) : newTaskData.value.predictDuration,
         priorityId: newTaskData.value.priorityId,
-        // "statusId": newTaskData.value.statusId,
         taskTypeId: newTaskData.value.taskTypeId,
         title: newTaskData.value.taskTheme,
         workTypeId: newTaskData.value.workContentId || newTaskData.value.workTypeId,
@@ -449,16 +453,12 @@ const addNewTask = async () => {
         }),
         creator: { userName: ddUserInfo.name, userId: ddUserInfo.userid },
         description: newTaskData.value.description,
-        // "endTime": newTaskData.value.endTime,
         expectEndDate: newTaskData.value.expectEndDate,
         links: newTaskData.value.links,
-        // "predictDuration": newTaskData.value.predictDuration,
         priorityId: newTaskData.value.priorityId,
-        // "statusId": newTaskData.value.statusId,
         taskTypeId: newTaskData.value.taskTypeId,
         title: newTaskData.value.taskTheme,
         workTypeId: newTaskData.value.workContentId || newTaskData.value.workTypeId
-        // "workers": newTaskData.value.workers
       }).then(res => {
         const { code, data } = res;
         if (code == 200) {
@@ -522,11 +522,11 @@ const workTypeChange = (val = false) => {
   if (!val) {
     newTaskData.value.workContentId = ''; 
     downloadFileName.value = [];
-
   }
+  
   let level1Name = workTypeMap.value.find(item => item.id === newTaskData.value.workTypeId).level1;
   let newlevel2 = [];
-  // debugger;
+  
   workContentMap.value.map(
     item => {
       if (item.level == 2 && item.level1 == level1Name) {
@@ -534,16 +534,13 @@ const workTypeChange = (val = false) => {
       }
     }
   );
+  
   console.log('newlevel2', newlevel2);
   
   workContentList.value = newlevel2;
-  // console.log("workValue", workValue);
-  // if (workValue) {
-  //   let download = extractInfo(workValue).filename;
-  //   downloadFileName.value = download;
-  // } else {
-  //   downloadFileName.value = [];
-  // }
+
+  // 更新 expectEndDate 的提示信息
+  taskRules.value.expectEndDate[0].message = isDesignWorkType.value ? "请与设计师沟通确保时间达成一致" : "选择期望完成时间";
 };
 const workContentChange = () => {
   let item = workContentList.value.find(item => item.id == newTaskData.value.workContentId)
@@ -662,6 +659,8 @@ const handleError = () => {
   message("上传失败", { type: "error" });
 }
 
+
+
 </script>
 
 <template>
@@ -735,7 +734,8 @@ const handleError = () => {
         <el-col :span="12">
           <el-form-item label="期望结束日期" prop="expectEndDate">
             <el-date-picker class="!w-full" :disabled="isEdit" v-model="newTaskData.expectEndDate" format="YYYY/MM/DD"
-              value-format="YYYY-MM-DD" type="date" placeholder="选择期望结束日期" />
+              value-format="YYYY-MM-DD" type="date" 
+              :placeholder="isDesignWorkType ? '请与设计师沟通确保时间达成一致' : '选择期望结束日期'" />
           </el-form-item>
         </el-col>
       </el-row>
