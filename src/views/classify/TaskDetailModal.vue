@@ -10,7 +10,7 @@
         <Level :level="taskData.priorityName" />
         <span style="font-size: 20px; font-weight: 600">{{
           taskData.title
-          }}</span>
+        }}</span>
       </div>
       <div class="task-detail-header">
         <span class="task-created-updated">
@@ -22,7 +22,7 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="需求发起人">
-              <span>{{ taskData.contacters.map(item => item.userName).join('、')}}</span>
+              <span>{{taskData.contacters.map(item => item.userName).join('、')}}</span>
             </el-form-item></el-col>
 
           <el-col :span="12">
@@ -73,22 +73,22 @@
           </el-col>
         </el-row>
         <el-row v-if="taskData.difficulty">
-            <el-col :span="12">
-              <el-form-item label="任务等级">
-                <span>{{ taskData.difficulty }}</span>
-              </el-form-item>
-            </el-col>
-            </el-row> 
+          <el-col :span="12">
+            <el-form-item label="任务等级">
+              <span>{{ taskData.difficulty }}</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
 
 
-            <el-row>
-              <el-col :span="24">
-                <el-form-item label="任务描述">
-                  <el-input type="textarea" v-model="taskData.description"
-                    :disabled="!canExamineTask(taskData) && !isSuperAdminUser" autosize />
-                </el-form-item>
-              </el-col>
-            </el-row>
+        <el-row>
+          <el-col :span="24">
+            <el-form-item label="任务描述">
+              <el-input type="textarea" v-model="taskData.description"
+                :disabled="!canExamineTask(taskData) && !isSuperAdminUser" autosize />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <el-tabs v-if="taskData.contacters" v-model="activeTab">
         <el-tab-pane label="工作记录" name="workRecord">
@@ -149,9 +149,9 @@
             class="upload-demo123 upload-demo w-full" :class="{
               'not-show-delete': taskData.statusName == '已完成'
             }" :action="postUrl" :on-error="handleError" :data="{
-            path: default_upload_url,
-            create_parents: false
-          }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-remove="removeFule"
+              path: default_upload_url,
+              create_parents: false
+            }" :with-credentials="false" :accept="'*'" :on-change="handleChange" :on-remove="removeFule"
             :before-upload="beforeUpload" :on-success="uploadSuccess" :auto-upload="false" :on-preview="val => {
               chaohuiDownload(val.realFileName || val?.row?.name || val.name);
             }
@@ -166,9 +166,9 @@
           </div>
 
           <el-tag class="mr-4" type="primary" @click="() => {
-              console.log('dddddd');
-            }
-            " v-for="item in taskData.links">{{ item }}</el-tag>
+            console.log('dddddd');
+          }
+          " v-for="item in taskData.links">{{ item }}</el-tag>
           <p class="text-center m-8" v-if="!taskData.links.length">
             暂无关联链接
           </p>
@@ -206,7 +206,7 @@
         <span>工作类型:</span>
         <span class="font-bold ml-4">{{
           extractInfo(taskData.workTypeName).name
-          }}</span>
+        }}</span>
       </p>
       <p class="text-base mb-4">
         <span>时间范围:</span>
@@ -288,7 +288,7 @@ const deleteHoster = index => {
     // 删除后如果长度>0，那么更新
     if (taskData.value.workers.length > 0) {
       updateTaskInfo();
-    }else{
+    } else {
       // 提醒一下承接人不能为空
       message('承接人不能为空', { type: 'error' });
     }
@@ -297,7 +297,7 @@ const deleteHoster = index => {
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 const updatePredictDuration = () => {
   if (!taskData.value.predictDuration || taskData.value.predictDuration <= 0) {
-    message('预估工时不能为空或小于等于0',{
+    message('预估工时不能为空或小于等于0', {
       type: 'warning',
     });
     return;
@@ -310,7 +310,7 @@ const updateEndTime = () => {
 const choosePerson = type => {
   let data_this =
     type == "contacter" ? taskData.value.creator
- : taskData.value.workers;
+      : taskData.value.workers;
   // let test = [{ "avatar": "", "name": "台江鹏", "emplId": "474805081221550528" }];
   // if (type == 'contacter') {
   //   form.value.requester = (test)
@@ -368,7 +368,18 @@ const handleChange = (file) => {
 }
 
 const canChangeStatus = (item) => {
-  if (item.id < taskData.value.statusId){
+  if (item.id < taskData.value.statusId) {
+    // 通常状态不能回退
+    // 退回修改-> 已关闭
+    const canReturnRevisionEdit = taskData.value.statusId === 90 && item.value === '已关闭';
+    // 待审核-> 已完成/已关闭
+    const canPendingReviewEdit = taskData.value.statusId === 91 && (['已完成', '已关闭'].includes(item.value));
+    if (canReturnRevisionEdit || canPendingReviewEdit) return false;
+    return true;
+  }
+  if (item.id > taskData.value.statusId && [90, 22].includes(taskData.value.statusId)) {
+    // 退回修改时，不能选择待审核
+    // 已完成时，均不能修改
     return true;
   }
   if (item.value == '已关闭') {
