@@ -157,7 +157,8 @@ const getCurrentPage = () => {
     pageNo: Number(currentPageNum.value),
     pageSize: Number(pageSize.value),
     userId: ddUserInfo?.userid || "",
-    searchStr: JSON.stringify(searchArr)
+    searchStr: JSON.stringify(searchArr),
+    sortStr: JSON.stringify([{ "sortName": "expectEndDate", "sortType": "desc" }])
   }).then(res => {
     console.log("res", res);
     if (res?.code) {
