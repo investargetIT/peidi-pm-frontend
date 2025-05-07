@@ -448,11 +448,110 @@ const getFileName = arr => {
   return names;
 };
 
+const { taskDetail } = defineProps({
+  isVisible: {
+    type: Boolean,
+    required: true
+  },
+  taskDetail: {
+    type: Object,
+    required: true
+  },
+  taskStatus: {
+    type: String
+  }
+});
+
+const taskData = ref({});
+const taskDataBackup = ref({});
+const workRecords = ref([]);
+const activeTab = ref("workRecord");
+const emit = defineEmits(["closeModal", "refresh"]);
+
+const getTaskRecordFun = () => {
+  getTaskRecord({
+    taskId: taskDetail.id
+  }).then(res => {
+    console.log("res", res);
+    const { code, data } = res;
+    if (code == 200) {
+      workRecords.value = data;
+      workRecords.value.map(item => {
+        item.timeRange = item.startTime + "至" + item.endTime;
+      });
+    }
+  });
+};
+
+const getOneTaskFun = () => {
+  getOneTask({
+    id: taskDetail.id
+  }).then(res => {
+    const { code, data } = res;
+    if (code == 200) {
+      let newArr = [];
+      if (data.attachments) {
+        data.attachments.map(item => {
+          if (!item.response) {
+            newArr.push({
+              raw: {
+                name: item
+              },
+              response: {
+                success: true
+              },
+              name: item,
+              status: "success",
+              uid: Date.now()
+            });
+          } else {
+            newArr.push({
+              ...item
+            })
+          }
+        });
+      }
+      data.attachments = JSON.parse(JSON.stringify(newArr));
+      taskData.value = data;
+      taskDataBackup.value = JSON.parse(JSON.stringify(data));
+    }
+  });
+};
+
+const handleModify = row => {
+  console.log("修改工作记录：", row);
+};
+const handleDetail = row => {
+  console.log("查看工作记录详细：", row);
+};
+const handleDelete = row => {
+  console.log("删除工作记录：", row);
+};
+// 定义数据
+const dialogVisible = ref(false);
+const priority = ref("低");
+const taskName = ref("某科技公司任务");
+const taskId = ref("T1485");
+const createdAt = ref("2024-12-11");
+const updatedAt = ref("23小时前");
+const taskForm = ref({
+  requester: "冶东",
+  assignee: "欧阳产品",
+  taskType: "需求",
+  estimatedHours: 10
+});
+
 const updateTaskInfo = val => {
   if (val == "newlink") {
     taskData.value.links.push(newLink.value);
   }
-  updateTask({
+  
+  // 检查 workerIds 是否有变化
+  const currentWorkerIds = taskData.value?.workers?.map(item => item?.emplId || item?.userId)?.sort()?.join(',');
+  const backupWorkerIds = taskDataBackup?.workers?.map(item => item?.emplId || item?.userId)?.sort()?.join(',');
+  const isWorkerIdsChanged = currentWorkerIds !== backupWorkerIds;
+
+  const sendConfig = {
     ...taskData.value,
     attachments: getFileName(taskData.value.attachments),
     workerIds: taskData.value.workers.map(item => {
@@ -461,16 +560,26 @@ const updateTaskInfo = val => {
         userId: item.emplId || item.userId
       };
     }),
-    updateUser: { userName: ddUserInfo.name, userId: ddUserInfo.userid }
-  }).then(res => {
+    updateUser: { userName: ddUserInfo.name, userId: ddUserInfo.userid },
+  };
+  // 当承接人发生变动时，传递isExamine=true
+  if(isWorkerIdsChanged){
+    sendConfig.isExamine = true;
+  }
+
+  updateTask(sendConfig).then(res => {
     const { code } = res;
     if (code == 200) {
       message("修改任务信息成功", { type: "success" });
       newLinkModal.value = false;
       newLink.value = "";
+      // 更新成功后更新备份数据
+      taskDataBackup.value = JSON.parse(JSON.stringify(taskData.value));
       emit("refresh");
     } else {
-      taskData.value.links.pop();
+      if (val == "newlink") {
+        taskData.value.links.pop();
+      }
     }
   });
 };
@@ -579,95 +688,7 @@ const addWorkRecord = async () => {
   });
 };
 
-const getTaskRecordFun = () => {
-  getTaskRecord({
-    taskId: taskDetail.id
-  }).then(res => {
-    console.log("res", res);
-    const { code, data } = res;
-    if (code == 200) {
-      workRecords.value = data;
-      workRecords.value.map(item => {
-        item.timeRange = item.startTime + "至" + item.endTime;
-      });
-    }
-  });
-};
-
-const { taskDetail } = defineProps({
-  isVisible: {
-    type: Boolean,
-    required: true
-  },
-  taskDetail: {
-    type: Object,
-    required: true
-  },
-  taskStatus: {
-    type: String
-  }
-});
-const taskData = ref({});
-const getOneTaskFun = () => {
-  getOneTask({
-    id: taskDetail.id
-  }).then(res => {
-    const { code, data } = res;
-    if (code == 200) {
-      let newArr = [];
-      if (data.attachments) {
-        data.attachments.map(item => {
-          if (!item.response) {
-            newArr.push({
-              raw: {
-                name: item
-              },
-              response: {
-                success: true
-              },
-              name: item,
-              status: "success",
-              uid: Date.now()
-            });
-          } else {
-            newArr.push({
-              ...item
-            })
-          }
-        });
-      }
-      data.attachments = JSON.parse(JSON.stringify(newArr));
-      taskData.value = data;
-    }
-  });
-};
 getOneTaskFun();
-const activeTab = ref("workRecord");
-const emit = defineEmits(["closeModal", "refresh"]);
-
-const handleModify = row => {
-  console.log("修改工作记录：", row);
-};
-const handleDetail = row => {
-  console.log("查看工作记录详细：", row);
-};
-const handleDelete = row => {
-  console.log("删除工作记录：", row);
-};
-// 定义数据
-const dialogVisible = ref(false);
-const priority = ref("低");
-const taskName = ref("某科技公司任务");
-const taskId = ref("T1485");
-const createdAt = ref("2024-12-11");
-const updatedAt = ref("23小时前");
-const taskForm = ref({
-  requester: "冶东",
-  assignee: "欧阳产品",
-  taskType: "需求",
-  estimatedHours: 10
-});
-const workRecords = ref([]);
 getTaskRecordFun();
 </script>
 <style scoped>
