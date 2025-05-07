@@ -546,10 +546,12 @@ const updateTaskInfo = val => {
     taskData.value.links.push(newLink.value);
   }
   
+
   // 检查 workerIds 是否有变化
   const currentWorkerIds = taskData.value?.workers?.map(item => item?.emplId || item?.userId)?.sort()?.join(',');
-  const backupWorkerIds = taskDataBackup?.workers?.map(item => item?.emplId || item?.userId)?.sort()?.join(',');
+  const backupWorkerIds = taskDataBackup.value?.workers?.map(item => item?.emplId || item?.userId)?.sort()?.join(',');
   const isWorkerIdsChanged = currentWorkerIds !== backupWorkerIds;
+ 
 
   const sendConfig = {
     ...taskData.value,
@@ -566,6 +568,7 @@ const updateTaskInfo = val => {
   if(isWorkerIdsChanged){
     sendConfig.isExamine = true;
   }
+
 
   updateTask(sendConfig).then(res => {
     const { code } = res;
