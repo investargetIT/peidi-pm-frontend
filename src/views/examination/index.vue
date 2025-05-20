@@ -102,7 +102,14 @@ const fetchExamList = async () => {
 
     const res = await getExaminationList({
       pageNo: 1,
-      pageSize: 1000
+      pageSize: 1000,
+      searchStr: JSON.stringify([
+        {
+          searchName:'month',
+          searchValue: `${new Date().getFullYear()}-${selectedMonth.value}`,
+          searchType:'like'
+        }
+      ])
     })
     
     // 为每条数据添加编辑状态标记
@@ -115,11 +122,11 @@ const fetchExamList = async () => {
     // 过滤 examList，只保留在 userResult 中存在的 examinationTypeId
     // 如果examinationTypeId的值是'all'，则保留所有数据
     // 如果userResult是空数组，则不能查看任何数据
-    const filteredExamList = userResult.length === 0 ? [] : examList.value.filter(exam => 
+    const tempArr = userResult.length === 0 ? [] : examList.value.filter(exam => 
       userResult.some(user => (user.examinationTypeId == exam.examinationTypeId || 
       user.examinationTypeId === 'all'))
     );
-    examList.value = filteredExamList
+    filteredExamList.value = tempArr;
     console.log(filteredExamList);
   } catch (error) {
     console.error('获取数据失败：', error)
@@ -191,14 +198,7 @@ const handleSave = async (row, field) => {
 
 // 过滤 examList 以匹配选定的月份
 const filterByMonth = () => {
-  if (selectedMonth.value !== null) {
-    filteredExamList.value = examList.value.filter(exam => {
-      const examMonth = exam.month.split('-')[1] // 提取月份部分
-      return examMonth === selectedMonth.value
-    })
-  } else {
-    filteredExamList.value = examList.value
-  }
+  fetchExamList()
 }
 
 // 在获取数据后初始化过滤列表
@@ -207,9 +207,7 @@ onMounted(() => {
   const currentMonth = new Date().getMonth() + 1
   selectedMonth.value = currentMonth < 10 ? `0${currentMonth}` : `${currentMonth}`
 
-  fetchExamList().then(() => {
-    filterByMonth() // 初始化时根据当前月份过滤
-  })
+  fetchExamList();
 })
 </script>
 
