@@ -64,7 +64,7 @@ export const getJsApi = params => {
 export const getUserInfo = code => {
   return http.request(
     "get",
-    `https://api.peidigroup.cn/oms/ding/userInfo?code=${code}`,
+    `https://user.peidigroup.cn/ding/userInfo?code=${code}`,
     {}
   );
 };

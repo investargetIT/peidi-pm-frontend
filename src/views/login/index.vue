@@ -99,7 +99,7 @@ const ddLogin = () => {
             console.log("ddUserInfo", ddUserInfo);
             // alert(JSON.stringify(ddUserInfo));
             localStorage.setItem("ddUserInfo", JSON.stringify(ddUserInfo));
-            const { org_email, name } = ddUserInfo;
+            const { org_email, name, userid } = ddUserInfo;
             if (org_email) {
               console.log("ddEmail", org_email);
               ddUserEmail = org_email;
@@ -110,7 +110,8 @@ const ddLogin = () => {
                 email: org_email,
                 emailCode: "",
                 password: DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD,
-                username: name
+                username: name,
+                dingId: userid
               });
             } else {
               message("获取钉钉用户企业邮箱失败：" + JSON.stringify(res), {
