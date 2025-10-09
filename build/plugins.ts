@@ -14,6 +14,7 @@ import removeConsole from "vite-plugin-remove-console";
 import { themePreprocessorPlugin } from "@pureadmin/theme";
 import { genScssMultipleScopeVars } from "../src/layout/theme";
 // import { vitePluginFakeServer } from "vite-plugin-fake-server";
+import BASIC_SSL from '@vitejs/plugin-basic-ssl';
 
 export function getPluginsList(
   VITE_CDN: boolean,
@@ -66,6 +67,8 @@ export function getPluginsList(
     // 打包分析
     lifecycle === "report"
       ? visualizer({ open: true, brotliSize: true, filename: "report.html" })
-      : (null as any)
+      : (null as any),
+    // 本地调试运行https支持
+    BASIC_SSL()
   ];
 }
