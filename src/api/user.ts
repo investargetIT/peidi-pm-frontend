@@ -69,6 +69,15 @@ export const getUserInfo = code => {
   );
 };
 
+// 获取基地信息
+export const getUserSite = () => {
+  return http.request(
+    "get",
+    `https://user.peidigroup.cn/user/site`,
+    {}
+  );
+};
+
 // 注册
 export const register = data => {
   return http.request(
@@ -78,6 +87,12 @@ export const register = data => {
       data
     }
   );
+};
+
+export const registerMobile = data => {
+  return http.request("post", `https://user.peidigroup.cn/user/sms-register`, {
+    data
+  });
 };
 
 /** 刷新`token` */

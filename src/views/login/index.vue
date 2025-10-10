@@ -13,7 +13,7 @@ import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import { ref, reactive, toRaw, onMounted, onBeforeUnmount } from "vue";
 import { useDataThemeChange } from "@/layout/hooks/useDataThemeChange";
 import { initDingH5RemoteDebug } from "dingtalk-h5-remote-debug";
-import { getUserInfo, register } from "../../api/user";
+import { getUserInfo, register, registerMobile, getUserSite } from "../../api/user";
 import dayIcon from "@/assets/svg/day.svg?component";
 import darkIcon from "@/assets/svg/dark.svg?component";
 import Lock from "@iconify-icons/ri/lock-fill";
@@ -38,21 +38,30 @@ const { dataTheme, overallStyle, dataThemeChange } = useDataThemeChange();
 dataThemeChange(overallStyle.value);
 const { title } = useNav();
 initDingH5RemoteDebug();
+const siteList = ref([
+  // {
+  //   label: "杭州",
+  //   value: "hangzhou"
+  // }
+]);
 const ruleForm = reactive({
   // username: "taijp@peidibrand.com",
   // password: "Aa123456"
-    username: "",
-  password: ""
+  username: "",
+  password: "",
+  site: ""
 });
 const onLogin = async (formEl: FormInstance | undefined) => {
   if (!formEl) return;
   await formEl.validate((valid, fields) => {
+    // console.log(valid, fields, ruleForm); return;
     if (valid) {
       loading.value = true;
       useUserStoreHook()
         .loginByUsername({
           username: ruleForm.username,
-          password: ruleForm.password
+          password: ruleForm.password,
+          site: ruleForm.site || null
         })
         .then(res => {
           if (res.success) {
@@ -67,7 +76,7 @@ const onLogin = async (formEl: FormInstance | undefined) => {
                 router.push({ path: '/my/index', query: { tabName: 'worker' } });
               });
 
-            }else{
+            } else {
               return initRouter().then(() => {
                 router.push(getTopMenu(true).path).then(() => {
                   message("登录成功", { type: "success" });
@@ -99,24 +108,42 @@ const ddLogin = () => {
             console.log("ddUserInfo", ddUserInfo);
             // alert(JSON.stringify(ddUserInfo));
             localStorage.setItem("ddUserInfo", JSON.stringify(ddUserInfo));
-            const { org_email, name, userid } = ddUserInfo;
+            const { org_email, name, userid, mobile } = ddUserInfo;
             if (org_email) {
               console.log("ddEmail", org_email);
               ddUserEmail = org_email;
               // 获取到钉钉用户企业邮箱，调用注册接口
-              ruleForm.username = ddUserEmail;
+              // ruleForm.username = `${ddUserEmail}&${mobile}`;
+              ruleForm.username = `${ddUserEmail}`;
               ruleForm.password = DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD;
               return register({
                 email: org_email,
                 emailCode: "",
                 password: DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD,
                 username: name,
+                dingId: userid,
+                mobile: mobile
+              });
+            } else if (mobile) {
+              console.log("使用手机号注册，mobile:", mobile);
+              ruleForm.username = `${mobile}`;
+              ruleForm.password = DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD;
+
+              // 使用手机号注册，添加标识
+              return registerMobile({
+                mobile,
+                mobileCode: "",
+                password: DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD,
+                username: name,
                 dingId: userid
               });
             } else {
-              message("获取钉钉用户企业邮箱失败：" + JSON.stringify(res), {
-                type: "error"
-              });
+              message(
+                "获取钉钉用户邮箱和手机号都失败：" + JSON.stringify(res),
+                {
+                  type: "error"
+                }
+              );
             }
           } else {
             message("用户注册失败：" + JSON.stringify(res), { type: "error" });
@@ -124,15 +151,37 @@ const ddLogin = () => {
         })
         .then(res => {
           if (res) {
-            if (
-              res.success ||
-              (res.code === 100100002 &&
-                res.msg === "EMAIL_ACCOUNT_ALREADY_EXIST")
-            ) {
+            // 获取当前用户信息来判断注册类型
+            const ddUserInfo = JSON.parse(
+              localStorage.getItem("ddUserInfo") || "{}"
+            );
+            const isEmailRegistration = !!ddUserInfo.org_email;
+
+            let registrationSuccess = false;
+
+            if (isEmailRegistration) {
+              // 邮箱注册的判断条件
+              registrationSuccess =
+                res.success ||
+                (res.code === 100100002 &&
+                  res.msg === "EMAIL_ACCOUNT_ALREADY_EXIST");
+              console.log("邮箱注册结果:", res);
+            } else {
+              // 手机号注册的判断条件
+              registrationSuccess =
+                res.success ||
+                (res.code === 100100003 &&
+                  res.msg === "PHONE_ACCOUNT_ALREADY_EXIST");
+              console.log("手机号注册结果:", res);
+            }
+
+            if (registrationSuccess) {
               // 注册成功，调用登录接口
+              console.log("注册成功，开始登录");
               onLogin(ruleFormRef.value);
             } else {
-              message("用户注册失败：" + JSON.stringify(res), {
+              const registrationType = isEmailRegistration ? "邮箱" : "手机号";
+              message(`${registrationType}注册失败：` + JSON.stringify(res), {
                 type: "error"
               });
             }
@@ -169,6 +218,15 @@ function onkeypress({ code }: KeyboardEvent) {
 
 onMounted(() => {
   window.document.addEventListener("keypress", onkeypress);
+
+  // 获取基地信息
+  getUserSite().then(res => {
+    if (res.success) {
+      const { data } = res;
+      console.log("siteList", data);
+      siteList.value = data;
+    }
+  });
 });
 
 onBeforeUnmount(() => {
@@ -200,20 +258,15 @@ onBeforeUnmount(() => {
             <h2 class="outline-none">{{ title }}</h2>
           </Motion>
 
-          <el-form
-            ref="ruleFormRef"
-            :model="ruleForm"
-            :rules="loginRules"
-            size="large"
-          >
+          <el-form ref="ruleFormRef" :model="ruleForm" :rules="loginRules" size="large">
             <Motion :delay="100">
               <el-form-item
                 :rules="[
                   {
                     required: true,
                     message: '请输入账号',
-                    trigger: 'blur'
-                  }
+                    trigger: 'blur',
+                  },
                 ]"
                 prop="username"
               >
@@ -235,6 +288,24 @@ onBeforeUnmount(() => {
                   placeholder="密码"
                   :prefix-icon="useRenderIcon(Lock)"
                 />
+              </el-form-item>
+            </Motion>
+
+            <Motion :delay="150">
+              <el-form-item prop="site">
+                <el-select v-model="ruleForm.site" clearable placeholder="基地">
+                  <template #prefix>
+                    <el-icon size="14" style="margin-right: 2px">
+                      <LocationFilled />
+                    </el-icon>
+                  </template>
+                  <el-option
+                    v-for="item in siteList"
+                    :key="item.id"
+                    :label="item.siteName"
+                    :value="item.id"
+                  />
+                </el-select>
               </el-form-item>
             </Motion>
 
@@ -263,5 +334,13 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 :deep(.el-input-group__append, .el-input-group__prepend) {
   padding: 0;
+}
+
+:deep(.el-select__wrapper) {
+  padding: 1px 15px;
+
+  span {
+    font-size: 14px;
+  }
 }
 </style>
