@@ -67,7 +67,7 @@ const onLogin = async (formEl: FormInstance | undefined, isDingTalkLogin: boolea
         .then(res => {
           if (res.success) {
             if (!isDingTalkLogin) {
-              getUserCheck(res?.data).then(res => localStorage.setItem("ddUserInfo", JSON.stringify({ ...DDUSERINFO, userid: res?.data?.id })));
+              getUserCheck(res?.data).then(res => localStorage.setItem("ddUserInfo", JSON.stringify({ userid: res?.data?.id, dept_id_list: [res?.data?.deptId] })))
             }
             // 获取后端路由
             const redirectPath = localStorage.getItem('redirectPath') || '/';
