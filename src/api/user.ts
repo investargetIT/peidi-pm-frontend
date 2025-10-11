@@ -68,6 +68,14 @@ export const getUserInfo = code => {
     {}
   );
 };
+// 根据token拿到userId
+export const getUserCheck = token => {
+  return http.request(
+    "get",
+    `https://user.peidigroup.cn/user/user-check?token=${token}`,
+    {}
+  );
+};
 
 // 获取基地信息
 export const getUserSite = () => {

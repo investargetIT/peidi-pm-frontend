@@ -4,7 +4,7 @@ import { ref, defineEmits } from 'vue';
 import { extractEmplId } from './utils';
 import { getEnum } from '../../api/pmApi';
 
-type Worker = {
+interface Worker {
   userId: string,
   userName: string,
   identify: string,
@@ -62,6 +62,7 @@ const workersExIds = ref<string[]>([]);
 
 // #region 初始化源数据
 const initWorkers = () => {
+  if(!props.workersData) return;
   workers.value = props.workersData.filter(item => item.identify == 'worker');
   // 格式化内部承接人适配钉钉选择器
   workers.value.map((item: any) => {
@@ -142,7 +143,7 @@ defineExpose({
 <template>
   <el-dialog v-model="dialogVisible" title="承接人" width="500" :close-on-click-modal="false">
     <div>
-      <el-divider content-position="left">内部承接人</el-divider>
+      <el-divider content-position="left"><b>内部</b></el-divider>
       <el-tag v-for="(item, index) in workers" :key="item.userId" closable :type="'info'" @close="deleteWorker(index)"
         style="margin-right: 10px;">
         {{ item.userName }}
@@ -150,7 +151,7 @@ defineExpose({
       <el-button @click="choosePerson()">+</el-button>
 
       <div style="height: 20px;"></div>
-      <el-divider content-position="left">外部承接人</el-divider>
+      <el-divider content-position="left"><b>外部</b></el-divider>
       <el-select v-model="workersExIds" multiple placeholder="选择外部承接人">
         <el-option v-for="item in workerExMap" :key="item.id" :label="item.name" :value="item.id" />
       </el-select>

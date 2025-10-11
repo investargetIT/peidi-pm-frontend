@@ -22,8 +22,7 @@ import {
 import Axios from "axios";
 import { message } from "@/utils/message";
 import { ElLoading, ElMessageBox } from "element-plus";
-import workerDetailModal from "./workerDetailModal.vue";
-import { alert } from "dingtalk-jsapi/api/apiObj";
+import WorkerDetailModal from "./workerDetailModal.vue";
 
 const isDesignWorkType = computed(() => {
   const designWorkTypes = ["包装设计", "品牌设计", "集团设计"];
@@ -859,7 +858,7 @@ const workerDetailModalRefresh = (data) => {
         重置
       </el-button>
     </div>
-    <workerDetailModal :workersData="newTaskData.workers" @refresh="workerDetailModalRefresh" ref="workerDetailModalRef"/>
+    <WorkerDetailModal :workersData="newTaskData.workers" @refresh="workerDetailModalRefresh" ref="workerDetailModalRef"/>
     <!-- </template> -->
   </div>
 </template>
