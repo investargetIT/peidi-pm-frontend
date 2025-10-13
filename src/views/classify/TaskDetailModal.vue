@@ -250,7 +250,7 @@ import {
   updateTask
 } from "../../api/pmApi";
 import { message } from "@/utils/message";
-import { extractInfo, extractEmplId } from "./utils";
+import { extractInfo, extractEmplId, isExternalTask } from "./utils";
 import * as dd from "dingtalk-jsapi";
 
 import {
@@ -560,8 +560,10 @@ const updateTaskInfo = val => {
     attachments: getFileName(taskData.value.attachments),
     workerIds: taskData.value.workers.map(item => {
       return {
+        ...item,
         userName: item.name || item.userName,
-        userId: item.emplId || item.userId
+        userId: item.emplId || item.userId,
+        identify: isExternalTask(item.userId) ? 'worker_ex' : 'worker'
       };
     }),
     updateUser: { userName: ddUserInfo.name, userId: ddUserInfo.userid },
@@ -700,6 +702,7 @@ const workerDetailModalRef = ref(null);
 const workerDetailModalRefresh = (data) => {
   console.log('workerDetailModalRefresh', data);
   taskData.value.workers = data;
+  updateTaskInfo();
 }
 </script>
 <style scoped>

@@ -40,3 +40,11 @@ export function splitTaskType(val){
     priority : arr[1]
   }
 }
+
+// 判断是否是外部承接人
+export function isExternalTask(id) {
+  const externalTask = localStorage.getItem('workerExEnum');
+  if (!externalTask) return false;
+  const externalTaskArr = JSON.parse(externalTask);
+  return externalTaskArr.some(item => item.id === id);
+}

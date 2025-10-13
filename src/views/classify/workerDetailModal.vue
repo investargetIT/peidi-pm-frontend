@@ -36,7 +36,8 @@ getEnum({
     workerExMap.value.map((item: any) => {
       item.id = item.value.split('&')[0];
       item.name = item.value.split('&')[1];
-    })
+    });
+    localStorage.setItem('workerExEnum', JSON.stringify(workerExMap.value));
   }
 });
 // #endregion
@@ -62,7 +63,7 @@ const workersExIds = ref<string[]>([]);
 
 // #region 初始化源数据
 const initWorkers = () => {
-  if(!props.workersData) return;
+  if (!props.workersData) return;
   workers.value = props.workersData.filter(item => item.identify == 'worker');
   // 格式化内部承接人适配钉钉选择器
   workers.value.map((item: any) => {
