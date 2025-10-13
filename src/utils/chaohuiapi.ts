@@ -77,10 +77,10 @@ export const testAllIPs = async () => {
 export const chaohuilogin = () => {
   // debugger;
   console.log("ddddd");
-    const loadingInstance1 = ElLoading.service({
-      fullscreen: true,
-      text: "局域网上传连接中。。。"
-    });
+    // const loadingInstance1 = ElLoading.service({
+    //   fullscreen: true,
+    //   text: "局域网上传连接中。。。"
+    // });
   return new Promise((resolve, reject) => {
     Axios.get(
       `${uploadUrl}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`
@@ -101,11 +101,14 @@ export const chaohuilogin = () => {
       .catch(err => {
         // reject(err)
         console.log("chaohuilogin err", err);
+        message("文件服务器连接异常。请联系管理员，或稍后重试。", {
+          type: "error"
+        });
         localStorage.removeItem('ipThis');
         // testAllIPs();
       })
           .finally(() => {
-      loadingInstance1.close();
+      // loadingInstance1.close();
     })
   });
 };
