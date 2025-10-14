@@ -216,7 +216,7 @@ ddLogin();
 /** 使用公共函数，避免`removeEventListener`失效 */
 function onkeypress({ code }: KeyboardEvent) {
   if (["Enter", "NumpadEnter"].includes(code)) {
-    onLogin(ruleFormRef.value);
+    onLogin(ruleFormRef.value, false);
   }
 }
 
