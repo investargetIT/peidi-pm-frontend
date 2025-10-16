@@ -85,6 +85,8 @@ export const useUserStore = defineStore({
       removeToken();
       useMultiTagsStoreHook().handleTags("equal", [...routerArrays]);
       resetRouter();
+      // 统一登录状态凭据删除
+      storageLocal().removeItem("peidi-userInfo");
       router.push("/login");
     },
     /** 刷新`token` */
