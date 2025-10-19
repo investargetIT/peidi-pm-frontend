@@ -35,6 +35,9 @@ importers:
       cross-storage:
         specifier: ^1.0.0
         version: 1.0.0
+      crypto-js:
+        specifier: ^4.2.0
+        version: 4.2.0
       dayjs:
         specifier: ^1.11.12
         version: 1.11.12
@@ -1722,6 +1725,9 @@ packages:
 
   cross-storage@1.0.0:
     resolution: {integrity: sha512-PkAi+2MD6T17klbIjRSGs5ku4AM97/1CYrWEJtClrw8UYLXq709+o92FfW+Q2uDPlv4PMMsa59dJNRIwjWReuw==}
+
+  crypto-js@4.2.0:
+    resolution: {integrity: sha512-KALDyEYgpY+Rlob/iriUtjV6d5Eq+Y191A5g4UqLAi8CyGP9N1+FdVbkc1SxKc2r4YAYqG8JzO2KGL+AizD70Q==}
 
   css-declaration-sorter@6.4.1:
     resolution: {integrity: sha512-rtdthzxKuyq6IzqX6jEcIzQF/YqccluefyCYheovBOLhFT/drQA9zj/UbRAa9J7C0o6EG6u3E6g+vKkay7/k3g==}
@@ -5987,6 +5993,8 @@ snapshots:
       which: 2.0.2
 
   cross-storage@1.0.0: {}
+
+  crypto-js@4.2.0: {}
 
   css-declaration-sorter@6.4.1(postcss@8.4.41):
     dependencies:
