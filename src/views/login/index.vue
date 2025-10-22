@@ -244,7 +244,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="select-none">
+  <div class="select-none" v-show="false">
     <img :src="bg" class="wave" />
     <div class="flex-c absolute right-5 top-3">
       <!-- 主题 -->
