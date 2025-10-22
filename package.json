@@ -57,6 +57,8 @@
     "@vueuse/motion": "^2.2.3",
     "animate.css": "^4.1.1",
     "axios": "^1.7.4",
+    "cross-storage": "^1.0.0",
+    "crypto-js": "^4.2.0",
     "dayjs": "^1.11.12",
     "dhtmlx-gantt": "^9.0.3",
     "dingtalk-h5-remote-debug": "^0.1.3",

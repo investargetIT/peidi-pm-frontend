@@ -10,7 +10,7 @@
         <Level :level="taskData.priorityName" />
         <span style="font-size: 20px; font-weight: 600">{{
           taskData.title
-        }}</span>
+          }}</span>
       </div>
       <div class="task-detail-header">
         <span class="task-created-updated">
@@ -28,7 +28,7 @@
           <el-col :span="12">
             <el-form-item label="承接人">
               <el-button v-if="canExamineTask(taskData) || isSuperAdminUser"
-                @click="choosePerson('workers')">选择承接人</el-button>
+                @click="workerDetailModalRef && workerDetailModalRef.handleShow()">选择承接人</el-button>
               <div v-if="taskData.workers.length" class="helpers">
                 <p v-for="(item, index) in taskData.workers" class="help-item">
                   {{ item.name || item.userName }}
@@ -206,7 +206,7 @@
         <span>工作类型:</span>
         <span class="font-bold ml-4">{{
           extractInfo(taskData.workTypeName).name
-        }}</span>
+          }}</span>
       </p>
       <p class="text-base mb-4">
         <span>时间范围:</span>
@@ -222,6 +222,7 @@
     <el-input class="!w-[500px] m-6" v-model="newLink"></el-input>
     <el-button type="primary" @click="updateTaskInfo('newlink')">新增</el-button>
   </el-dialog>
+  <WorkerDetailModal :workersData="taskData.workers" @refresh="workerDetailModalRefresh" ref="workerDetailModalRef" />
 </template>
 
 <script setup>
@@ -249,7 +250,7 @@ import {
   updateTask
 } from "../../api/pmApi";
 import { message } from "@/utils/message";
-import { extractInfo, extractEmplId } from "./utils";
+import { extractInfo, extractEmplId, isExternalTask } from "./utils";
 import * as dd from "dingtalk-jsapi";
 
 import {
@@ -265,6 +266,7 @@ import {
   canExamineTask,
   updateExpectData
 } from "../../utils/permission";
+import WorkerDetailModal from "./workerDetailModal.vue";
 const postUrl = ref("");
 const uploadRef = ref(null)
 const handleRemove = (uploadFile, uploadFiles) => {
@@ -558,8 +560,10 @@ const updateTaskInfo = val => {
     attachments: getFileName(taskData.value.attachments),
     workerIds: taskData.value.workers.map(item => {
       return {
+        ...item,
         userName: item.name || item.userName,
-        userId: item.emplId || item.userId
+        userId: item.emplId || item.userId,
+        identify: isExternalTask(item.userId) ? 'worker_ex' : 'worker'
       };
     }),
     updateUser: { userName: ddUserInfo.name, userId: ddUserInfo.userid },
@@ -693,6 +697,13 @@ const addWorkRecord = async () => {
 
 getOneTaskFun();
 getTaskRecordFun();
+
+const workerDetailModalRef = ref(null);
+const workerDetailModalRefresh = (data) => {
+  console.log('workerDetailModalRefresh', data);
+  taskData.value.workers = data;
+  updateTaskInfo();
+}
 </script>
 <style scoped>
 .helpers {

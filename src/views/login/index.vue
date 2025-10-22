@@ -13,13 +13,14 @@ import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import { ref, reactive, toRaw, onMounted, onBeforeUnmount } from "vue";
 import { useDataThemeChange } from "@/layout/hooks/useDataThemeChange";
 import { initDingH5RemoteDebug } from "dingtalk-h5-remote-debug";
-import { getUserInfo, register, registerMobile, getUserSite } from "../../api/user";
+import { getUserInfo, register, registerMobile, getUserSite, getUserCheck } from "../../api/user";
 import dayIcon from "@/assets/svg/day.svg?component";
 import darkIcon from "@/assets/svg/dark.svg?component";
 import Lock from "@iconify-icons/ri/lock-fill";
 import User from "@iconify-icons/ri/user-3-fill";
 import * as dd from "dingtalk-jsapi";
 import { useRoute } from 'vue-router'
+import { DDUSERINFO } from "./utils/constants";
 const route = useRoute()
 
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
@@ -51,7 +52,7 @@ const ruleForm = reactive({
   password: "",
   site: ""
 });
-const onLogin = async (formEl: FormInstance | undefined) => {
+const onLogin = async (formEl: FormInstance | undefined, isDingTalkLogin: boolean = true) => {
   if (!formEl) return;
   await formEl.validate((valid, fields) => {
     // console.log(valid, fields, ruleForm); return;
@@ -65,6 +66,9 @@ const onLogin = async (formEl: FormInstance | undefined) => {
         })
         .then(res => {
           if (res.success) {
+            if (!isDingTalkLogin) {
+              getUserCheck(res?.data).then(res => localStorage.setItem("ddUserInfo", JSON.stringify({ userid: res?.data?.id, dept_id_list: [res?.data?.deptId] })))
+            }
             // 获取后端路由
             const redirectPath = localStorage.getItem('redirectPath') || '/';
             if (redirectPath.includes('/examination')) {
@@ -212,11 +216,16 @@ ddLogin();
 /** 使用公共函数，避免`removeEventListener`失效 */
 function onkeypress({ code }: KeyboardEvent) {
   if (["Enter", "NumpadEnter"].includes(code)) {
-    onLogin(ruleFormRef.value);
+    onLogin(ruleFormRef.value, false);
   }
 }
 
 onMounted(() => {
+  // 不在钉钉环境下，跳转到新登录页
+  if (!navigator.userAgent.includes("DingTalk")) {
+    window.location.href = `${window.location.origin}/#/login_`;
+  }
+  
   window.document.addEventListener("keypress", onkeypress);
 
   // 获取基地信息
@@ -235,7 +244,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="select-none">
+  <div class="select-none" v-show="false">
     <img :src="bg" class="wave" />
     <div class="flex-c absolute right-5 top-3">
       <!-- 主题 -->
@@ -315,7 +324,7 @@ onBeforeUnmount(() => {
                 size="default"
                 type="primary"
                 :loading="loading"
-                @click="onLogin(ruleFormRef)"
+                @click="onLogin(ruleFormRef, false)"
               >
                 登录
               </el-button>

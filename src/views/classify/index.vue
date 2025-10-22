@@ -35,6 +35,7 @@ import TaskStatus from "../../components/Common/taskStatus.vue";
 import { useRouter, useRoute } from "vue-router";
 import CardDetail from "./cardDetail.vue";
 import CloseTask from "./closeTask.vue";
+import WorkerDetailModal from "./workerDetailModal.vue";
 
 const route = useRoute()
 ddAuthFun();
@@ -239,7 +240,8 @@ const getCurrentPage = () => {
   }
 
   // 添加worker
-  if (form.value.assignee) {
+  if (form.value.assignee && form.value.assignee.length > 0) {
+    // console.log('form.value.assignee', form.value.assignee);
     searchArr.push({
       searchName: "worker",
       searchType: "like",
@@ -525,6 +527,12 @@ const renderTabLabel = (item) => {
 };
 
 const closeModalShow = ref(false);
+
+const workerDetailModalRef = ref(null);
+const workerDetailModalRefresh = (data) => {
+  console.log('workerDetailModalRefresh', data);
+  form.value.assignee = data;
+}
 </script>
 
 <template>
@@ -562,7 +570,7 @@ const closeModalShow = ref(false);
           <el-tag v-for="tag in form.assignee" :key="tag" :disable-transitions="false">
             {{ tag.name }}
           </el-tag>
-          <el-button class="button-new-tag" size="default" @click="choosePerson('worker')">
+          <el-button class="button-new-tag" size="default" @click="workerDetailModalRef && workerDetailModalRef.handleShow()">
             + 承接人
           </el-button>
         </el-form-item>
@@ -700,6 +708,7 @@ const closeModalShow = ref(false);
       @close="isShowCardDetail = false;" :detailId="detailId" />
     <CloseTask v-if="closeModalShow" v-model:closeModalShow="closeModalShow" :closeData="closeData"
       @refresh="getCurrentPage" />
+    <WorkerDetailModal :workersData="form.assignee" @refresh="workerDetailModalRefresh" ref="workerDetailModalRef" />
   </div>
 </template>
 

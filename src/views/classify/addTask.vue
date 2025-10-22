@@ -22,6 +22,7 @@ import {
 import Axios from "axios";
 import { message } from "@/utils/message";
 import { ElLoading, ElMessageBox } from "element-plus";
+import WorkerDetailModal from "./workerDetailModal.vue";
 
 const isDesignWorkType = computed(() => {
   const designWorkTypes = ["包装设计", "品牌设计", "集团设计"];
@@ -400,12 +401,13 @@ const updateTaskFun = async () => {
         taskTypeId: newTaskData.value.taskTypeId,
         title: newTaskData.value.taskTheme,
         workTypeId: newTaskData.value.workContentId || newTaskData.value.workTypeId,
-        workerIds: newTaskData.value.workers.map(item => {
-          return {
-            userName: item.name,
-            userId: item.emplId
-          };
-        }),
+        // workerIds: newTaskData.value.workers.map(item => {
+        //   return {
+        //     userName: item.name,
+        //     userId: item.emplId
+        //   };
+        // }),
+        workerIds: newTaskData.value.workers,
         isExamine: examine,
         difficulty: newTaskData.value.difficulty
       }).then(res => {
@@ -659,7 +661,33 @@ const handleError = () => {
   message("上传失败", { type: "error" });
 }
 
-
+// const workersData = ref([
+//   {
+//     userId: '1',
+//     userName: 'n1',
+//     identify: 'worker'
+//   },
+//   {
+//     userId: '2',
+//     userName: 'n2',
+//     identify: 'worker'
+//   },
+//   {
+//     userId: '4',
+//     userName: 'w4',
+//     identify: 'worker_ex'
+//   },
+//   {
+//     userId: '1926449443739600967',
+//     userName: '蒋子文',
+//     identify: 'worker_ex'
+//   }
+// ]);
+const workerDetailModalRef = ref(null);
+const workerDetailModalRefresh = (data) => {
+  console.log('workerDetailModalRefresh', data);
+  newTaskData.value.workers = data;
+}
 
 </script>
 
@@ -734,8 +762,7 @@ const handleError = () => {
         <el-col :span="12">
           <el-form-item label="期望结束日期" prop="expectEndDate">
             <el-date-picker class="!w-full" :disabled="isEdit" v-model="newTaskData.expectEndDate" format="YYYY/MM/DD"
-              value-format="YYYY-MM-DD" type="date" 
-              :placeholder="isDesignWorkType ? '请与设计师沟通确保时间达成一致' : '选择期望结束日期'" />
+              value-format="YYYY-MM-DD" type="date" :placeholder="isDesignWorkType ? '请与设计师沟通确保时间达成一致' : '选择期望结束日期'" />
           </el-form-item>
         </el-col>
       </el-row>
@@ -777,7 +804,7 @@ const handleError = () => {
       <el-row :gutter="20">
         <el-col :span="20">
           <el-form-item label="承接人" prop="workers">
-            <el-button :disabled="isNew || isMy" @click="choosePerson('workers')">选择承接人</el-button>
+            <el-button :disabled="isNew || isMy" @click="workerDetailModalRef && workerDetailModalRef.handleShow()">选择承接人</el-button>
             <div class="helpers">
               <p v-for="(item, index) in newTaskData.workers" class="help-item">
                 {{ item.name }}
@@ -831,6 +858,7 @@ const handleError = () => {
         重置
       </el-button>
     </div>
+    <WorkerDetailModal :workersData="newTaskData.workers" @refresh="workerDetailModalRefresh" ref="workerDetailModalRef"/>
     <!-- </template> -->
   </div>
 </template>

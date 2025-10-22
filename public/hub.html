@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Cross-Storage Hub</title>
+  <script src="./hub.js"></script>
+</head>
+
+<body>
+  <script>
+    new CrossStorageHub.init([
+      { origin: /localhost:8848$/, allow: ['get', 'set', 'del', 'getKeys', 'clear'] },
+      { origin: /localhost:8849$/, allow: ['get', 'set', 'del', 'getKeys', 'clear'] },
+      { origin: /localhost:8850$/, allow: ['get', 'set', 'del', 'getKeys', 'clear'] },
+      { origin: /login.peidigroup.cn$/, allow: ['get', 'set', 'del', 'getKeys', 'clear'] }
+    ]);
+  </script>
+</body>
+
+</html>
