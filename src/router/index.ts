@@ -134,6 +134,16 @@ showLink: false  // 方式4：自定义hideInMenu属性
     }
   },
   {
+    path: '/debug',
+    name: 'debug',
+    component: () => import('@/views/debug/index.vue'),
+    hidden: true,
+    meta: {
+      rank: 102,
+      showLink: false  // 方式4：自定义hideInMenu属性
+    }
+  },
+  {
     path: '/login_',
     name: 'login_',
     component: () => import('@/views/login/index_.vue'),
