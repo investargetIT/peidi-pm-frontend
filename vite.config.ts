@@ -26,7 +26,7 @@ export default ({ mode }: ConfigEnv): UserConfigExport => {
       // 本地跨域代理 https://cn.vitejs.dev/config/server-options.html#server-proxy
       proxy: {
         "/nasapi": {
-          target: "http://9vx396nm1505.vicp.fun:6001",
+          target: "https://12.18.1.16:5001",
           changeOrigin: true,
           rewrite: path => path.replace(/^\/nasapi/, "")
         }

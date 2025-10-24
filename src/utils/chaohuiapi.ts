@@ -2,6 +2,7 @@ import Axios from "axios";
 import { ElLoading } from "element-plus";
 export const default_upload_url = "/web_packages/test/uploadFile";
 import { message } from "@/utils/message";
+import { pingIP } from "@/utils/ip";
 
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 const port = 5001;
@@ -12,15 +13,15 @@ let ipThis = "";
 const ips = ["192.168.1.252", "12.18.1.16", "192.168.110.252"];
 const ipsName = [
   {
-    url: "192.168.1.252",
+    url: "http://192.168.1.252:6001",
     name: "A区"
   },
   {
-    url: "12.18.1.16",
+    url: "http://12.18.1.16:6001",
     name: "B区"
   },
   {
-    url: "192.168.110.252",
+    url: "http://192.168.110.252:6001",
     name: "CD区"
   }
 ];
@@ -28,7 +29,10 @@ import { jsonp } from "vue-jsonp";
 
 const testResults: any = [];
 // let uploadUrl = "http://9vx396nm1505.vicp.fun:6001";
+// let uploadUrl = "http://pm.peidigroup.cn/nas";
+// let uploadUrl = "http://12.18.1.16:6001";
 let uploadUrl = "http://pm.peidigroup.cn/nas";
+// console.log("uploadUrl", uploadUrl);
 
 const testIPWithJsonp = ip => {
   return new Promise((resolve, reject) => {
@@ -53,7 +57,7 @@ const testIPWithJsonp = ip => {
       })
       .catch(error => {
         // 如果出现错误，认为不可访问，记录错误信息
-        console.log("ddddsss",error);
+        console.log("ddddsss", error);
 
         testResults.push({
           ip: ip,
@@ -68,6 +72,28 @@ const testIPWithJsonp = ip => {
 // 导入这个方法，导入后会自动登陆chaohui
 export const testAllIPs = async () => {
 
+  //#region 内外网判断
+  await pingIP(ips[0]).then(async res => {
+    if (!res) {
+      await pingIP(ips[1]).then(async res => {
+        if (!res) {
+          await pingIP(ips[2]).then(res => {
+            if (!res) {
+              console.log("所有IP都不可访问");
+            } else {
+              uploadUrl = ipsName[2].url;
+            }
+          });
+        } else {
+          uploadUrl = ipsName[1].url;
+        }
+      });
+    } else {
+      uploadUrl = ipsName[0].url;
+    }
+  });
+  //#endregion
+
   return new Promise((resolve, reject) => {
     resolve(chaohuilogin());
   });
@@ -77,21 +103,22 @@ export const testAllIPs = async () => {
 export const chaohuilogin = () => {
   // debugger;
   console.log("ddddd");
-    // const loadingInstance1 = ElLoading.service({
-    //   fullscreen: true,
-    //   text: "局域网上传连接中。。。"
-    // });
+  // const loadingInstance1 = ElLoading.service({
+  //   fullscreen: true,
+  //   text: "局域网上传连接中。。。"
+  // });
   return new Promise((resolve, reject) => {
     Axios.get(
       `${uploadUrl}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`
+      // `https://12.18.1.16:5001/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`
     )
       .then(res => {
-        
         if (res?.data?.data?.sid) {
           sid = res?.data?.data?.sid;
           resolve({
             sid: res?.data?.data?.sid,
             postUrl: `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Upload&method=upload&version=2&_sid=${res?.data?.data?.sid}`
+            // postUrl: `https://12.18.1.16:5001/webapi/entry.cgi?api=SYNO.FileStation.Upload&method=upload&version=2&_sid=${res?.data?.data?.sid}`
           });
         }
         // localStorage.setItem('QunHuiToken', res.data.data.sid)
@@ -104,19 +131,24 @@ export const chaohuilogin = () => {
         message("文件服务器连接异常。请联系管理员，或稍后重试。", {
           type: "error"
         });
-        localStorage.removeItem('ipThis');
+        localStorage.removeItem("ipThis");
         // testAllIPs();
       })
-          .finally(() => {
-      // loadingInstance1.close();
-    })
+      .finally(() => {
+        // loadingInstance1.close();
+      });
   });
 };
 
 // 下载
 export const chaohuiDownload = filename => {
-const encodedFilename = encodeURIComponent(filename);
-  console.log("filename", filename , encodedFilename ,  `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`);
+  const encodedFilename = encodeURIComponent(filename);
+  console.log(
+    "filename",
+    filename,
+    encodedFilename,
+    `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`
+  );
   Axios.get(
     `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`,
     {
@@ -134,7 +166,7 @@ const encodedFilename = encodeURIComponent(filename);
       URL.revokeObjectURL(objectURL); // 释放临时URL对象
     })
     .catch(err => {
-              localStorage.removeItem('ipThis');
-        testAllIPs();
-    })
+      localStorage.removeItem("ipThis");
+      testAllIPs();
+    });
 };
