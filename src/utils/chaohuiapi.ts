@@ -2,7 +2,7 @@ import Axios from "axios";
 import { ElLoading } from "element-plus";
 export const default_upload_url = "/web_packages/test/uploadFile";
 import { message } from "@/utils/message";
-import { pingIP } from "@/utils/ip";
+import { pingIP, getYourIP, pingIP2 } from "@/utils/ip";
 
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 const port = 5001;
@@ -10,28 +10,29 @@ const USERNAME = "夏琰";
 const PASSWORD = "X81y0122";
 let sid = "";
 let ipThis = "";
-const ips = ["192.168.1.252", "12.18.1.16", "192.168.110.252"];
+const ips = ["192.168.110.252", "12.18.1.16", "192.168.1.252"];
 const ipsName = [
   {
-    url: "http://192.168.1.252:6001",
-    name: "A区"
+    url: "http://192.168.110.252:6001",
+    name: "CD区"
   },
   {
     url: "http://12.18.1.16:6001",
     name: "B区"
   },
   {
-    url: "http://192.168.110.252:6001",
-    name: "CD区"
+    url: "http://192.168.1.252:6001",
+    name: "A区"
   }
 ];
 import { jsonp } from "vue-jsonp";
 
 const testResults: any = [];
+let downloadUrl = "http://pm.peidigroup.cn/nas";
 // let uploadUrl = "http://9vx396nm1505.vicp.fun:6001";
-// let uploadUrl = "http://pm.peidigroup.cn/nas";
-// let uploadUrl = "http://12.18.1.16:6001";
 let uploadUrl = "http://pm.peidigroup.cn/nas";
+// let uploadUrl = "http://12.18.1.16:6001";
+// let uploadUrl = "/nasapi"
 // console.log("uploadUrl", uploadUrl);
 
 const testIPWithJsonp = ip => {
@@ -71,34 +72,38 @@ const testIPWithJsonp = ip => {
 
 // 导入这个方法，导入后会自动登陆chaohui
 export const testAllIPs = async () => {
+  // 默认使用外网地址
+  uploadUrl = "http://pm.peidigroup.cn/nas"; // 外网地址
 
   //#region 内外网判断
-  await pingIP(ips[0]).then(async res => {
-    if (!res) {
-      await pingIP(ips[1]).then(async res => {
-        if (!res) {
-          await pingIP(ips[2]).then(res => {
-            if (!res) {
-              console.log("所有IP都不可访问");
-            } else {
-              uploadUrl = ipsName[2].url;
-            }
-          });
-        } else {
-          uploadUrl = ipsName[1].url;
-        }
-      });
-    } else {
-      uploadUrl = ipsName[0].url;
+  // 按顺序测试内网IP，300毫秒内能ping通则使用内网地址
+  for (let i = 0; i < ips.length; i++) {
+    const isReachable = await pingIP(ips[i]);
+    if (isReachable) {
+      uploadUrl = ipsName[i].url; // 使用当前可用的内网地址
+      console.log(`使用内网地址: ${ipsName[i].name} (${ipsName[i].url})`);
+      break;
     }
-  });
+  }
+  //#endregion
+
+  //#region 测试内网IP是否可访问
+  // 按顺序测试内网IP，300毫秒内能ping通则使用内网地址
+  // for (let i = 0; i < ips.length; i++) {
+  //   const isReachable = await pingIP2(ips[i]);
+  //   if (isReachable) {
+  //     uploadUrl = ipsName[i].url; // 使用当前可用的内网地址
+  //     console.log(`使用内网地址: ${ipsName[i].name} (${ipsName[i].url})`);
+  //     break;
+  //   }
+  // }
   //#endregion
 
   return new Promise((resolve, reject) => {
     resolve(chaohuilogin());
   });
 };
-
+// getYourIP();
 // 登陆
 export const chaohuilogin = () => {
   // debugger;
@@ -109,8 +114,10 @@ export const chaohuilogin = () => {
   // });
   return new Promise((resolve, reject) => {
     Axios.get(
-      `${uploadUrl}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`
-      // `https://12.18.1.16:5001/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`
+      `${uploadUrl}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`,
+      {
+        timeout: 3000
+      }
     )
       .then(res => {
         if (res?.data?.data?.sid) {
@@ -118,7 +125,6 @@ export const chaohuilogin = () => {
           resolve({
             sid: res?.data?.data?.sid,
             postUrl: `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Upload&method=upload&version=2&_sid=${res?.data?.data?.sid}`
-            // postUrl: `https://12.18.1.16:5001/webapi/entry.cgi?api=SYNO.FileStation.Upload&method=upload&version=2&_sid=${res?.data?.data?.sid}`
           });
         }
         // localStorage.setItem('QunHuiToken', res.data.data.sid)
@@ -127,12 +133,29 @@ export const chaohuilogin = () => {
       })
       .catch(err => {
         // reject(err)
-        console.log("chaohuilogin err", err);
-        message("文件服务器连接异常。请联系管理员，或稍后重试。", {
-          type: "error"
-        });
+        // console.log("chaohuilogin err", err);
         localStorage.removeItem("ipThis");
         // testAllIPs();
+
+        // 如果报错说明没连上内网，直接返回外网
+        Axios.get(
+          `${downloadUrl}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`
+        )
+          .then(res => {
+            if (res?.data?.data?.sid) {
+              sid = res?.data?.data?.sid;
+              resolve({
+                sid: res?.data?.data?.sid,
+                postUrl: `${downloadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Upload&method=upload&version=2&_sid=${res?.data?.data?.sid}`
+              });
+            }
+          })
+
+          .catch(err => {
+            message("文件服务器连接异常。请联系管理员，或稍后重试。", {
+              type: "error"
+            });
+          });
       })
       .finally(() => {
         // loadingInstance1.close();
@@ -147,10 +170,10 @@ export const chaohuiDownload = filename => {
     "filename",
     filename,
     encodedFilename,
-    `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`
+    `${downloadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`
   );
   Axios.get(
-    `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`,
+    `${downloadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`,
     {
       responseType: "blob"
     }
