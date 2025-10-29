@@ -28,9 +28,12 @@ const ipsName = [
 import { jsonp } from "vue-jsonp";
 
 const testResults: any = [];
-let downloadUrl = "http://pm.peidigroup.cn/nas";
+// 定义一个标识来判断当前是否使用了内网地址
+let isUsingInternalIP = true;
+
+let downloadUrl = "http://pm.peidigroup.cn/nas"; // 固定为外网地址，不会变
 // let uploadUrl = "http://9vx396nm1505.vicp.fun:6001";
-let uploadUrl = "http://pm.peidigroup.cn/nas";
+let uploadUrl = "http://pm.peidigroup.cn/nas"; // 上传地址：会根据内外网判断而变化
 // let uploadUrl = "http://12.18.1.16:6001";
 // let uploadUrl = "/nasapi"
 // console.log("uploadUrl", uploadUrl);
@@ -138,6 +141,9 @@ export const chaohuilogin = () => {
         // testAllIPs();
 
         // 如果报错说明没连上内网，直接返回外网
+        // 标记为使用了内网地址
+        isUsingInternalIP = false;
+
         Axios.get(
           `${downloadUrl}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`
         )
@@ -170,10 +176,10 @@ export const chaohuiDownload = filename => {
     "filename",
     filename,
     encodedFilename,
-    `${downloadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`
+    `${isUsingInternalIP ? uploadUrl : downloadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`
   );
   Axios.get(
-    `${downloadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`,
+    `${isUsingInternalIP ? uploadUrl : downloadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`,
     {
       responseType: "blob"
     }
