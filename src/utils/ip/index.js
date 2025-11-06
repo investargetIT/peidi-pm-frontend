@@ -1,3 +1,4 @@
+import * as dd from "dingtalk-jsapi";
 /**
  * 获取当前设备的内网ip 需要开启WebRTC
  */
@@ -61,32 +62,82 @@ export function getYourIP(){
 
 //  ping 函数, 检测与内网连接是否能在300ms 内响应
 export function pingIP(ip) {
-  return new Promise((resolve, reject) => {
-    let img = new Image();
-    let start = new Date().getTime();
-    img.src = "http://" + ip + "?t=" + start;
-    let flag = false;
-    let hasResponded = false;
+  // 不在钉钉环境下
+  // if (!navigator.userAgent.includes("DingTalk")) {
+  if(true){
+    return new Promise((resolve, reject) => {
+      let img = new Image();
+      let start = new Date().getTime();
+      img.src = "http://" + ip + "?t=" + start;
+      let flag = false;
+      let hasResponded = false;
 
-    img.onload = function () {
-      hasResponded = true;
-      const responseTime = new Date().getTime() - start;
-      // 300毫秒内响应返回true，否则返回false
-      resolve(responseTime <= 300);
-    }
-    img.onerror = function () {
-      hasResponded = true;
-      const responseTime = new Date().getTime() - start;
-      // 300毫秒内响应返回true，否则返回false
-      resolve(responseTime <= 300);
-    };
- 
-    let timer = setTimeout(function () {
-      if (!hasResponded) {
-        resolve(false); // 超时返回false
+      img.onload = function () {
+        hasResponded = true;
+        const responseTime = new Date().getTime() - start;
+        // 300毫秒内响应返回true，否则返回false
+        resolve(responseTime <= 300);
       }
-    }, 300); // 改为300毫秒超时
-  });
+      img.onerror = function () {
+        hasResponded = true;
+        const responseTime = new Date().getTime() - start;
+        // 300毫秒内响应返回true，否则返回false
+        resolve(responseTime <= 300);
+      };
+  
+      let timer = setTimeout(function () {
+        if (!hasResponded) {
+          resolve(false); // 超时返回false
+        }
+      }, 300); // 改为300毫秒超时
+   });
+  } else {
+    // 在钉钉环境下用钉钉自带的httpRequest 函数
+    return new Promise((resolve, reject) => {
+      const start = new Date().getTime();
+      let hasResponded = false;
+      let timeoutTimer;
+
+      console.log(`钉钉环境下开始ping IP: ${ip}`);
+      
+      // 设置超时定时器
+      timeoutTimer = setTimeout(() => {
+        if (!hasResponded) {
+          hasResponded = true;
+          console.log(`IP ${ip} 请求超时`);
+          resolve(false);
+        }
+      }, 300);
+
+      dd.httpRequest({
+        url: `http://${ip}/`,
+        method: 'HEAD',
+        timeout: 300,
+        onSuccess: function(res) {
+          if (hasResponded) return;
+          hasResponded = true;
+          clearTimeout(timeoutTimer);
+          
+          const responseTime = new Date().getTime() - start;
+          console.log(`IP ${ip} 请求成功, 响应时间: ${responseTime}ms`);
+          
+          // 300毫秒内响应返回true，否则返回false
+          resolve(responseTime <= 300);
+        },
+        onFail: function(err) {
+          if (hasResponded) return;
+          hasResponded = true;
+          clearTimeout(timeoutTimer);
+          
+          const responseTime = new Date().getTime() - start;
+          console.log(`IP ${ip} 请求失败, 错误:`, err, `响应时间: ${responseTime}ms`);
+          
+          // 即使请求失败，只要在300ms内收到响应也认为连通
+          resolve(responseTime <= 300);
+        }
+      });
+    });
+  }
 }
 
 //  ping 函数, 检测与内网连接是否能在300ms 内响应

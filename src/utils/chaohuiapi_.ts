@@ -111,7 +111,6 @@ export const testAllIPs = async () => {
 export const chaohuilogin = () => {
   // debugger;
   console.log("ddddd");
-  // message("当前ip" + uploadUrl);
   // const loadingInstance1 = ElLoading.service({
   //   fullscreen: true,
   //   text: "局域网上传连接中。。。"
@@ -144,7 +143,7 @@ export const chaohuilogin = () => {
         // 如果报错说明没连上内网，直接返回外网
         // 标记为使用了内网地址
         isUsingInternalIP = false;
-        // message("当前ip" + downloadUrl);
+
         Axios.get(
           `${downloadUrl}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`
         )
