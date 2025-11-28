@@ -25,6 +25,8 @@ const route = useRoute()
 
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 const DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD = "Aa123456";
+const DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD_ENCRYPTED =
+  "U2FsdGVkX1/pC5emPAlvIsXeST8WGcK7+inXwej0YG8cv7GwuSmwuubV2X2h0aZ6";
 defineOptions({
   name: "Login"
 });
@@ -61,7 +63,7 @@ const onLogin = async (formEl: FormInstance | undefined, isDingTalkLogin: boolea
       useUserStoreHook()
         .loginByUsername({
           username: ruleForm.username,
-          password: ruleForm.password,
+          password: DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD_ENCRYPTED,
           site: ruleForm.site || null
         })
         .then(res => {
