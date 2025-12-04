@@ -513,7 +513,7 @@ const allLength = ref(0);
           <template #default="scope">
             <el-button @click="closeTask(scope.row)"
             v-if="scope.row.statusName != '已关闭'"
-              :disabled="!isSuperAdminUser && (scope.row.statusName != '待处理'  || (scope.row.workers?.length && scope.row.predictDuration))">
+              :disabled="!isSuperAdminUser && ((scope.row.statusName != '待处理' && scope.row.statusName != '退回修改') || (scope.row.workers?.length && scope.row.predictDuration))">
               关闭
             </el-button>
           </template>
