@@ -537,9 +537,32 @@ const workTypeChange = (val = false) => {
     }
   );
   
-  console.log('newlevel2', newlevel2);
+  // console.log('newlevel2', newlevel2);
   
-  workContentList.value = newlevel2;
+  // workContentList.value = newlevel2;
+
+  // 自定义排序函数，支持数字前缀的字符串排序
+  const sortByNumberPrefix = (a, b) => {
+    // 提取数字前缀（如 "1.3" 或 "2.1"）
+    const extractNumber = (str) => {
+      const match = str.match(/^(\d+(?:\.\d+)?)/);
+      return match ? parseFloat(match[1]) : 0;
+    };
+
+    const numA = extractNumber(a.level2);
+    const numB = extractNumber(b.level2);
+
+    // 如果数字相同，则按字符串自然排序
+    if (numA === numB) {
+      return a.level2.localeCompare(b.level2, 'zh-CN');
+    }
+
+    return numA - numB;
+  };
+
+  console.log('newlevel2', newlevel2.sort(sortByNumberPrefix));
+
+  workContentList.value = newlevel2.sort(sortByNumberPrefix);
 
   // 更新 expectEndDate 的提示信息
   taskRules.value.expectEndDate[0].message = isDesignWorkType.value ? "请与设计师沟通确保时间达成一致" : "选择期望完成时间";
