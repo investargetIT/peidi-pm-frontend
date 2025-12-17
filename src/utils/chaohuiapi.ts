@@ -182,7 +182,8 @@ export const chaohuiDownload = filename => {
   Axios.get(
     `${downloadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`,
     {
-      responseType: "blob"
+      responseType: "blob",
+      timeout: 1000 * 60 * 30
     }
   )
     .then(res => {
