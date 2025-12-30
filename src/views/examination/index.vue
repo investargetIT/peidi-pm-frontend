@@ -14,6 +14,7 @@ const PERMISSION_ID_LIST = [
   '1850741012504838145', // 张思宇
   '1887377779519434753', // 王家琦
 ]
+const hasExportPermission = ref(false);
 
 const activeName = ref('excamination')
 
@@ -21,17 +22,16 @@ const handleClick = (tab: TabsPaneContext, event: Event) => {
   console.log(tab, event)
 }
 
-const injectPermissionIdList = () => {
+
+
+const checkPermission = () => {
   const temp: any = storageLocal().getItem('user-check-info');
-  console.log("injectPermissionIdList", temp);
-  if (temp?.id) {
-    const id = temp?.id;
-    return PERMISSION_ID_LIST.includes(id);
-  }
+  // console.log("injectPermissionIdList", temp);
+  hasExportPermission.value = temp?.id ? PERMISSION_ID_LIST.includes(temp.id) : false;
 }
 
 onMounted(() => {
-  injectPermissionIdList();
+  checkPermission();
 })
 </script>
 
@@ -42,7 +42,7 @@ onMounted(() => {
       <el-tab-pane label="考核页面" name="excamination" lazy>
         <Examination v-if="activeName === 'excamination'" />
       </el-tab-pane>
-      <el-tab-pane label="报表导出" name="reportExport" lazy v-if="injectPermissionIdList()">
+      <el-tab-pane label="报表导出" name="reportExport" lazy v-if="hasExportPermission">
         <ReportExport v-if="activeName === 'reportExport'" />
       </el-tab-pane>
     </el-tabs>

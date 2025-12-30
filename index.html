@@ -89,7 +89,7 @@
     <script>
       // 用日期做一个唯一标识存入localStorage，用于判断是否是大版本更新，清空localStorage
       const oldUniqueId = localStorage.getItem("peidi-uniqueId") || "";
-      const uniqueId = 202511031732; // 需要用户强制更新时就改变这个值
+      const uniqueId = 202512310952; // 需要用户强制更新时就改变这个值
       if (oldUniqueId != uniqueId) {
         localStorage.clear();
         localStorage.setItem("peidi-uniqueId", uniqueId);
