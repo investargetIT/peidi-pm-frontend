@@ -66,14 +66,25 @@ onMounted(() => {
       .then((res) => {
         if (res.success) {
 
-          getUserCheck(res?.data).then((res: any) =>
+          getUserCheck(res?.data).then((res: any) => {
+            // 模拟出Web端的ddUserInfo对象
             localStorage.setItem(
               "ddUserInfo",
               JSON.stringify({
+                ...res?.data,
                 userid: res?.data?.id,
-                dept_id_list: [res?.data?.deptId]
+                dept_id_list: [res?.data?.deptId],
+                name: res?.data?.username,
               })
             )
+            // 需要有个新的对象来存储userCheckInfo
+            localStorage.setItem(
+              "user-check-info",
+              JSON.stringify({
+                ...res?.data,
+              })
+            )
+          }
           );
 
           // 获取后端路由

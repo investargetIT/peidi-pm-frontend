@@ -249,11 +249,8 @@ export const getModifyUser = params => {
 
 // 获取考核记录结果
 export const getExaminationRecordResult = params => {
-  return http.request(
-    "get",
-    "http://12.18.1.12:8087/pm/kpi-examination/result/list",
-    {
-      params
-    }
-  );
+  return http.request("get", baseUrlApi("/kpi-examination/result/list"), {
+    params,
+    timeout: 1000 * 60
+  });
 };

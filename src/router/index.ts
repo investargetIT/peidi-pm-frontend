@@ -111,18 +111,7 @@ const routes = [
       }
     ]
   },
-  {
-    path: "/examination",
-    name: "examination",
-    component: () => import("@/views/examination/index.vue"),
-    meta: {
-      title: "考核页面",
-      icon: "flowbite:address-book-outline",
-      showParent: false,
-      showLink: false 
-    },
-    
-  },
+
     {
     path: '/demo',
     name: 'demo',

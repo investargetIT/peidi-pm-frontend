@@ -1,7 +1,7 @@
 <template>
   <div class="examination-list">
     <!-- 修改月份选择器 -->
-    <el-select v-model="selectedMonth" placeholder="选择月份" @change="filterByMonth">
+    <el-select v-model="selectedMonth" placeholder="选择月份" @change="filterByMonth" class="mb-[20px]">
       <el-option
         v-for="month in months"
         :key="month.value"

@@ -1,26 +1,52 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import Examination from './excamination.vue'
 import ReportExport from './reportExport.vue'
+import NavBar from './navBar.vue'
 
 import type { TabsPaneContext } from 'element-plus'
+import { storageLocal } from '@pureadmin/utils'
+
+const PERMISSION_ID_LIST = [
+  '1897890298264596481', // 林双叶
+  '1870023775338692610', // 大树
+  '1926449443739600965', // 沈皓钰
+  '1850741012504838145', // 张思宇
+  '1887377779519434753', // 王家琦
+]
 
 const activeName = ref('excamination')
 
 const handleClick = (tab: TabsPaneContext, event: Event) => {
   console.log(tab, event)
 }
+
+const injectPermissionIdList = () => {
+  const temp: any = storageLocal().getItem('user-check-info');
+  console.log("injectPermissionIdList", temp);
+  if (temp?.id) {
+    const id = temp?.id;
+    return PERMISSION_ID_LIST.includes(id);
+  }
+}
+
+onMounted(() => {
+  injectPermissionIdList();
+})
 </script>
 
 <template>
-  <el-tabs v-model="activeName" type="card" class="demo-tabs" @tab-click="handleClick">
-    <el-tab-pane label="考核页面" name="excamination" lazy>
-      <Examination />
-    </el-tab-pane>
-    <el-tab-pane label="报表导出" name="reportExport" lazy v-if="false">
-      <ReportExport />
-    </el-tab-pane>
-  </el-tabs>
+  <div class="px-[20px] py-[20px] pt-[70px]">
+    <NavBar />
+    <el-tabs v-model="activeName" type="card" class="demo-tabs" @tab-click="handleClick">
+      <el-tab-pane label="考核页面" name="excamination" lazy>
+        <Examination v-if="activeName === 'excamination'" />
+      </el-tab-pane>
+      <el-tab-pane label="报表导出" name="reportExport" lazy v-if="injectPermissionIdList()">
+        <ReportExport v-if="activeName === 'reportExport'" />
+      </el-tab-pane>
+    </el-tabs>
+  </div>
 </template>
 
 <style lang="scss" scoped>
