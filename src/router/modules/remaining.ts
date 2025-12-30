@@ -26,5 +26,16 @@ export default [
         component: () => import("@/layout/redirect.vue")
       }
     ]
+  },
+  {
+    path: "/examination",
+    name: "examination",
+    component: () => import("@/views/examination/index.vue"),
+    meta: {
+      title: "考核页面",
+      icon: "flowbite:address-book-outline",
+      showParent: false,
+      showLink: false
+    }
   }
 ] satisfies Array<RouteConfigsTable>;

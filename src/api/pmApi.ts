@@ -170,12 +170,12 @@ export const getAdminUserEnum = () => {
 // 修改任务
 // /pm/task-manage/update
 export const updateTask = data => {
-  let ddUserInfo:any = localStorage.getItem("ddUserInfo");
+  let ddUserInfo: any = localStorage.getItem("ddUserInfo");
   if (ddUserInfo) {
     ddUserInfo = JSON.parse(ddUserInfo);
   }
-  if(data){
-    data.updateUser = { userName: ddUserInfo.name, userId: ddUserInfo.userid }
+  if (data) {
+    data.updateUser = { userName: ddUserInfo.name, userId: ddUserInfo.userid };
   }
   return http.request("post", baseUrlApi("/task-manage/update"), {
     data
@@ -212,7 +212,6 @@ export const updateTaskRecord = data => {
   });
 };
 
-
 // 获取任务类型 API
 export const getTaskTypeApi = params => {
   return http.request("get", baseUrlApi("/task-manage/enum"), {
@@ -245,5 +244,13 @@ export const updateExamination = data => {
 export const getModifyUser = params => {
   return http.request("get", baseUrlApi("/kpi-examination/manage"), {
     params
+  });
+};
+
+// 获取考核记录结果
+export const getExaminationRecordResult = params => {
+  return http.request("get", baseUrlApi("/kpi-examination/result/list"), {
+    params,
+    timeout: 1000 * 60
   });
 };
