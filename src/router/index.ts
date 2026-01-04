@@ -69,12 +69,12 @@ const routes = [
   // },
   {
     path: "/addTasks",
-    name: "addTasks",
+    name: "addTask",
     redirect: "/addTask/index",
     component: Layout,
     meta: {
       icon: "prime:book",
-      title: "首页",
+      title: "",
       rank: 21
     },
     children: [
@@ -111,35 +111,58 @@ const routes = [
       }
     ]
   },
+  {
+    path: "/aiDrawing",
+    name: "aiDrawing",
+    redirect: "/aiDrawing/index",
+    component: Layout,
+    meta: {
+      icon: "ri:input-method-line",
+      title: "",
+      rank: 22
+    },
+    children: [
+      {
+        path: "/aiDrawing/index",
+        name: "aiDrawing",
+        component: () => import("@/views/aiDrawing/index.vue"),
+        meta: {
+          title: "AI 绘图",
+          showParent: false
+        }
+      }
+    ]
+  },
 
-    {
-    path: '/demo',
-    name: 'demo',
-    component: () => import('@/views/demo/index.vue'),
+  {
+    path: "/demo",
+    name: "demo",
+    component: () => import("@/views/demo/index.vue"),
     hidden: true,
     meta: {
-      rank: 100,
-showLink: false  // 方式4：自定义hideInMenu属性
+      rank: 1000,
+      showLink: false // 方式4：自定义hideInMenu属性
     }
   },
   {
-    path: '/debug',
-    name: 'debug',
-    component: () => import('@/views/debug/index.vue'),
+    path: "/debug",
+    name: "debug",
+    component: () => import("@/views/debug/index.vue"),
     hidden: true,
     meta: {
-      rank: 102,
-      showLink: false  // 方式4：自定义hideInMenu属性
+      title: "调试页面",
+      rank: 1002,
+      showLink: false // 方式4：自定义hideInMenu属性
     }
   },
   {
-    path: '/login_',
-    name: 'login_',
-    component: () => import('@/views/login/index_.vue'),
+    path: "/login_",
+    name: "login_",
+    component: () => import("@/views/login/index_.vue"),
     hidden: true,
     meta: {
-    rank: 101,
-    showLink: false  // 方式4：自定义hideInMenu属性
+      rank: 1001,
+      showLink: false // 方式4：自定义hideInMenu属性
     }
   }
   // {
@@ -278,10 +301,10 @@ router.beforeEach((to: ToRouteType, _from, next) => {
       handleAliveRoute(to);
     }
   }
-  if (to.path === '/examination') {
-    localStorage.setItem('redirectPath', to.fullPath);
-  } else if (to.path !== '/login') {
-    localStorage.removeItem('redirectPath');
+  if (to.path === "/examination") {
+    localStorage.setItem("redirectPath", to.fullPath);
+  } else if (to.path !== "/login") {
+    localStorage.removeItem("redirectPath");
   }
   const userInfo = storageLocal().getItem<DataInfo<number>>(userKey);
   NProgress.start();
