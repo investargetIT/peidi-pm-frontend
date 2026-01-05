@@ -90,7 +90,7 @@ const beforeUpload = (file: any) => {
 
     <!-- 预览图片列表 -->
     <div v-if="modelValue && modelValue.length > 0" class="mt-4">
-      <div class="text-sm text-gray-500 mb-2">图片预览 ({{ modelValue.length }}/5)</div>
+      <div class="text-sm text-gray-500 mb-2">图片预览 ({{ modelValue.length }}/{{ limit }})</div>
       <div class="flex flex-wrap gap-2">
         <div v-for="(image, index) in modelValue" :key="index" class="relative">
           <el-image :src="image" style="width: 80px; height: 80px; object-fit: cover;" :preview-src-list="modelValue"

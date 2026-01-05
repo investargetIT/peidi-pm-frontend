@@ -4,7 +4,7 @@ import DevUpLoad from './components/devUpLoad.vue';
 import { DSL_SCHEMA } from './constants'
 
 const loading = ref(false);
-const nanoImgUrl = ref("");
+const nanoImgUrls = ref<string[]>([]); // 改为数组存储多张图片
 const progress = ref(0); // 添加进度状态
 const status = ref(''); // 添加状态显示
 
@@ -29,13 +29,34 @@ const handleSubmit = async () => {
   loading.value = true;
   progress.value = 0;
   status.value = '开始生成图片...';
+  nanoImgUrls.value = []; // 清空之前的图片
   console.log("提交表单", aiDrawingForm)
   // return;
 
+  try {
+    // 创建3个并发请求
+    const requests = [];
+    for (let i = 0; i < 3; i++) {
+      requests.push(sendDrawingRequest(i));
+    }
+
+    // 等待所有请求完成
+    await Promise.all(requests);
+    status.value = '所有图片生成完成！';
+
+  } catch (error: any) {
+    console.error('请求失败:', error);
+    status.value = `请求失败: ${error.message}`;
+  } finally {
+    loading.value = false;
+  }
+}
+
+// 发送单个绘图请求
+const sendDrawingRequest = async (index: number) => {
   const params = formatParams();
 
   try {
-    // 使用Fetch API来处理SSE流式响应
     const response = await fetch('https://grsai.dakka.com.cn/v1/draw/nano-banana', {
       method: 'POST',
       headers: {
@@ -74,21 +95,25 @@ const handleSubmit = async () => {
           if (dataStr.trim()) {
             try {
               const data = JSON.parse(dataStr);
-              console.log("接收到的数据:", data);
+              console.log(`图片${index + 1}接收到的数据:`, data);
 
               // 更新进度和状态
               progress.value = data.progress || 0;
-              status.value = data.status || '';
+              status.value = `图片${index + 1}: ${data.status || ''}`;
 
-              // 如果生成完成，显示图片
+              // 如果生成完成，添加到图片数组
               if (data.status === 'succeeded' && data.results && data.results.length > 0) {
-                nanoImgUrl.value = data.results[0].url;
-                status.value = '图片生成完成！';
+                // 确保数组长度足够
+                while (nanoImgUrls.value.length <= index) {
+                  nanoImgUrls.value.push('');
+                }
+                nanoImgUrls.value[index] = data.results[0].url;
+                status.value = `图片${index + 1}生成完成！`;
               }
 
               // 如果生成失败，显示错误信息
               if (data.status === 'failed') {
-                status.value = `生成失败: ${data.error || data.failure_reason || '未知错误'}`;
+                status.value = `图片${index + 1}生成失败: ${data.error || data.failure_reason || '未知错误'}`;
               }
             } catch (e) {
               console.error('解析JSON失败:', e, '原始数据:', dataStr);
@@ -98,10 +123,9 @@ const handleSubmit = async () => {
       }
     }
   } catch (error: any) {
-    console.error('请求失败:', error);
-    status.value = `请求失败: ${error.message}`;
-  } finally {
-    loading.value = false;
+    console.error(`图片${index + 1}请求失败:`, error);
+    status.value = `图片${index + 1}请求失败: ${error.message}`;
+    throw error; // 重新抛出错误以便外层处理
   }
 
   function formatParams() {
@@ -111,13 +135,13 @@ const handleSubmit = async () => {
     return {
       model: "nano-banana-pro",
       prompt: `
-      模板图为提供的URL里的第1张图，它的DSL为${old_dsl}，DSL没有提及的字段，就必须按照模板图保持原样。
-      根据新DSL和旧DSL的差异来修改模板图，最后输出修改后的模板图。再重申一次，不能修改模板图里DSL没有提及的字段所代表的元素！
-      重点：event_badge字段的image_ref字段，它的值为提供的URL里的第2张图，这个地方必须替换掉，不能保持原样，也不能随意修改。 
-      新的DSL为${new_dsl}。
-      `,
+    模板图为提供的URL里的第1张图，它的DSL为${old_dsl}，DSL没有提及的字段，就必须按照模板图保持原样。
+    根据新DSL和旧DSL的差异来修改模板图，最后输出修改后的模板图。再重申一次，不能修改模板图里DSL没有提及的字段所代表的元素！
+    重点：event_badge字段的image_ref字段，它的值为提供的URL里的第2张图，这个地方必须替换掉，颜色和提供的图片要保持一致！
+    新的DSL为${new_dsl}。
+    `,
       aspectRatio: "1:1",
-      imageSize: "4K",
+      imageSize: "2K",
       urls: formatUrls(),
       shutProgress: false,
     }
@@ -288,11 +312,17 @@ const handleSubmit = async () => {
 
         <el-card shadow="never" class="mt-[20px]">
           <div>生成图片：</div>
-          <el-image :src="nanoImgUrl" alt="图片" :preview-src-list="[nanoImgUrl]"
-            style="width: 200px; height: auto; object-fit: cover;" />
+          <div class="flex flex-wrap gap-4">
+            <div v-for="(imgUrl, index) in nanoImgUrls" :key="index" class="image-container">
+              <div class="text-sm mb-2">图片 {{ index + 1 }}</div>
+              <el-image :src="imgUrl" :alt="`图片${index + 1}`" :preview-src-list="nanoImgUrls.filter(url => url)"
+                style="width: 200px; height: auto; object-fit: cover;" />
+              <div v-if="!imgUrl && loading" class="text-gray-400 text-sm mt-2">生成中...</div>
+            </div>
+          </div>
           <!-- 添加进度显示 -->
           <div v-if="loading" style="margin-top: 10px;">
-            <el-progress :percentage="progress" :status="status === 'succeeded' ? 'success' : ''" />
+            <el-progress :percentage="progress" :status="status.includes('完成') ? 'success' : ''" />
             <div style="margin-top: 5px; font-size: 12px; color: #666;">{{ status }}</div>
           </div>
         </el-card>
