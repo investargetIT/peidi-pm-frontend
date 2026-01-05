@@ -26,6 +26,8 @@ const IFrame = () => import("@/layout/frame.vue");
 // https://cn.vitejs.dev/guide/features.html#glob-import
 const modulesRoutes = import.meta.glob("/src/views/**/*.{vue,tsx}");
 
+const Layout = () => import("@/layout/index.vue");
+
 // 动态路由
 import { getAsyncRoutes } from "@/api/routes";
 
@@ -192,56 +194,83 @@ function handleAsyncRoutes(routeList) {
 /** 初始化路由（`new Promise` 写法防止在异步请求中造成无限循环）*/
 function initRouter() {
   // 固定路由
-  const permissionRouter = {
-    path: "/permission",
-    meta: {
-      title: "权限管理000",
-      icon: "ep:lollipop",
-      rank: 10
-    },
-    children: [
-      {
-        path: "/permission/page/index",
-        name: "PermissionPage",
-        meta: {
-          title: "页面权限",
-          roles: ["admin", "common"]
-        }
+  // const permissionRouter = {
+  //   path: "/permission",
+  //   meta: {
+  //     title: "权限管理000",
+  //     icon: "ep:lollipop",
+  //     rank: 10
+  //   },
+  //   children: [
+  //     {
+  //       path: "/permission/page/index",
+  //       name: "PermissionPage",
+  //       meta: {
+  //         title: "页面权限",
+  //         roles: ["admin", "common"]
+  //       }
+  //     },
+  //     {
+  //       path: "/permission/button",
+  //       meta: {
+  //         title: "按钮权限",
+  //         roles: ["admin", "common"]
+  //       },
+  //       children: [
+  //         {
+  //           path: "/permission/button/router",
+  //           component: "permission/button/index",
+  //           name: "PermissionButtonRouter",
+  //           meta: {
+  //             title: "路由返回按钮权限",
+  //             auths: [
+  //               "permission:btn:add",
+  //               "permission:btn:edit",
+  //               "permission:btn:delete"
+  //             ]
+  //           }
+  //         },
+  //         {
+  //           path: "/permission/button/login",
+  //           component: "permission/button/perms",
+  //           name: "PermissionButtonLogin",
+  //           meta: {
+  //             title: "登录接口返回按钮权限"
+  //           }
+  //         }
+  //       ]
+  //     }
+  //   ]
+  // };
+  const routesTemp = [
+    {
+      path: "/aiDrawing",
+      name: "aiDrawing",
+      redirect: "/aiDrawing/index",
+      component: Layout,
+      meta: {
+        icon: "ri:input-method-line",
+        title: "",
+        rank: 22,
+        showLink:
+          storageLocal().getItem("user-check-info")?.id === "1926449443739600965" // 沈皓钰
       },
-      {
-        path: "/permission/button",
-        meta: {
-          title: "按钮权限",
-          roles: ["admin", "common"]
-        },
-        children: [
-          {
-            path: "/permission/button/router",
-            component: "permission/button/index",
-            name: "PermissionButtonRouter",
-            meta: {
-              title: "路由返回按钮权限",
-              auths: [
-                "permission:btn:add",
-                "permission:btn:edit",
-                "permission:btn:delete"
-              ]
-            }
-          },
-          {
-            path: "/permission/button/login",
-            component: "permission/button/perms",
-            name: "PermissionButtonLogin",
-            meta: {
-              title: "登录接口返回按钮权限"
-            }
+      children: [
+        {
+          path: "/aiDrawing/index",
+          name: "aiDrawing",
+          component: () => import("@/views/aiDrawing/index.vue"),
+          meta: {
+            title: "AI 绘图",
+            showParent: false
           }
-        ]
-      }
-    ]
-  };
+        }
+      ]
+    }
+  ];
   return new Promise(resolve => {
-    handleAsyncRoutes([permissionRouter]);
+    // handleAsyncRoutes([permissionRouter]);
+    handleAsyncRoutes(cloneDeep(routesTemp));
     resolve(router);
   });
   // if (getConfig()?.CachingAsyncRoutes) {
@@ -354,6 +383,7 @@ function handleAliveRoute({ name }: ToRouteType, mode?: string) {
 /** 过滤后端传来的动态路由 重新生成规范路由 */
 function addAsyncRoutes(arrRoutes: Array<RouteRecordRaw>) {
   if (!arrRoutes || !arrRoutes.length) return;
+  return arrRoutes;
   const modulesRoutesKeys = Object.keys(modulesRoutes);
   arrRoutes.forEach((v: RouteRecordRaw) => {
     // 将backstage属性加入meta，标识此路由为后端返回路由

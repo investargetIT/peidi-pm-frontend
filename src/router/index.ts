@@ -111,28 +111,28 @@ const routes = [
       }
     ]
   },
-  {
-    path: "/aiDrawing",
-    name: "aiDrawing",
-    redirect: "/aiDrawing/index",
-    component: Layout,
-    meta: {
-      icon: "ri:input-method-line",
-      title: "",
-      rank: 22
-    },
-    children: [
-      {
-        path: "/aiDrawing/index",
-        name: "aiDrawing",
-        component: () => import("@/views/aiDrawing/index.vue"),
-        meta: {
-          title: "AI 绘图",
-          showParent: false
-        }
-      }
-    ]
-  },
+  // {
+  //   path: "/aiDrawing",
+  //   name: "aiDrawing",
+  //   redirect: "/aiDrawing/index",
+  //   component: Layout,
+  //   meta: {
+  //     icon: "ri:input-method-line",
+  //     title: "",
+  //     rank: 22
+  //   },
+  //   children: [
+  //     {
+  //       path: "/aiDrawing/index",
+  //       name: "aiDrawing",
+  //       component: () => import("@/views/aiDrawing/index.vue"),
+  //       meta: {
+  //         title: "AI 绘图",
+  //         showParent: false
+  //       }
+  //     }
+  //   ]
+  // },
 
   {
     path: "/demo",

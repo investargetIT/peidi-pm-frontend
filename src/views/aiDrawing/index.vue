@@ -3,7 +3,7 @@ import Dev from './dev/index.vue'
 </script>
 
 <template>
-  <div class="!mt-0">
+  <div>
     <Dev />
   </div>
 </template>

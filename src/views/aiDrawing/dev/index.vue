@@ -39,7 +39,7 @@ const handleSubmit = async () => {
     const response = await fetch('https://grsai.dakka.com.cn/v1/draw/nano-banana', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer sk-51dbfd7b7d124ce593750b03ba2f877a',
+        'Authorization': 'Bearer sk-f1a82e4ffc184a92a8422c593ce44b25',
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(params)
@@ -116,7 +116,7 @@ const handleSubmit = async () => {
       重点：event_badge字段的image_ref字段，它的值为提供的URL里的第2张图，这个地方必须替换掉，不能保持原样，也不能随意修改。 
       新的DSL为${new_dsl}。
       `,
-      aspectRatio: "auto",
+      aspectRatio: "1:1",
       imageSize: "4K",
       urls: formatUrls(),
       shutProgress: false,
