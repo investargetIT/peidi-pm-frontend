@@ -756,7 +756,7 @@ const workerDetailModalRefresh = (data) => {
 
   /* padding-top: 54px; */
   padding: 0 30px;
-  margin: 0 !important;
+  /* margin: 0 !important; */
 }
 
 .addCate {

@@ -13,5 +13,7 @@ addIcon("ep:cate", suplierIcon);
 // @iconify-icons/ri
 import Search from "@iconify-icons/ri/search-line";
 import InformationLine from "@iconify-icons/ri/information-line";
+import RiInputMethodLine from "@iconify-icons/ri/input-method-line";
 addIcon("ri:search-line", Search);
 addIcon("ri:information-line", InformationLine);
+addIcon("ri:input-method-line", RiInputMethodLine);

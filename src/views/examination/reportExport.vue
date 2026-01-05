@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { getExaminationRecordResult } from '@/api/pmApi.ts'
 import { Download } from '@element-plus/icons-vue';
 import { exportExaminationTable } from './utils/export.ts';
@@ -94,6 +94,11 @@ const fetchResultList = () => {
 }
 //#endregion
 
+// 计算属性 -monthList 只要最后3个数据，如果不足3个，就返回所有数据
+const last3MonthList = computed(() => {
+  return monthList.value.length >= 3 ? monthList.value.slice(-3) : monthList.value;
+})
+
 // 数值格式化 
 const formatPice = (num: number | string) => {
   const number = Number(num);
@@ -135,19 +140,19 @@ onMounted(() => {
         </div>
       </div>
       <el-table :data="tableData" style="width: 100%" :header-cell-style="{ color: '#606266' }" height="700px"
-        v-loading="loading">
-        <el-table-column prop="department1" label="一级部门" min-width="150px" />
+        size="small" v-loading="loading">
+        <el-table-column prop="department1" label="一级部门" min-width="100px" />
         <el-table-column prop="department2" label="二级部门" min-width="150px" />
-        <el-table-column prop="examinationGroup" label="考核组" min-width="150px" />
-        <el-table-column prop="userName" label="考核人" min-width="150px" />
+        <el-table-column prop="examinationGroup" label="考核组" min-width="120px" />
+        <el-table-column prop="userName" label="考核人" min-width="120px" />
         <el-table-column prop="examinationType" label="指标名称" min-width="150px" />
-        <el-table-column prop="dataType" label="数据类型" min-width="150px" />
+        <el-table-column prop="dataType" label="数据类型" min-width="100px" />
         <el-table-column prop="dataSum" label="当前数据合计" min-width="150px">
           <template #default="scope">
             {{ formatPice(scope.row.dataSum) }}
           </template>
         </el-table-column>
-        <el-table-column v-for="month in monthList" :key="month" :prop="month" :label="month" min-width="150px">
+        <el-table-column v-for="month in last3MonthList" :key="month" :prop="month" :label="month" min-width="150px">
           <template #default="scope">
             {{ formatPice(scope.row[month]) }}
           </template>

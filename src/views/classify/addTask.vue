@@ -142,7 +142,7 @@ if (ddUserInfo) {
           loadingInstance1.close();
         });
   }else{
-    message("localStorage 获取部门信息失败", { type: "error" });
+    message("获取部门信息失败，请在钉钉应用中打开", { type: "error" });
   }
 }else{
   message("localStorage 获取信息失败", { type: "error" });

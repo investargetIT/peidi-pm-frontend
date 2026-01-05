@@ -71,26 +71,35 @@ const onLogin = async (formEl: FormInstance | undefined, isDingTalkLogin: boolea
             // if (!isDingTalkLogin) {
             //   getUserCheck(res?.data).then(res => localStorage.setItem("ddUserInfo", JSON.stringify({ userid: res?.data?.id, dept_id_list: [res?.data?.deptId] })))
             // }
-            getUserCheck(res?.data).then(res => localStorage.setItem("user-check-info", JSON.stringify({ ...res?.data })))
-            
-            // 获取后端路由
-            const redirectPath = localStorage.getItem('redirectPath') || '/';
-            if (redirectPath.includes('/examination')) {
-              return initRouter().then(() => {
-                router.push('/examination');
-              });
-            } else if (route.query.tabName == 'worker') {
-              return initRouter().then(() => {
-                router.push({ path: '/my/index', query: { tabName: 'worker' } });
-              });
+            return getUserCheck(res?.data)
+              .then(res => localStorage.setItem("user-check-info", JSON.stringify({ ...res?.data })))
+              .catch((error: any) => {
+                console.error('获取用户信息失败:', error)
+                message("获取用户信息失败:" + error.message, { type: "error" })
+              })
+              .then(() => { return initRouterAndRedirect() });
 
-            } else {
-              return initRouter().then(() => {
-                router.push(getTopMenu(true).path).then(() => {
-                  message("登录成功", { type: "success" });
+            // 获取后端路由
+            function initRouterAndRedirect() {
+              const redirectPath = localStorage.getItem('redirectPath') || '/';
+              if (redirectPath.includes('/examination')) {
+                return initRouter().then(() => {
+                  router.push('/examination');
                 });
-              });
+              } else if (route.query.tabName == 'worker') {
+                return initRouter().then(() => {
+                  router.push({ path: '/my/index', query: { tabName: 'worker' } });
+                });
+
+              } else {
+                return initRouter().then(() => {
+                  router.push(getTopMenu(true).path).then(() => {
+                    message("登录成功", { type: "success" });
+                  });
+                });
+              }
             }
+
           } else {
             message("登录失败", { type: "error" });
           }
@@ -229,7 +238,7 @@ onMounted(() => {
   if (!navigator.userAgent.includes("DingTalk")) {
     window.location.href = `${window.location.origin}/#/login_`;
   }
-  
+
   window.document.addEventListener("keypress", onkeypress);
 
   // 获取基地信息
@@ -252,13 +261,8 @@ onBeforeUnmount(() => {
     <img :src="bg" class="wave" />
     <div class="flex-c absolute right-5 top-3">
       <!-- 主题 -->
-      <el-switch
-        v-model="dataTheme"
-        inline-prompt
-        :active-icon="dayIcon"
-        :inactive-icon="darkIcon"
-        @change="dataThemeChange"
-      />
+      <el-switch v-model="dataTheme" inline-prompt :active-icon="dayIcon" :inactive-icon="darkIcon"
+        @change="dataThemeChange" />
     </div>
     <div class="login-container">
       <div class="img">
@@ -273,34 +277,21 @@ onBeforeUnmount(() => {
 
           <el-form ref="ruleFormRef" :model="ruleForm" :rules="loginRules" size="large">
             <Motion :delay="100">
-              <el-form-item
-                :rules="[
-                  {
-                    required: true,
-                    message: '请输入账号',
-                    trigger: 'blur',
-                  },
-                ]"
-                prop="username"
-              >
-                <el-input
-                  v-model="ruleForm.username"
-                  clearable
-                  placeholder="账号"
-                  :prefix-icon="useRenderIcon(User)"
-                />
+              <el-form-item :rules="[
+                {
+                  required: true,
+                  message: '请输入账号',
+                  trigger: 'blur',
+                },
+              ]" prop="username">
+                <el-input v-model="ruleForm.username" clearable placeholder="账号" :prefix-icon="useRenderIcon(User)" />
               </el-form-item>
             </Motion>
 
             <Motion :delay="150">
               <el-form-item prop="password">
-                <el-input
-                  v-model="ruleForm.password"
-                  clearable
-                  show-password
-                  placeholder="密码"
-                  :prefix-icon="useRenderIcon(Lock)"
-                />
+                <el-input v-model="ruleForm.password" clearable show-password placeholder="密码"
+                  :prefix-icon="useRenderIcon(Lock)" />
               </el-form-item>
             </Motion>
 
@@ -312,24 +303,14 @@ onBeforeUnmount(() => {
                       <LocationFilled />
                     </el-icon>
                   </template>
-                  <el-option
-                    v-for="item in siteList"
-                    :key="item.id"
-                    :label="item.siteName"
-                    :value="item.id"
-                  />
+                  <el-option v-for="item in siteList" :key="item.id" :label="item.siteName" :value="item.id" />
                 </el-select>
               </el-form-item>
             </Motion>
 
             <Motion :delay="250">
-              <el-button
-                class="w-full mt-4"
-                size="default"
-                type="primary"
-                :loading="loading"
-                @click="onLogin(ruleFormRef, false)"
-              >
+              <el-button class="w-full mt-4" size="default" type="primary" :loading="loading"
+                @click="onLogin(ruleFormRef, false)">
                 登录
               </el-button>
             </Motion>
