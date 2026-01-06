@@ -10,6 +10,7 @@ const status = ref(''); // 添加状态显示
 
 const aiDrawingForm = reactive({
   templateImage: [] as string[], // 现在这里存储的是图片的base64字符串数组
+  imageSize: '2K' as string, // 输出图像大小
   campaignLogoImage: [] as string[], // 活动LOGO图片
   highlightedSellingPoints: '特色冻干工艺' as string, // 产品卖点-高亮
   normalSellingPoints: '特色冻干工艺 蜜汁鸡肉冻干' as string, // 产品卖点-全部
@@ -40,8 +41,18 @@ const handleSubmit = async () => {
       requests.push(sendDrawingRequest(i));
     }
 
-    // 等待所有请求完成
-    await Promise.all(requests);
+    // 等待所有请求完成（无论成功或失败）
+    const results = await Promise.allSettled(requests);
+
+    // 处理每个请求的结果
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        console.log(`图片${index + 1}生成成功`);
+      } else {
+        console.error(`图片${index + 1}生成失败:`, result.reason);
+      }
+    });
+
     status.value = '所有图片生成完成！';
 
   } catch (error: any) {
@@ -141,7 +152,7 @@ const sendDrawingRequest = async (index: number) => {
     新的DSL为${new_dsl}。
     `,
       aspectRatio: "1:1",
-      imageSize: "2K",
+      imageSize: aiDrawingForm.imageSize,
       urls: formatUrls(),
       shutProgress: false,
     }
@@ -258,10 +269,18 @@ const sendDrawingRequest = async (index: number) => {
     <el-row :gutter="10">
       <el-col :xs="24" :sm="12">
         <el-card shadow="never">
-          <div class="h-[calc(100vh)] overflow-auto">
+          <!-- <div class="h-[calc(100vh)] overflow-auto"> -->
+          <div>
             <el-form :model="aiDrawingForm" label-width="auto" style="max-width: 600px">
               <el-form-item label="模板图片">
                 <DevUpLoad v-model="aiDrawingForm.templateImage" :limit="1" />
+              </el-form-item>
+              <el-form-item label="输出图像大小">
+                <el-select v-model="aiDrawingForm.imageSize" placeholder="请选择输出图像大小">
+                  <el-option label="1K" value="1K" />
+                  <el-option label="2K" value="2K" />
+                  <el-option label="4K" value="4K" />
+                </el-select>
               </el-form-item>
               <el-form-item label="活动LOGO图片">
                 <DevUpLoad v-model="aiDrawingForm.campaignLogoImage" :limit="1" />
@@ -304,19 +323,27 @@ const sendDrawingRequest = async (index: number) => {
               </el-form-item>
 
               <el-form-item>
-                <el-button type="primary" @click="handleSubmit" :loading="loading">提交</el-button>
+                <el-button type="primary" @click="handleSubmit" :loading="loading">生成图片</el-button>
               </el-form-item>
             </el-form>
           </div>
         </el-card>
 
         <el-card shadow="never" class="mt-[20px]">
+          <div>
+            <pre class="text-sm">{{ JSON.stringify(DSL_SCHEMA, null, 2) }}</pre>
+          </div>
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" :sm="12">
+        <el-card shadow="never">
           <div>生成图片：</div>
           <div class="flex flex-wrap gap-4">
             <div v-for="(imgUrl, index) in nanoImgUrls" :key="index" class="image-container">
               <div class="text-sm mb-2">图片 {{ index + 1 }}</div>
               <el-image :src="imgUrl" :alt="`图片${index + 1}`" :preview-src-list="nanoImgUrls.filter(url => url)"
-                style="width: 200px; height: auto; object-fit: cover;" />
+                :initial-index="index" style="width: 200px; height: auto; object-fit: cover;" />
               <div v-if="!imgUrl && loading" class="text-gray-400 text-sm mt-2">生成中...</div>
             </div>
           </div>
@@ -324,13 +351,6 @@ const sendDrawingRequest = async (index: number) => {
           <div v-if="loading" style="margin-top: 10px;">
             <el-progress :percentage="progress" :status="status.includes('完成') ? 'success' : ''" />
             <div style="margin-top: 5px; font-size: 12px; color: #666;">{{ status }}</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="12">
-        <el-card shadow="never">
-          <div class="h-[calc(100vh)] overflow-auto">
-            <pre class="text-sm">{{ JSON.stringify(DSL_SCHEMA, null, 2) }}</pre>
           </div>
         </el-card>
       </el-col>

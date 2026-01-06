@@ -19,10 +19,8 @@ const hasExportPermission = ref(false);
 const activeName = ref('excamination')
 
 const handleClick = (tab: TabsPaneContext, event: Event) => {
-  console.log(tab, event)
+  // console.log(tab, event)
 }
-
-
 
 const checkPermission = () => {
   const temp: any = storageLocal().getItem('user-check-info');

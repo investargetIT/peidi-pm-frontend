@@ -253,7 +253,10 @@ function initRouter() {
         title: "",
         rank: 22,
         showLink:
-          storageLocal().getItem("user-check-info")?.id === "1926449443739600965" // 沈皓钰
+          storageLocal().getItem("user-check-info")?.id ===
+            "1926449443739600965" || // 沈皓钰
+          storageLocal().getItem("user-check-info")?.id ===
+            "1846392647319093250" // Summer
       },
       children: [
         {
