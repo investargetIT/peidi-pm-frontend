@@ -30,6 +30,7 @@ import {
   removeToken,
   multipleTabsKey
 } from "@/utils/auth";
+import { isDevEnv } from "@/utils/debug";
 
 import pdIcon from "../assets/png/prodIcon.png";
 import priceIcon from "../assets/png/priceIcon.png";
@@ -150,9 +151,10 @@ const routes = [
     component: () => import("@/views/debug/index.vue"),
     hidden: true,
     meta: {
+      icon: "ri:bug-line",
       title: "调试页面",
       rank: 1002,
-      showLink: false // 方式4：自定义hideInMenu属性
+      showLink: isDevEnv() // 方式4：自定义hideInMenu属性
     }
   },
   {

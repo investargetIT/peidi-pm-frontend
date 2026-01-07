@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import Dev from './dev/index.vue'
+import ExcelTable from './excelTable/index.vue'
 </script>
 
 <template>
   <div>
-    <Dev />
+    <ExcelTable />
   </div>
 </template>

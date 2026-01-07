@@ -17,3 +17,5 @@ import RiInputMethodLine from "@iconify-icons/ri/input-method-line";
 addIcon("ri:search-line", Search);
 addIcon("ri:information-line", InformationLine);
 addIcon("ri:input-method-line", RiInputMethodLine);
+import RiBugLine from "@iconify-icons/ri/bug-line";
+addIcon("ri:bug-line", RiBugLine);

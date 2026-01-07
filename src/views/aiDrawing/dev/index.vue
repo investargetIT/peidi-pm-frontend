@@ -144,7 +144,7 @@ const sendDrawingRequest = async (index: number) => {
     const new_dsl = JSON.stringify(formatPromptDSLSchema());
 
     return {
-      model: "nano-banana-pro",
+      model: "nano-banana-fast",
       prompt: `
     模板图为提供的URL里的第1张图，它的DSL为${old_dsl}，DSL没有提及的字段，就必须按照模板图保持原样。
     根据新DSL和旧DSL的差异来修改模板图，最后输出修改后的模板图。再重申一次，不能修改模板图里DSL没有提及的字段所代表的元素！
