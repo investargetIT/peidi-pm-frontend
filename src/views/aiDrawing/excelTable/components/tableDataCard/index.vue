@@ -4,7 +4,21 @@ import { type ExcelTableItem } from "@/views/aiDrawing/excelTable/type/index";
 import { EXCEL_TABLE_ITEM_DEFAULT, MAX_PIC_COUNT } from "@/views/aiDrawing/excelTable/utils/constants";
 import { generateID } from "@/views/aiDrawing/excelTable/utils/tools";
 import DevUpLoad from '@/views/aiDrawing/dev/components/devUpLoad.vue';
-import { Check, Close, Delete, Edit } from '@element-plus/icons-vue';
+import {
+  Check,
+  Close,
+  Delete,
+  Edit,
+  Back,
+  DArrowRight,
+  Download,
+  Refresh,
+  RefreshLeft,
+  RefreshRight,
+  Right,
+  ZoomIn,
+  ZoomOut,
+} from '@element-plus/icons-vue';
 import { LineMdLoadingTwotoneLoop } from '@/views/aiDrawing/excelTable/svg/index';
 
 const props = defineProps({
@@ -73,10 +87,31 @@ const handleDeleteRow = (index: number) => {
   }
 }
 //#endregion
+
+const handleDownload = (src: string) => {
+  const suffix = src.slice(src.lastIndexOf('.'))
+  const filename = Date.now() + suffix
+
+  fetch(src)
+    .then((response) => response.blob())
+    .then((blob) => {
+      const blobUrl = URL.createObjectURL(new Blob([blob]))
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      URL.revokeObjectURL(blobUrl)
+      link.remove()
+    })
+
+}
 </script>
 
 <template>
   <el-card shadow="never" style="border-radius: 10px">
+    <div class="text-[14px]  text-[#0a0a0a] mb-[5px]">AI绘图参数配置表</div>
+
     <el-table :data="tableData" style="width: 100%" border size="small" :header-cell-style="{
       background: '#f5f6f7',
       color: '#0a0a0a',
@@ -284,9 +319,41 @@ const handleDeleteRow = (index: number) => {
       <!-- 结果图片 -->
       <el-table-column :resizable="false" prop="resultImages" label="结果图片" width="120" fixed="right">
         <template #default="{ row, $index }">
-          <div v-for="(image, index) in row.resultImages" :key="index">
-            <el-image :src="image" fit="contain" class="w-[50px] h-[50px]" :preview-src-list="row.resultImages"
-              :initial-index="(index as number)" preview-teleported />
+          <div v-for="(image, index) in row.fullGiftImages" :key="index">
+            <el-image :src="image" fit="contain" class="w-[50px] h-[50px]" :preview-src-list="row.fullGiftImages"
+              :initial-index="(index as number)" preview-teleported show-progress>
+              <template #toolbar="{ actions, prev, next, reset, activeIndex, setActiveItem }">
+                <el-icon @click="prev">
+                  <Back />
+                </el-icon>
+                <el-icon @click="next">
+                  <Right />
+                </el-icon>
+                <el-icon @click="setActiveItem(row.fullGiftImages.length - 1)">
+                  <DArrowRight />
+                </el-icon>
+                <el-icon @click="actions('zoomOut')">
+                  <ZoomOut />
+                </el-icon>
+                <el-icon @click="actions('zoomIn', { enableTransition: false, zoomRate: 2 })">
+                  <ZoomIn />
+                </el-icon>
+                <el-icon @click="
+                  actions('clockwise', { rotateDeg: 180, enableTransition: false })
+                  ">
+                  <RefreshRight />
+                </el-icon>
+                <el-icon @click="actions('anticlockwise')">
+                  <RefreshLeft />
+                </el-icon>
+                <el-icon @click="reset">
+                  <Refresh />
+                </el-icon>
+                <el-icon @click="handleDownload(image)">
+                  <Download />
+                </el-icon>
+              </template>
+            </el-image>
           </div>
           <div class=" flex items-center" v-if="loading && row.resultImages.length < MAX_PIC_COUNT">
             <div class="w-[24px] h-[24px]">
@@ -319,7 +386,7 @@ const handleDeleteRow = (index: number) => {
     </el-table>
     <el-button style="width: 100%; display: flex; justify-content: flex-start" @click="handleAddRow"
       :disabled="editingRowIndex !== null || loading">
-      <span class="text-[20px] font-bold text-[#A8ADB3]">+</span>
+      <span class="text-[14px] text-[#0a0a0a]">+ 添加数据</span>
     </el-button>
   </el-card>
 </template>

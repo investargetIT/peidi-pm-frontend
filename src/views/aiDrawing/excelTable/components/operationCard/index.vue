@@ -309,6 +309,7 @@ const sendDrawingRequest = async (item: ExcelTableItem) => {
 
 <template>
   <el-card shadow="never" style="border-radius:10px;" class="mt-[10px]">
+    <div class="text-[14px] text-[#0a0a0a] mb-[5px]">操作栏</div>
     <div class="flex justify-between">
       <div
         class="text-[14px] text-[#303133] w-[80%] overflow-auto h-[200px] border border-[#e4e7ed] rounded-[4px] p-[10px] bg-[#f5f7fa]">

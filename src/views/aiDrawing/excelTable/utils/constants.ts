@@ -1,12 +1,12 @@
 import { ExcelTableItem } from "@/views/aiDrawing/excelTable/type/index";
 
 // 模型名称
-// export const GRSAI_MODEL_NAME = "nano-banana-fast";
-export const GRSAI_MODEL_NAME = "nano-banana-pro";
+export const GRSAI_MODEL_NAME = "nano-banana-fast";
+// export const GRSAI_MODEL_NAME = "nano-banana-pro";
 
 // 接口密钥
-export const GRSAI_API_KEY = "sk-f1a82e4ffc184a92a8422c593ce44b25";
-
+export const GRSAI_API_KEY = "sk-f1a82e4ffc184a92a8422c593ce44b25"; // Dawn
+// export const GRSAI_API_KEY = "sk-09cb79b26ae44b2f8e4fa46cdd9ac96d";
 
 // 生成的图片数量
 export const MAX_PIC_COUNT = 3;
