@@ -1,8 +1,8 @@
 import { ExcelTableItem } from "@/views/aiDrawing/excelTable/type/index";
 
 // 模型名称
-export const GRSAI_MODEL_NAME = "nano-banana-fast";
-// export const GRSAI_MODEL_NAME = "nano-banana-pro";
+// export const GRSAI_MODEL_NAME = "nano-banana-fast";
+export const GRSAI_MODEL_NAME = "nano-banana-pro";
 
 // 接口密钥
 export const GRSAI_API_KEY = "sk-f1a82e4ffc184a92a8422c593ce44b25";

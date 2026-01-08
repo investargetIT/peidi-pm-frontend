@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { getExaminationRecordResult } from '@/api/pmApi.ts'
+import { getExaminationRecordResult } from '@/api/pmApi'
 import { Download } from '@element-plus/icons-vue';
-import { exportExaminationTable } from './utils/export.ts';
+import { exportExaminationTable } from './utils/export';
 import { ElMessage, ElLoading } from 'element-plus';
 
 const loading = ref(false);

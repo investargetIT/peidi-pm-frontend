@@ -168,12 +168,7 @@ export const exportExaminationTable = async (
       label: "当前数据合计",
       width: 15,
       format: (value: any) => {
-        const number = Number(value);
-        if (isNaN(number)) return value;
-        if (number >= 10000) {
-          return (number / 10000).toFixed(2) + " 万元";
-        }
-        return number.toFixed(2);
+        return formatNumber(value);
       }
     },
     ...monthList.map(month => ({
@@ -181,15 +176,25 @@ export const exportExaminationTable = async (
       label: month,
       width: 12,
       format: (value: any) => {
-        const number = Number(value);
-        if (isNaN(number)) return value;
-        if (number >= 10000) {
-          return (number / 10000).toFixed(2) + " 万元";
-        }
-        return number.toFixed(2);
+        return formatNumber(value);
       }
     }))
   ];
+
+  function formatNumber(value: any) {
+    const number = Number(value);
+    if (isNaN(number)) return value;
+    if (number === 0) return "0";
+
+    const isNegative = number < 0;
+    const absoluteValue = Math.abs(number);
+
+    if (absoluteValue >= 10000) {
+      return `${isNegative ? "-" : ""}${(absoluteValue / 10000).toFixed(2)} 万元`;
+    }
+
+    return number.toFixed(4);
+  }
 
   await exportToExcel(tableData, columns, "绩效数据报表", "绩效数据");
 };

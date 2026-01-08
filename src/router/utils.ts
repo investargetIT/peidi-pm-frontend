@@ -257,7 +257,7 @@ function initRouter() {
           "1846392647319093250", // Summer
           "1874713377599172609", // 熊玉葵
           "1919685162362777602" // 张悦
-        ].includes(storageLocal().getItem("user-check-info")?.id)
+        ].includes((storageLocal().getItem("user-check-info") as any).id)
       },
       children: [
         {
