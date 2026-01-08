@@ -139,18 +139,18 @@ const handleExceed = (files: any[], uploadFileList: any[]) => {
       :on-remove="handleRemove" :on-exceed="handleExceed" :before-upload="beforeUpload" :show-file-list="false"
       accept="image/*" multiple :limit="limit">
       <template #trigger>
-        <el-button type="primary">选择图片</el-button>
+        <el-button type="primary" size="small">选择图片</el-button>
       </template>
       <template #tip>
         <div class="el-upload__tip">
-          支持 jpg、png 等图片格式，最多可上传{{ limit }}张图片
+          最多可上传{{ limit }}张图片
         </div>
       </template>
     </el-upload>
 
     <!-- 预览图片列表 -->
     <div v-if="modelValue && modelValue.length > 0" class="mt-4">
-      <div class="text-sm text-gray-500 mb-2">图片预览 ({{ modelValue.length }}/{{ limit }})</div>
+      <div class="text-[12px] text-gray-500">图片预览 ({{ modelValue.length }}/{{ limit }})</div>
       <div class="flex flex-wrap gap-2">
         <div v-for="(image, index) in modelValue" :key="index" class="relative">
           <el-image :src="image" style="width: 80px; height: 80px; object-fit: cover;" :preview-src-list="modelValue"

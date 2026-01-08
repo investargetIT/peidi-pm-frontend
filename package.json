@@ -168,6 +168,9 @@
       "allowedVersions": {
         "eslint": "9"
       }
+    },
+    "overrides": {
+      "@modelcontextprotocol/sdk": "^1.25.1"
     }
   }
 }

@@ -252,11 +252,12 @@ function initRouter() {
         icon: "ri:input-method-line",
         title: "",
         rank: 22,
-        showLink:
-          storageLocal().getItem("user-check-info")?.id ===
-            "1926449443739600965" || // 沈皓钰
-          storageLocal().getItem("user-check-info")?.id ===
-            "1846392647319093250" // Summer
+        showLink: [
+          "1926449443739600965", // 沈皓钰
+          "1846392647319093250", // Summer
+          "1874713377599172609", // 熊玉葵
+          "1919685162362777602" // 张悦
+        ].includes(storageLocal().getItem("user-check-info")?.id)
       },
       children: [
         {
