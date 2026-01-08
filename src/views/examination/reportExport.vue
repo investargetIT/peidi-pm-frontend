@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { getExaminationRecordResult } from '@/api/pmApi'
 import { Download } from '@element-plus/icons-vue';
-import { exportExaminationTable } from './utils/export';
+import { exportExaminationTable, formatNumber } from './utils/export';
 import { ElMessage, ElLoading } from 'element-plus';
 
 const loading = ref(false);
@@ -46,8 +46,34 @@ const handleExport = async () => {
     background: 'rgba(0, 0, 0, 0.7)'
   });
 
+  // 自定义的业务数据清洗
+  function cleanData() {
+    // 业务清洗指标
+    const cleanConfig = {
+      "累计销售收入": [],
+      "累计销售收入（GMV）-全京东": ["付阳"],
+    }
+    const tableDataTemp = JSON.parse(JSON.stringify(tableData.value));
+
+    // tableDataTemp中清洗掉examinationType在cleanCnfig的key里，但userName不在cleanCnfig[item.examinationType]里的数据
+    // 使用filter进行安全的数据过滤
+    return tableDataTemp.filter((item: any) => {
+      const examinationType = item.examinationType;
+      const userName = item.userName;
+
+      // 如果该考核类型不在清洗配置中，保留所有数据
+      if (!cleanConfig[examinationType]) {
+        return true;
+      }
+
+      // 如果该考核类型在清洗配置中，只保留配置中指定的用户名
+      return cleanConfig[examinationType].includes(userName);
+    });
+
+  }
+
   try {
-    await exportExaminationTable(tableData.value, monthList.value);
+    await exportExaminationTable(cleanData(), monthList.value);
     ElMessage.success('导出成功');
   } catch (error) {
     console.error('导出失败:', error);
@@ -99,19 +125,6 @@ const last3MonthList = computed(() => {
   return monthList.value.length >= 3 ? monthList.value.slice(-3) : monthList.value;
 })
 
-// 数值格式化 
-const formatPice = (num: number | string) => {
-  const number = Number(num);
-  if (isNaN(number)) {
-    return num;
-  }
-  if (number >= 10000) {
-    return (number / 10000).toFixed(2) + ' 万元';
-  }
-  return number.toFixed(2);
-
-}
-
 onMounted(() => {
   fetchResultList();
 })
@@ -149,12 +162,12 @@ onMounted(() => {
         <el-table-column prop="dataType" label="数据类型" min-width="100px" />
         <el-table-column prop="dataSum" label="当前数据合计" min-width="150px">
           <template #default="scope">
-            {{ formatPice(scope.row.dataSum) }}
+            {{ formatNumber(scope.row.dataSum) }}
           </template>
         </el-table-column>
         <el-table-column v-for="month in last3MonthList" :key="month" :prop="month" :label="month" min-width="150px">
           <template #default="scope">
-            {{ formatPice(scope.row[month]) }}
+            {{ formatNumber(scope.row[month]) }}
           </template>
         </el-table-column>
       </el-table>

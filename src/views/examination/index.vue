@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import Examination from './excamination.vue'
+import Examination from './examination.vue'
 import ReportExport from './reportExport.vue'
 import NavBar from './navBar.vue'
-
 import type { TabsPaneContext } from 'element-plus'
 import { storageLocal } from '@pureadmin/utils'
 

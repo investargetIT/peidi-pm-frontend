@@ -181,20 +181,20 @@ export const exportExaminationTable = async (
     }))
   ];
 
-  function formatNumber(value: any) {
-    const number = Number(value);
-    if (isNaN(number)) return value;
-    if (number === 0) return "0";
-
-    const isNegative = number < 0;
-    const absoluteValue = Math.abs(number);
-
-    if (absoluteValue >= 10000) {
-      return `${isNegative ? "-" : ""}${(absoluteValue / 10000).toFixed(2)} 万元`;
-    }
-
-    return number.toFixed(4);
-  }
-
   await exportToExcel(tableData, columns, "绩效数据报表", "绩效数据");
 };
+
+export function formatNumber(value: any) {
+  const number = Number(value);
+  if (isNaN(number)) return value;
+  if (number === 0) return "0";
+
+  const isNegative = number < 0;
+  const absoluteValue = Math.abs(number);
+
+  if (absoluteValue >= 10000) {
+    return `${isNegative ? "-" : ""}${(absoluteValue / 10000).toFixed(2)} 万元`;
+  }
+
+  return number.toFixed(4);
+}
