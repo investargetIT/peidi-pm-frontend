@@ -15,5 +15,8 @@ export interface ExcelTableItem {
   handPrice: string;
   profitPoints: string;
   activityTime: string;
+  remark: string;
   resultImages: string[];
+  // 更好的模板图
+  betterTemplateImage: object;
 }

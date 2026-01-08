@@ -1,3 +1,4 @@
-import LineMdLoadingTwotoneLoop from './lineMdLoadingTwotoneLoop.vue';
+import LineMdLoadingTwotoneLoop from "./lineMdLoadingTwotoneLoop.vue";
+import IconParkSolidGoodTwo from "./iconParkSolidGoodTwo.vue";
 
-export { LineMdLoadingTwotoneLoop };
+export { LineMdLoadingTwotoneLoop, IconParkSolidGoodTwo };

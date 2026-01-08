@@ -1,12 +1,11 @@
 import { ExcelTableItem } from "@/views/aiDrawing/excelTable/type/index";
 
 // 模型名称
-export const GRSAI_MODEL_NAME = "nano-banana-fast";
-// export const GRSAI_MODEL_NAME = "nano-banana-pro";
+// export const GRSAI_MODEL_NAME = "nano-banana-fast";
+export const GRSAI_MODEL_NAME = "nano-banana-pro";
 
 // 接口密钥
 export const GRSAI_API_KEY = "sk-f1a82e4ffc184a92a8422c593ce44b25"; // Dawn
-// export const GRSAI_API_KEY = "sk-09cb79b26ae44b2f8e4fa46cdd9ac96d";
 
 // 生成的图片数量
 export const MAX_PIC_COUNT = 3;
@@ -31,5 +30,8 @@ export const EXCEL_TABLE_ITEM_DEFAULT: ExcelTableItem = {
   handPrice: "￥34.3" as string, // 到手价-价格
   profitPoints: "会员抢券 全场满199-15" as string, // 利益点
   activityTime: "活动时间：12/15 00:00:00 - 12/25 23:59:59" as string, // 活动时间
-  resultImages: []
+  remark: "" as string, // 备注
+  resultImages: [] as string[], // 生成的图片
+  // 更好的模板图
+  betterTemplateImage: {} as object
 };
