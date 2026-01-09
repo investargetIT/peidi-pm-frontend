@@ -8,7 +8,7 @@ export const GRSAI_MODEL_NAME = "nano-banana-pro";
 export const GRSAI_API_KEY = "sk-f1a82e4ffc184a92a8422c593ce44b25"; // Dawn
 
 // 生成的图片数量
-export const MAX_PIC_COUNT = 3;
+export const MAX_PIC_COUNT = 2;
 
 /**
  * 表格数据默认值
@@ -16,7 +16,7 @@ export const MAX_PIC_COUNT = 3;
 export const EXCEL_TABLE_ITEM_DEFAULT: ExcelTableItem = {
   id: "",
   templateImage: [] as string[], // 现在这里存储的是图片的base64字符串数组
-  imageSize: "1K" as string, // 输出图像大小
+  imageSize: "4K" as string, // 输出图像大小
   campaignLogoImage: [] as string[], // 活动LOGO图片
   highlightedSellingPoints: "特色酥骨工艺" as string, // 产品卖点-高亮
   normalSellingPoints: "特色酥骨工艺 蜜汁兔脊" as string, // 产品卖点-全部
