@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import { type ExcelTableItem } from "@/views/aiDrawing/excelTable/type/index";
 import {
   EXCEL_TABLE_ITEM_DEFAULT,
@@ -24,9 +24,10 @@ import {
 } from "@element-plus/icons-vue";
 import {
   LineMdLoadingTwotoneLoop,
-  IconParkSolidGoodTwo
+  IconParkSolidGoodTwo,
+  RiImageEditFill
 } from "@/views/aiDrawing/excelTable/svg/index";
-import { ElMessageBox } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 
 const props = defineProps({
   loading: {
@@ -58,6 +59,11 @@ const props = defineProps({
 const emit = defineEmits<{
   "update:tableData": [value: ExcelTableItem[]];
 }>();
+
+const updateTemplateImg = inject<Function>("updateTemplateImg");
+const handleEditImage = (row: ExcelTableItem, index: number | string) => {
+  updateTemplateImg(row.resultImages[index]);
+};
 
 //#region 动态编辑表格逻辑
 const editingRowIndex = ref<number | null>(null);
@@ -126,6 +132,10 @@ const handleDeleteRow = (index: number) => {
 
 // 下载图片
 const handleDownload = (src: string) => {
+  const message = ElMessage({
+    message: "下载中...",
+    duration: 0
+  });
   const suffix = src.slice(src.lastIndexOf("."));
   const filename = Date.now() + suffix;
 
@@ -140,6 +150,9 @@ const handleDownload = (src: string) => {
       link.click();
       URL.revokeObjectURL(blobUrl);
       link.remove();
+
+      message.close();
+      ElMessage.success("下载完成");
     });
 };
 
@@ -158,7 +171,7 @@ const selectable = (row: ExcelTableItem, index: number) => {
       style="width: 100%"
       border
       size="small"
-      empty-text="请先添加数据⬇️"
+      empty-text="请先添加数据"
       @selection-change="props.handleSelectionChange"
       :header-cell-style="{
         background: '#f5f7fa',
@@ -553,7 +566,7 @@ const selectable = (row: ExcelTableItem, index: number) => {
               <el-image
                 :src="image"
                 fit="contain"
-                class="w-[50px] h-[50px]"
+                class="w-[70px] h-[70px]"
                 :preview-src-list="row.resultImages"
                 :initial-index="Number(index)"
                 preview-teleported
@@ -615,18 +628,32 @@ const selectable = (row: ExcelTableItem, index: number) => {
                 </template>
               </el-image>
 
-              <el-button text @click="props.handleGoodsClick(row, index)">
-                <IconParkSolidGoodTwo
-                  class="w-[16px] h-[16px]"
-                  color="#ccc"
-                  v-show="!row.betterTemplateImage[`${row.id}_${index}`]"
-                />
-                <IconParkSolidGoodTwo
-                  class="w-[16px] h-[16px]"
-                  color="green"
-                  v-show="row.betterTemplateImage[`${row.id}_${index}`]"
-                />
-              </el-button>
+              <div class="flex flex-col justify-around items-center gap-[12px]">
+                <el-button
+                  text
+                  @click="props.handleGoodsClick(row, index)"
+                  size="small"
+                >
+                  <IconParkSolidGoodTwo
+                    class="w-[16px] h-[16px]"
+                    color="#ccc"
+                    v-show="!row.betterTemplateImage[`${row.id}_${index}`]"
+                  />
+                  <IconParkSolidGoodTwo
+                    class="w-[16px] h-[16px]"
+                    color="green"
+                    v-show="row.betterTemplateImage[`${row.id}_${index}`]"
+                  />
+                </el-button>
+
+                <el-button
+                  text
+                  @click="handleEditImage(row, index)"
+                  size="small"
+                >
+                  <RiImageEditFill class="w-[16px] h-[16px]" color="#000" />
+                </el-button>
+              </div>
             </div>
           </div>
 
@@ -695,3 +722,9 @@ const selectable = (row: ExcelTableItem, index: number) => {
     </el-button>
   </el-card>
 </template>
+
+<style lang="scss" scoped>
+:deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+</style>

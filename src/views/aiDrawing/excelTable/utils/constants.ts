@@ -9,6 +9,7 @@ export const GRSAI_API_KEY = "sk-f1a82e4ffc184a92a8422c593ce44b25"; // Dawn
 
 // 生成的图片数量
 export const MAX_PIC_COUNT = 2;
+// export const MAX_PIC_COUNT = 3;
 
 /**
  * 表格数据默认值

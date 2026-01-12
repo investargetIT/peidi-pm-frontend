@@ -8,6 +8,7 @@ import {
   MAX_PIC_COUNT,
   GRSAI_MODEL_NAME
 } from "@/views/aiDrawing/excelTable/utils/constants";
+import { newAiDraw } from "@/api/aiDraw";
 
 const props = defineProps({
   loading: {
@@ -44,7 +45,7 @@ const requestList = ref<(() => Promise<any>)[]>([]);
 const failedRequestsList = ref<(() => Promise<any>)[]>([]);
 
 // 点击开始绘图
-const handleGenerateImagesClick = () => {
+const handleGenerateImagesClick = (isTemplate: boolean = false) => {
   if (props.selectedIds.length === 0) {
     ElMessage.warning("请选择要生成图片的配置项！");
     return;
@@ -56,7 +57,7 @@ const handleGenerateImagesClick = () => {
     type: "warning"
   })
     .then(() => {
-      prepareData();
+      prepareData(isTemplate);
     })
     .catch(() => {
       // message("Delete operation cancelled", { type: "info" });
@@ -64,7 +65,7 @@ const handleGenerateImagesClick = () => {
 };
 
 // 数据准备操作
-const prepareData = () => {
+const prepareData = (isTemplate: boolean = false) => {
   requestList.value = [];
   failedRequestsList.value = [];
 
@@ -74,9 +75,20 @@ const prepareData = () => {
   );
 
   selectedItems.forEach(item => {
+    let itemTemp = { ...item };
+    if (isTemplate) {
+      itemTemp.remark = `
+        备注优先级最高的需求：
+        - 结果图中抹除中间左侧红边框里的的产品图，变成空白。
+        - 结果图中抹除中间右侧草坪上的产品图，空出来的位置需要和底图和谐。
+        备注优先级低的需求：
+        ${item.remark || ""}
+      `;
+    }
+
     for (let i = 0; i < MAX_PIC_COUNT; i++) {
       // 存入Promise工厂函数，但不立即执行
-      requestList.value.push(() => sendDrawingRequest(item));
+      requestList.value.push(() => sendDrawingRequest(itemTemp));
     }
   });
 
@@ -143,8 +155,7 @@ const sendDrawingRequest = async (item: ExcelTableItem) => {
           }
         },
         product: {
-          image:
-            "提供的URL里的第3张图，产品图如果内容是很多产品，只要原封不动放到指定位置即可",
+          image: "提供的URL里的第3张图，把第3张图原封不动放到指定位置即可",
           position: "center",
           shadow: "soft"
         },
@@ -238,10 +249,12 @@ const sendDrawingRequest = async (item: ExcelTableItem) => {
         2. 仅允许修改 new_dsl 与 old_dsl 存在差异的字段。
         3. old_dsl 未提及的任何元素，必须与模板图保持 100% 一致，不得修改。
         4. 严禁重新渲染、重绘或生成任何已有文字内容。
+        5. 生成最高清的图片，把小字体放大。 
+        7. 如果有备注，必须严格按照备注说明执行。
 
         【模板与图片规则】
         1. 提供的第 1 张图为基础模板图，其结构与元素以 old_dsl 为准。
-        2. 提供的第 2 张图用于 event_badge.image_ref，必须完整替换该元素，颜色与样式保持与图片一致。
+        2. 提供的第 2 张图用于 event_badge.image_ref，必须完整替换该元素，颜色与样式保持与原图保持一致。
         3. 若传入图片数量 > ${3 + fullGiftImagesLen}，则多余图片为历史合格结果，仅用于参考风格，不作为修改对象。
 
         【执行指令（仅做差异修改）】
@@ -422,20 +435,30 @@ const handleGenerateImages = async () => {
       <div
         class="text-[14px] text-[#303133] w-[50%] overflow-auto h-[200px] border border-[#e4e7ed] rounded-[4px] p-[10px] bg-[#f5f7fa]"
       >
-        <p class="text-[14px] text-[#0a0a0a] font-[500]">💻日志</p>
+        <p class="text-[14px] text-[#0a0a0a] font-[500]">日志</p>
         <div v-for="(log, index) in logsList" :key="index">{{ log }}</div>
       </div>
-      <div class="flex flex-col items-end w-[10%]">
-        <el-button
-          type="primary"
-          @click="handleGenerateImagesClick"
-          :loading="loading"
-          :disabled="isEdit"
-        >
-          开始绘图
-        </el-button>
+      <div class="flex flex-col items-end">
+        <div class="flex items-end">
+          <el-button
+            @click="handleGenerateImagesClick(true)"
+            :loading="loading"
+            :disabled="isEdit"
+          >
+            AI绘图（出模板图）
+          </el-button>
+          <el-button
+            type="primary"
+            @click="handleGenerateImagesClick()"
+            :loading="loading"
+            :disabled="isEdit"
+          >
+            AI绘图（出完整图）
+          </el-button>
+        </div>
+
         <p class="text-[12px] text-[#606266] font-[500] mt-[5px]">
-          ⚠️仅生成勾选的配置项对应的图片，每条数据生成3张图，每张图片生成时间约为100~200秒。
+          仅生成勾选的配置项对应的图片，每条数据生成3张图，每张图片生成时间约为100~200秒。
         </p>
       </div>
     </div>

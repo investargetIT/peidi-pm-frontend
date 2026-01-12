@@ -41,7 +41,7 @@ import suplierIcon from "../assets/png/suplierIcon.png";
  * 如何排除文件请看：https://cn.vitejs.dev/guide/features.html#negative-patterns
  */
 const modules: Record<string, any> = import.meta.glob(
-  ["./modules/**/*.ts", "!./modules/**/error.ts", "!./modules/**/remaining.ts"],
+  ["./modules/**/*.ts", "!./modules/**/remaining.ts"],
   {
     eager: true
   }
