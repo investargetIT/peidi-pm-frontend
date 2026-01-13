@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from "vue";
 import { Close } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElLoading } from "element-plus";
+import { uploadDraw, getDownloadUrl } from "@/api/aiDraw";
+import OnlineImage from "../../excelTable/components/onlineImage/index.vue";
 
 interface Props {
   modelValue?: string[] | null;
@@ -20,30 +22,69 @@ const emit = defineEmits<{
 const uploadRef = ref();
 const fileList = ref<any[]>([]);
 const isUpdating = ref(false); // 防止循环更新的标志
+const uploading = ref(false); // 上传状态
 
 // 生成唯一ID
 const generateUID = () => Date.now() + Math.random().toString(36).substr(2, 9);
 
-// 将文件转换为 base64
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = error => reject(error);
-  });
+// 上传图片到服务器
+const uploadImage = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const response: any = await uploadDraw(formData);
+    if (response.data && response.success) {
+      return response.data;
+      // 获取文件url
+      // const downloadUrlResponse: any = await getDownloadUrl({
+      //   objectName: response.data
+      // });
+      // if (downloadUrlResponse.data && downloadUrlResponse.success) {
+      //   return downloadUrlResponse.data;
+      // } else {
+      //   throw new Error(downloadUrlResponse.msg || "获取文件url失败");
+      // }
+    } else {
+      throw new Error(response.msg || "上传失败");
+    }
+  } catch (error: any) {
+    console.error("上传失败:", error);
+    throw new Error(error.message || "上传失败");
+  }
 };
 
 // 处理文件选择
 const handleChange = async (file: any, uploadFileList: any[]) => {
   if (file.raw) {
+    uploading.value = true;
+    const loadingInstance = ElLoading.service({
+      lock: true,
+      text: "图片上传中...",
+      background: "rgba(0, 0, 0, 0.7)"
+    });
+
     try {
-      const base64 = await fileToBase64(file.raw);
+      // 上传图片到服务器
+      const imageUrl = await uploadImage(file.raw);
+
+      // 更新文件列表状态
+      file.status = "success";
+      file.url = imageUrl;
+
+      // 更新modelValue
       const currentImages = props.modelValue ? [...props.modelValue] : [];
-      currentImages.push(base64);
+      currentImages.push(imageUrl);
       emit("update:modelValue", currentImages);
-    } catch (error) {
-      console.error("文件转换失败:", error);
+
+      ElMessage.success("图片上传成功");
+    } catch (error: any) {
+      console.error("上传失败:", error);
+      file.status = "fail";
+      ElMessage.error(`上传失败: ${error.message}`);
+    } finally {
+      loadingInstance.close();
+      uploading.value = false;
     }
   }
 };
@@ -131,6 +172,21 @@ const beforeUpload = (file: any) => {
     ElMessage.warning(`最多只能上传${props.limit}张图片`);
     return false;
   }
+
+  // 检查文件类型
+  const isImage = file.type.startsWith("image/");
+  if (!isImage) {
+    ElMessage.warning("只能上传图片文件");
+    return false;
+  }
+
+  // 检查文件大小（限制为50MB）
+  const isLt50M = file.size / 1024 / 1024 < 50;
+  if (!isLt50M) {
+    ElMessage.warning("图片大小不能超过50MB");
+    return false;
+  }
+
   return true;
 };
 
@@ -152,32 +208,36 @@ const handleExceed = (files: any[], uploadFileList: any[]) => {
       :on-exceed="handleExceed"
       :before-upload="beforeUpload"
       :show-file-list="false"
+      :disabled="uploading"
       accept="image/*"
       multiple
       :limit="limit"
     >
       <template #trigger>
-        <el-button type="primary" size="small">选择图片</el-button>
+        <el-button type="primary" size="small" :disabled="uploading">
+          {{ uploading ? "上传中..." : "选择图片" }}
+        </el-button>
       </template>
       <template #tip>
-        <div class="el-upload__tip">最多可上传{{ limit }}张图片</div>
+        <div class="el-upload__tip">最多上传{{ limit }}张</div>
       </template>
     </el-upload>
 
     <!-- 预览图片列表 -->
     <div v-if="modelValue && modelValue.length > 0" class="mt-4">
       <div class="text-[12px] text-gray-500">
-        图片预览 ({{ modelValue.length }}/{{ limit }})
+        预览 ({{ modelValue.length }}/{{ limit }})
       </div>
       <div class="flex flex-wrap gap-2">
         <div v-for="(image, index) in modelValue" :key="index" class="relative">
-          <el-image
+          <!-- <el-image
             :src="image"
             style="width: 80px; height: 80px; object-fit: cover"
             :preview-src-list="modelValue"
             :initial-index="index"
             preview-teleported
-          />
+          /> -->
+          <OnlineImage :url="image" />
           <div class="absolute top-0 right-0">
             <el-button
               size="small"
@@ -185,6 +245,7 @@ const handleExceed = (files: any[], uploadFileList: any[]) => {
               :icon="Close"
               circle
               @click="handlePreviewRemove(index)"
+              :disabled="uploading"
             />
           </div>
         </div>

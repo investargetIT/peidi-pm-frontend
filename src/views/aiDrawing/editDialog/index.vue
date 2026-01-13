@@ -1,9 +1,11 @@
 <script lang="ts" setup>
 import { onMounted, ref, reactive, nextTick, onUnmounted, watch } from "vue";
-import { ElMessageBox, ElMessage } from "element-plus";
+import { ElMessage } from "element-plus";
 import TEMP_IMG from "./imgs/temp.png";
+import DEFAULT_IMG from "./imgs/default.png";
 import html2canvas from "html2canvas";
 import { snapdom } from "@zumer/snapdom";
+import { downloadFile } from "@/api/aiDraw";
 
 const props = defineProps({
   templateImg: {
@@ -13,62 +15,25 @@ const props = defineProps({
 });
 
 const exportContainer = ref(null);
-const templateImgBase64 = ref(""); // 存储转换后的base64图片
-
-// 将URL图片转换为base64
-const convertUrlToBase64 = async (url: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous"; // 处理跨域问题
-
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
-
-      try {
-        const base64 = canvas.toDataURL("image/png");
-        resolve(base64);
-      } catch (error) {
-        reject(new Error("图片转换失败: " + error.message));
-      }
-    };
-
-    img.onerror = () => {
-      reject(new Error("图片加载失败"));
-    };
-
-    img.src = url;
-  });
-};
+const templateImgBase64 = ref(DEFAULT_IMG); // 存储转换后的base64图片
+const exportPNGLoading = ref<boolean>(false);
 
 // 检查是否是URL并转换为base64
 const processTemplateImage = async () => {
   if (!props.templateImg) return;
 
-  // 如果是base64格式或相对路径，直接使用
-  if (
-    props.templateImg.startsWith("data:") ||
-    props.templateImg.startsWith("./") ||
-    props.templateImg.startsWith("/")
-  ) {
-    templateImgBase64.value = props.templateImg;
-    return;
-  }
-
-  // 如果是URL，转换为base64
   try {
     ElMessage.info("正在加载模板图片...");
-    const base64 = await convertUrlToBase64(props.templateImg);
-    templateImgBase64.value = base64;
-    ElMessage.success("模板图片加载成功");
+    const res: any = await downloadFile({ objectName: props.templateImg });
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      templateImgBase64.value = reader.result as string;
+      ElMessage.success("模板图片加载成功");
+    };
+    reader.readAsDataURL(res);
   } catch (error) {
     console.error("图片转换失败:", error);
     ElMessage.error("模板图片加载失败，请检查URL是否正确");
-    // 使用默认图片作为fallback
-    templateImgBase64.value = TEMP_IMG;
   }
 };
 
@@ -76,7 +41,7 @@ const processTemplateImage = async () => {
 watch(
   () => props.templateImg,
   () => {
-    templateImgBase64.value = "";
+    templateImgBase64.value = DEFAULT_IMG;
     processTemplateImage();
   }
 );
@@ -99,6 +64,7 @@ const handleCapture = async () => {
     duration: 0
   });
   if (!exportContainer.value) {
+    exportPNGLoading.value = false;
     return;
   }
 
@@ -117,13 +83,14 @@ const handleCapture = async () => {
     await capture.download({
       //@ts-ignore
       format: "png",
-      filename: "vue3-capture"
+      filename: "AI_Generated_Image"
     });
   } catch (err) {
     console.error("Capture error:", err);
   } finally {
     message.close();
     ElMessage.success("图片捕获成功");
+    exportPNGLoading.value = false;
   }
 };
 
@@ -353,9 +320,16 @@ const resizeImage = (event: MouseEvent, element: any, direction: string) => {
 
 // 导出为PNG
 const exportAsPNG = () => {
-  // ElMessage.info("导出功能开发中");
   // capture();
-  handleCapture();
+
+  exportPNGLoading.value = true;
+  deselectAll();
+
+  nextTick(() => {
+    setTimeout(() => {
+      handleCapture();
+    }, 1000);
+  });
 };
 
 // 窗口大小变化时更新容器位置
@@ -364,7 +338,6 @@ const handleResize = () => {
 };
 
 onMounted(() => {
-  // dialogVisible.value = true;
   processTemplateImage();
   nextTick(() => {
     updateContainerRect();
@@ -406,8 +379,8 @@ defineExpose({
     >
       <div class="editor-container">
         <div class="toolbar">
-          <el-button type="primary" @click="importImage">导入图片</el-button>
-          <span class="tip">导入的图片将作为可拖动的元素添加到画布中</span>
+          <el-button type="primary" @click="importImage">导入素材</el-button>
+          <span class="tip">导入的素材将作为可拖动的元素添加到画布中</span>
         </div>
 
         <div
@@ -481,8 +454,15 @@ defineExpose({
 
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="exportAsPNG">导出PNG</el-button>
           <el-button @click="dialogVisible = false">取消</el-button>
+
+          <el-button
+            type="primary"
+            @click="exportAsPNG"
+            :loading="exportPNGLoading"
+          >
+            导出PNG
+          </el-button>
         </div>
       </template>
     </el-dialog>
@@ -513,10 +493,12 @@ defineExpose({
 .image-container {
   position: relative;
   flex: 1;
-  border: 1px solid #ddd;
-  /* overflow: hidden; */
-  background-color: #f5f5f5;
+  /* border: 1px solid #ddd; */
+  overflow: hidden;
+  background-color: transparent;
   cursor: default;
+  display: flex; /* 添加flex布局 */
+  align-items: flex-start; /* 顶部对齐 */
 }
 
 .background-image {

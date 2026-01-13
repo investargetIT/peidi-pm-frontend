@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { DSL_SCHEMA } from "@/views/aiDrawing/dev/constants";
+import { inject } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { GRSAI_API_KEY } from "@/views/aiDrawing/excelTable/utils/constants";
-import { type ExcelTableItem } from "@/views/aiDrawing/excelTable/type/index";
+import { DSL_SCHEMA } from "../../../dev/constants";
 import {
   MAX_PIC_COUNT,
-  GRSAI_MODEL_NAME
-} from "@/views/aiDrawing/excelTable/utils/constants";
-import { newAiDraw } from "@/api/aiDraw";
+  GRSAI_MODEL_NAME,
+  MAX_RETRY_COUNT
+} from "../../utils/constants";
+import { type ExcelTableItem } from "../../type/index";
+import { newAiDraw, downloadFile } from "@/api/aiDraw";
+import { th } from "element-plus/es/locale/index.mjs";
 
 const props = defineProps({
   loading: {
@@ -33,21 +34,13 @@ const props = defineProps({
   }
 });
 
-//#region 日志逻辑
-const logsList = ref<string[]>([]);
-const addLog = (log: string) => {
-  logsList.value.unshift("[" + new Date().toLocaleString() + "] " + log);
-};
-//#endregion
+const fetchAiDrawPage = inject<() => Promise<any>>("fetchAiDrawPage");
 
 //#region 生成图片逻辑
-const requestList = ref<(() => Promise<any>)[]>([]);
-const failedRequestsList = ref<(() => Promise<any>)[]>([]);
-
 // 点击开始绘图
 const handleGenerateImagesClick = (isTemplate: boolean = false) => {
   if (props.selectedIds.length === 0) {
-    ElMessage.warning("请选择要生成图片的配置项！");
+    ElMessage.warning("请勾选要生成图片的配置项！");
     return;
   }
 
@@ -57,49 +50,64 @@ const handleGenerateImagesClick = (isTemplate: boolean = false) => {
     type: "warning"
   })
     .then(() => {
-      prepareData(isTemplate);
+      props.handleLoadingStatus(true);
+      callServerGeneratedImages(isTemplate);
     })
-    .catch(() => {
-      // message("Delete operation cancelled", { type: "info" });
-    });
+    .catch(() => {});
 };
 
-// 数据准备操作
-const prepareData = (isTemplate: boolean = false) => {
-  requestList.value = [];
-  failedRequestsList.value = [];
-
+//#region 调用线上API生成图片 逻辑交给服务器处理
+const callServerGeneratedImages = async (isTemplate: boolean = false) => {
   // 过滤出选中的项
   const selectedItems = props.tableData.filter(item =>
-    props.selectedIds.includes(item.id)
+    props.selectedIds.includes(item.uiid)
   );
 
-  selectedItems.forEach(item => {
+  // 先等待获取所有的Promise工厂函数
+  const factoryPromises = selectedItems.map(async item => {
     let itemTemp = { ...item };
     if (isTemplate) {
       itemTemp.remark = `
-        备注优先级最高的需求：
-        - 结果图中抹除中间左侧红边框里的的产品图，变成空白。
-        - 结果图中抹除中间右侧草坪上的产品图，空出来的位置需要和底图和谐。
-        备注优先级低的需求：
-        ${item.remark || ""}
-      `;
+      备注优先级最高的需求：
+      - 结果图中抹除中间左侧红边框里的的产品图，变成空白。
+      - 结果图中抹除中间右侧草坪上的产品图，空出来的位置需要和底图和谐。
+      备注优先级低的需求：
+      ${item.remark || ""}
+    `;
     }
 
-    for (let i = 0; i < MAX_PIC_COUNT; i++) {
-      // 存入Promise工厂函数，但不立即执行
-      requestList.value.push(() => sendDrawingRequest(itemTemp));
-    }
+    // 等待formatParamsToPromises完成，获取工厂函数
+    return await formatParamsToPromises(itemTemp, item);
   });
 
-  handleGenerateImages();
+  // 等待所有工厂函数准备完成
+  const requestFactories = await Promise.all(factoryPromises);
+
+  // console.log("requestFactories", requestFactories);
+
+  // // 然后并行执行所有请求
+  Promise.all(requestFactories.map(factory => factory()))
+    .then(results => {
+      // console.log("所有请求成功:", results);
+      ElMessage.success("生图请求已经提交，后台处理中...");
+      fetchAiDrawPage();
+    })
+    .catch(err => {
+      console.error("至少有一个请求失败:", err);
+      ElMessage.error("至少有一个生图请求失败，请检查配置！" + err.message);
+    })
+    .finally(() => {
+      props.handleLoadingStatus(false);
+    });
 };
 
-// 请求初始化
-const sendDrawingRequest = async (item: ExcelTableItem) => {
-  const params = formatParams();
+const formatParamsToPromises = async (
+  item: ExcelTableItem,
+  sourceItem: ExcelTableItem
+) => {
+  const params = await formatParams();
 
-  function formatParams() {
+  async function formatParams() {
     const fullGiftImagesLen = item.fullGiftImages.length;
     const old_dsl = JSON.stringify(DSL_SCHEMA);
     const new_dsl = JSON.stringify(formatPromptDSLSchema());
@@ -200,7 +208,7 @@ const sendDrawingRequest = async (item: ExcelTableItem) => {
         }
       };
     }
-    function formatUrls() {
+    async function formatUrls() {
       const temp = [
         ...item.templateImage,
         ...item.campaignLogoImage,
@@ -214,34 +222,38 @@ const sendDrawingRequest = async (item: ExcelTableItem) => {
       }
 
       // console.log("图片", temp);
-      return temp;
+
+      // 直接创建 Promise 数组，而不是函数数组
+      const tempBase64Promises = temp.map(item => {
+        return getBase64(item);
+      });
+
+      const tempBase64Results = await Promise.all(tempBase64Promises);
+
+      // console.log("base64", tempBase64Results);
+
+      return tempBase64Results;
+    }
+    async function getBase64(url: string) {
+      return new Promise((resolve, reject) => {
+        downloadFile({ objectName: url })
+          .then((res: any) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              // console.log("getBase64", reader.result);
+              resolve(reader.result as string);
+            };
+            reader.onerror = () => {
+              reject(reader.error);
+            };
+            reader.readAsDataURL(res);
+          })
+          .catch(reject);
+      });
     }
 
     return {
       model: GRSAI_MODEL_NAME,
-
-      // prompt: `
-      //     【文字清晰度要求】
-      //     - 字体：江城圆体，高清可识别！
-      //     - 渲染质量：汉字不能有任何错误或变形，印刷级清晰度！
-      //     - 边缘要求：边缘锐利，无抗锯齿模糊，增强边缘清晰度！
-      //     - 笔画要求：每一笔都清晰可辨，笔画不粘连！
-
-      //     【基础模板图要求】
-      //     - 除了第一张图（模板图）以外，其他图片都不能修改，字一定不能动！
-      //     - 所有图片尺寸较小时，字体也要清晰可辨识，不能模糊！尤其是满赠图片，因为满赠图片的尺寸通常会比较小，所以字体要保持清晰可辨识！
-      //     - 只做图片层面的替换，不要重新渲染文字，会导致文字变形、模糊、压缩等问题！
-      //     - 基础模板图为提供的URL里的第1张图，它的DSL为${old_dsl}，DSL没有提及的字段，就必须按照模板图保持原样。
-      //     - 传入的图片数可能大于${3 + fullGiftImagesLen}张，如果大于，则说明是再次生成，此时超过的图片是可以用来当成符合条件的结果图，可以用来参考，照着符合条件的结果图生成。
-      //     - 根据新DSL和旧DSL的差异来修改模板图，最后输出修改后的模板图。再重申一次，不能修改模板图里DSL没有提及的字段所代表的元素！
-      //     - 重点：event_badge字段的image_ref字段，它的值为提供的URL里的第2张图，这个地方必须替换掉，颜色和提供的图片要保持一致！
-      //     - 新的DSL为${new_dsl}。
-
-      //     【其他注意事项】
-      //     - 特别注意‘爵’字，它是一个上中下结构的字：顶部像‘罒’（网字头）但略扁；中间是‘艹’（草字头）；底部是‘寸’（寸字）。注意顶部不是‘目’，且整体字形修长。
-      //     - 特别注意‘宴’字，上面是宝盖头（宀），下面是‘安’字，但是要在‘安’字的‘女’字上面、宝盖头下面，加一个‘日’字。
-      //     - ${item.remark}
-      //   `,
 
       prompt: `
         【最高优先级 · 系统约束】
@@ -249,7 +261,7 @@ const sendDrawingRequest = async (item: ExcelTableItem) => {
         2. 仅允许修改 new_dsl 与 old_dsl 存在差异的字段。
         3. old_dsl 未提及的任何元素，必须与模板图保持 100% 一致，不得修改。
         4. 严禁重新渲染、重绘或生成任何已有文字内容。
-        5. 生成最高清的图片，把小字体放大。 
+        5. 生成最高清的图片，把小字体放大。
         7. 如果有备注，必须严格按照备注说明执行。
 
         【模板与图片规则】
@@ -278,188 +290,59 @@ const sendDrawingRequest = async (item: ExcelTableItem) => {
 
       aspectRatio: "1:1",
       imageSize: item.imageSize,
-      urls: formatUrls(),
+      urls: await formatUrls(),
       shutProgress: false
     };
   }
 
-  function formatParamsPro() {
-    function formatPromptDSLSchema() {
-      return {
-        模板图片: "提供的URL里的第1张图",
-        双旦礼遇季图片: "提供的URL里的第2张图",
-        特色酥骨工艺: item.highlightedSellingPoints,
-        蜜汁兔脊: item.normalSellingPoints,
-        兔脊骨120g: item.productName,
-        产品图片: "提供的URL里的第3张图",
-        全场满199送: item.fullGiftTitle,
-        "爵宴狗粮随行装试吃（50g*4）": item.fullGiftDescription,
-        赠: item.fullGiftTags,
-        全场满赠图片: "提供的URL里的第4张图"
-      };
-    }
-  }
-
-  try {
-    const response = await fetch(
-      "https://grsai.dakka.com.cn/v1/draw/nano-banana",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${GRSAI_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(params)
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error("无法读取响应流");
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-
-      // 保留最后一行（可能不完整）
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const dataStr = line.slice(6); // 去掉 "data: " 前缀
-          if (dataStr.trim()) {
-            try {
-              const data = JSON.parse(dataStr);
-              // console.log(`${item.id}接收到的数据:`, data);
-              // addLog(`${item.id}接收到的数据: ${dataStr}`);
-
-              // 如果生成完成，添加到图片数组
-              if (
-                data.status === "succeeded" &&
-                data.results &&
-                data.results.length > 0
-              ) {
-                addLog(`${item.id}生成成功，图片URL: ${data.results[0].url}`);
-
-                for (const ele of props.tableData) {
-                  if (ele.id === item.id) {
-                    ele.resultImages.push(data.results[0].url);
-                  }
-                }
-                return data; // 返回成功的结果
-              }
-
-              // 如果生成失败，抛出错误
-              if (data.status === "failed") {
-                addLog(`${item.id}生成失败，错误信息: ${data.error}`);
-                throw new Error(data.error);
-              }
-            } catch (e) {
-              failedRequestsList.value.push(() => sendDrawingRequest(item));
-              console.error("解析JSON失败:", e, "原始数据:", dataStr);
-            }
-          }
-        }
-      }
-    }
-  } catch (error: any) {
-    failedRequestsList.value.push(() => sendDrawingRequest(item));
-    console.error(`${item.id}请求失败:`, error);
-    // 将错误信息附加item信息，便于重试时使用
-    error.item = item;
-    throw error;
-  }
-};
-
-// 请求发起
-const handleGenerateImages = async () => {
-  props.handleLoadingStatus(true);
-  addLog("开始生成图片...");
-
-  try {
-    addLog(`共${requestList.value.length}个生成请求开始处理...`);
-
-    // 执行所有Promise工厂函数，获取实际的Promise数组
-    const promises = requestList.value.map(factory => factory());
-
-    // 等待所有请求完成（无论成功或失败）
-    const results = await Promise.allSettled(promises);
-    console.log("Promise.allSettled结果:", results); // 添加调试
-
-    // 处理每个请求的结果
-    results.forEach((result, index) => {
-      console.log(`结果${index}:`, result); // 查看每个结果
-      if (result.status === "fulfilled") {
-        addLog(`请求${index + 1}成功，图片URL: ${result.value.results[0].url}`);
-      } else {
-        addLog(`请求${index + 1}失败，错误信息: ${result.reason}`);
-        // 将失败的请求重新添加到重试列表
-        // failedRequestsList.value.push(() => sendDrawingRequest(result.reason.item || props.tableData[Math.floor(index / MAX_PIC_COUNT)]));
-      }
-    });
-  } catch (error: any) {
-    console.error("请求失败:", error);
-  } finally {
-    if (failedRequestsList.value.length > 0) {
-      addLog(`共${failedRequestsList.value.length}个请求失败，将重试...`);
-
-      requestList.value = [...failedRequestsList.value];
-      failedRequestsList.value = [];
-      await handleGenerateImages();
-    } else {
-      addLog("🎇所有图片生成完成！");
-      ElMessage.success("所有图片生成完成！");
-      props.handleLoadingStatus(false);
-    }
-  }
+  // 返回一个不执行的Promise工厂函数
+  return () => {
+    return newAiDraw({
+      fields: JSON.stringify(sourceItem),
+      maxRetries: MAX_RETRY_COUNT,
+      remark: JSON.stringify({
+        uiid: item.uiid,
+        moduleName: "京东模板"
+      }),
+      size: MAX_PIC_COUNT,
+      urlParam: JSON.stringify(params),
+      uuid: item.uiid
+    })
+      .then(res => {
+        // console.log("新增画图: ", res);
+        return res;
+      })
+      .catch(err => {
+        console.log("err", err);
+        throw err; // 重新抛出错误
+      });
+  };
 };
 //#endregion
 </script>
 
 <template>
-  <el-card shadow="never" style="border-radius: 10px" class="mt-[10px]">
-    <div class="text-[14px] text-[#0a0a0a] mb-[5px]">操作栏</div>
-    <div class="flex justify-between">
-      <div
-        class="text-[14px] text-[#303133] w-[50%] overflow-auto h-[200px] border border-[#e4e7ed] rounded-[4px] p-[10px] bg-[#f5f7fa]"
-      >
-        <p class="text-[14px] text-[#0a0a0a] font-[500]">日志</p>
-        <div v-for="(log, index) in logsList" :key="index">{{ log }}</div>
-      </div>
-      <div class="flex flex-col items-end">
-        <div class="flex items-end">
-          <el-button
-            @click="handleGenerateImagesClick(true)"
-            :loading="loading"
-            :disabled="isEdit"
-          >
-            AI绘图（出模板图）
-          </el-button>
-          <el-button
-            type="primary"
-            @click="handleGenerateImagesClick()"
-            :loading="loading"
-            :disabled="isEdit"
-          >
-            AI绘图（出完整图）
-          </el-button>
-        </div>
-
-        <p class="text-[12px] text-[#606266] font-[500] mt-[5px]">
-          仅生成勾选的配置项对应的图片，每条数据生成3张图，每张图片生成时间约为100~200秒。
-        </p>
+  <el-card shadow="never" style="border-radius: 10px" class="mb-[10px]">
+    <div class="flex justify-between items-center">
+      <p class="text-[14px] text-[#666] font-[500]">
+        仅生成勾选的配置项对应的图片，每条数据生成3张图，单次生成时间约为1~5分钟
+      </p>
+      <div class="flex items-end">
+        <el-button
+          @click="handleGenerateImagesClick(true)"
+          :loading="loading"
+          :disabled="isEdit"
+        >
+          AI智能留白
+        </el-button>
+        <el-button
+          type="primary"
+          @click="handleGenerateImagesClick()"
+          :loading="loading"
+          :disabled="isEdit"
+        >
+          AI一键创作
+        </el-button>
       </div>
     </div>
   </el-card>

@@ -1,33 +1,17 @@
 <script setup lang="ts">
-import { computed, inject, ref } from "vue";
-import { type ExcelTableItem } from "@/views/aiDrawing/excelTable/type/index";
-import {
-  EXCEL_TABLE_ITEM_DEFAULT,
-  MAX_PIC_COUNT
-} from "@/views/aiDrawing/excelTable/utils/constants";
-import { generateID } from "@/views/aiDrawing/excelTable/utils/tools";
+import { inject, ref } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
 import DevUpLoad from "@/views/aiDrawing/dev/components/devUpLoad.vue";
-import {
-  Check,
-  Close,
-  Delete,
-  Edit,
-  Back,
-  DArrowRight,
-  Download,
-  Refresh,
-  RefreshLeft,
-  RefreshRight,
-  Right,
-  ZoomIn,
-  ZoomOut
-} from "@element-plus/icons-vue";
+import { Check, Close, Delete, Edit } from "@element-plus/icons-vue";
+import { type ExcelTableItem } from "../../type/index";
+import { EXCEL_TABLE_ITEM_DEFAULT } from "../../utils/constants";
+import { generateID } from "../../utils/tools";
 import {
   LineMdLoadingTwotoneLoop,
   IconParkSolidGoodTwo,
   RiImageEditFill
-} from "@/views/aiDrawing/excelTable/svg/index";
-import { ElMessage, ElMessageBox } from "element-plus";
+} from "../../svg/index";
+import OnlineImage from "../onlineImage/index.vue";
 
 const props = defineProps({
   loading: {
@@ -71,9 +55,12 @@ const editingRowData = ref<ExcelTableItem | null>(null);
 
 const handleAddRow = () => {
   const newData = [...props.tableData];
-  newData.push(
+  newData.unshift(
     JSON.parse(
-      JSON.stringify({ ...EXCEL_TABLE_ITEM_DEFAULT, id: generateID() })
+      JSON.stringify({
+        ...EXCEL_TABLE_ITEM_DEFAULT,
+        uiid: generateID()
+      })
     )
   );
   emit("update:tableData", newData);
@@ -130,48 +117,28 @@ const handleDeleteRow = (index: number) => {
 };
 //#endregion
 
-// 下载图片
-const handleDownload = (src: string) => {
-  const message = ElMessage({
-    message: "下载中...",
-    duration: 0
-  });
-  const suffix = src.slice(src.lastIndexOf("."));
-  const filename = Date.now() + suffix;
-
-  fetch(src)
-    .then(response => response.blob())
-    .then(blob => {
-      const blobUrl = URL.createObjectURL(new Blob([blob]));
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      URL.revokeObjectURL(blobUrl);
-      link.remove();
-
-      message.close();
-      ElMessage.success("下载完成");
-    });
-};
-
 // 禁用勾选状态
 const selectable = (row: ExcelTableItem, index: number) => {
-  return !props.loading;
+  return !(props.loading || row.status === 0);
 };
 </script>
 
 <template>
   <el-card shadow="never" style="border-radius: 10px">
-    <div class="text-[14px] text-[#0a0a0a] mb-[5px]">AI绘图参数配置表</div>
+    <el-button
+      style="width: 100%; display: flex; justify-content: flex-start"
+      @click="handleAddRow"
+      :disabled="editingRowIndex !== null || loading"
+    >
+      <span class="text-[14px] text-[#0a0a0a]">+ 添加数据</span>
+    </el-button>
 
     <el-table
       :data="tableData"
       style="width: 100%"
       border
       size="small"
-      empty-text="请先添加数据"
+      empty-text="点击上方按钮 添加数据"
       @selection-change="props.handleSelectionChange"
       :header-cell-style="{
         background: '#f5f7fa',
@@ -179,10 +146,14 @@ const selectable = (row: ExcelTableItem, index: number) => {
         fontWeight: '500',
         fontSize: '12px'
       }"
+      row-key="uiid"
     >
-      <el-table-column type="selection" :selectable="selectable" width="30" />
-
-      <el-table-column type="index" width="50" label="序号" fixed="left" />
+      <el-table-column
+        type="selection"
+        :selectable="selectable"
+        width="30"
+        fixed="left"
+      />
 
       <!-- 模板图片 -->
       <el-table-column
@@ -197,14 +168,7 @@ const selectable = (row: ExcelTableItem, index: number) => {
           </template>
           <template v-else>
             <div v-for="(image, index) in row.templateImage" :key="index">
-              <el-image
-                :src="image"
-                fit="contain"
-                class="w-[50px] h-[50px]"
-                :preview-src-list="row.templateImage"
-                :initial-index="Number(index)"
-                preview-teleported
-              />
+              <OnlineImage :url="image" />
             </div>
           </template>
         </template>
@@ -244,14 +208,7 @@ const selectable = (row: ExcelTableItem, index: number) => {
           </template>
           <template v-else>
             <div v-for="(image, index) in row.campaignLogoImage" :key="index">
-              <el-image
-                :src="image"
-                fit="contain"
-                class="w-[50px] h-[50px]"
-                :preview-src-list="row.campaignLogoImage"
-                :initial-index="Number(index)"
-                preview-teleported
-              />
+              <OnlineImage :url="image" />
             </div>
           </template>
         </template>
@@ -336,14 +293,7 @@ const selectable = (row: ExcelTableItem, index: number) => {
           </template>
           <template v-else>
             <div v-for="(image, index) in row.productImage" :key="index">
-              <el-image
-                :src="image"
-                fit="contain"
-                class="w-[50px] h-[50px]"
-                :preview-src-list="row.productImage"
-                :initial-index="Number(index)"
-                preview-teleported
-              />
+              <OnlineImage :url="image" />
             </div>
           </template>
         </template>
@@ -428,14 +378,7 @@ const selectable = (row: ExcelTableItem, index: number) => {
           </template>
           <template v-else>
             <div v-for="(image, index) in row.fullGiftImages" :key="index">
-              <el-image
-                :src="image"
-                fit="contain"
-                class="w-[50px] h-[50px]"
-                :preview-src-list="row.fullGiftImages"
-                :initial-index="Number(index)"
-                preview-teleported
-              />
+              <OnlineImage :url="image" />
             </div>
           </template>
         </template>
@@ -533,7 +476,7 @@ const selectable = (row: ExcelTableItem, index: number) => {
       <el-table-column
         :resizable="false"
         prop="remark"
-        label="备注"
+        label="补充描述"
         width="150"
         fixed="right"
       >
@@ -541,7 +484,6 @@ const selectable = (row: ExcelTableItem, index: number) => {
           <template v-if="editingRowIndex === $index">
             <el-input
               v-model="editingRowData!.remark"
-              placeholder="补充描述"
               type="textarea"
               :rows="3"
             />
@@ -563,70 +505,7 @@ const selectable = (row: ExcelTableItem, index: number) => {
         <template #default="{ row, $index }">
           <div v-for="(image, index) in row.resultImages" :key="index">
             <div class="flex justify-around items-center mb-[8px]">
-              <el-image
-                :src="image"
-                fit="contain"
-                class="w-[70px] h-[70px]"
-                :preview-src-list="row.resultImages"
-                :initial-index="Number(index)"
-                preview-teleported
-                show-progress
-              >
-                <template
-                  #toolbar="{
-                    actions,
-                    prev,
-                    next,
-                    reset,
-                    activeIndex,
-                    setActiveItem
-                  }"
-                >
-                  <el-icon @click="prev">
-                    <Back />
-                  </el-icon>
-                  <el-icon @click="next">
-                    <Right />
-                  </el-icon>
-                  <el-icon
-                    @click="setActiveItem(row.fullGiftImages.length - 1)"
-                  >
-                    <DArrowRight />
-                  </el-icon>
-                  <el-icon @click="actions('zoomOut')">
-                    <ZoomOut />
-                  </el-icon>
-                  <el-icon
-                    @click="
-                      actions('zoomIn', {
-                        enableTransition: false,
-                        zoomRate: 2
-                      })
-                    "
-                  >
-                    <ZoomIn />
-                  </el-icon>
-                  <el-icon
-                    @click="
-                      actions('clockwise', {
-                        rotateDeg: 180,
-                        enableTransition: false
-                      })
-                    "
-                  >
-                    <RefreshRight />
-                  </el-icon>
-                  <el-icon @click="actions('anticlockwise')">
-                    <RefreshLeft />
-                  </el-icon>
-                  <el-icon @click="reset">
-                    <Refresh />
-                  </el-icon>
-                  <el-icon @click="handleDownload(image)">
-                    <Download />
-                  </el-icon>
-                </template>
-              </el-image>
+              <OnlineImage :url="image" />
 
               <div class="flex flex-col justify-around items-center gap-[12px]">
                 <el-button
@@ -637,12 +516,12 @@ const selectable = (row: ExcelTableItem, index: number) => {
                   <IconParkSolidGoodTwo
                     class="w-[16px] h-[16px]"
                     color="#ccc"
-                    v-show="!row.betterTemplateImage[`${row.id}_${index}`]"
+                    v-show="!row.betterTemplateImage[`${row.uiid}_${index}`]"
                   />
                   <IconParkSolidGoodTwo
                     class="w-[16px] h-[16px]"
                     color="green"
-                    v-show="row.betterTemplateImage[`${row.id}_${index}`]"
+                    v-show="row.betterTemplateImage[`${row.uiid}_${index}`]"
                   />
                 </el-button>
 
@@ -659,19 +538,26 @@ const selectable = (row: ExcelTableItem, index: number) => {
 
           <div
             class="flex items-center"
-            v-if="loading && props.selectedIds.includes(row.id)"
+            v-if="
+              (loading && props.selectedIds.includes(row.uiid)) ||
+              row.status === 0
+            "
           >
             <div class="w-[24px] h-[24px]">
               <LineMdLoadingTwotoneLoop />
             </div>
             <div class="text-[12px]">生成中...</div>
           </div>
+
+          <div v-if="row.status === 2">
+            <p class="text-[12px] text-red-500">生成失败！</p>
+          </div>
         </template>
       </el-table-column>
 
       <!-- 操作列 -->
       <el-table-column label="操作" width="125" fixed="right">
-        <template #default="{ $index }">
+        <template #default="{ $index, row }">
           <template v-if="editingRowIndex === $index">
             <el-button
               type="primary"
@@ -695,12 +581,15 @@ const selectable = (row: ExcelTableItem, index: number) => {
               type="primary"
               size="default"
               @click="handleEditRow($index)"
-              :disabled="editingRowIndex !== null || loading"
+              :disabled="
+                editingRowIndex !== null || loading || row.status === 0
+              "
               text
               :icon="Edit"
             >
             </el-button>
             <el-button
+              v-if="!row.uuid"
               type="danger"
               size="default"
               @click="handleDeleteRow($index)"
@@ -713,13 +602,6 @@ const selectable = (row: ExcelTableItem, index: number) => {
         </template>
       </el-table-column>
     </el-table>
-    <el-button
-      style="width: 100%; display: flex; justify-content: flex-start"
-      @click="handleAddRow"
-      :disabled="editingRowIndex !== null || loading"
-    >
-      <span class="text-[14px] text-[#0a0a0a]">+ 添加数据</span>
-    </el-button>
   </el-card>
 </template>
 

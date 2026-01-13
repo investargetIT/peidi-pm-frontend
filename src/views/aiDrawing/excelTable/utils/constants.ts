@@ -1,4 +1,4 @@
-import { ExcelTableItem } from "@/views/aiDrawing/excelTable/type/index";
+import { ExcelTableItem } from "../type/index";
 
 // 模型名称
 // export const GRSAI_MODEL_NAME = "nano-banana-fast";
@@ -8,13 +8,22 @@ export const GRSAI_MODEL_NAME = "nano-banana-pro";
 export const GRSAI_API_KEY = "sk-f1a82e4ffc184a92a8422c593ce44b25"; // Dawn
 
 // 生成的图片数量
-export const MAX_PIC_COUNT = 2;
-// export const MAX_PIC_COUNT = 3;
+// export const MAX_PIC_COUNT = 1;
+export const MAX_PIC_COUNT = 3;
+
+// 最大重试次数
+export const MAX_RETRY_COUNT = 10;
+
+// 轮询间隔
+export const POLL_INTERVAL = 1000 * 60;
 
 /**
  * 表格数据默认值
  */
 export const EXCEL_TABLE_ITEM_DEFAULT: ExcelTableItem = {
+  status: 1,
+  uuid: null,
+  uiid: null,
   id: "",
   templateImage: [] as string[], // 现在这里存储的是图片的base64字符串数组
   imageSize: "4K" as string, // 输出图像大小
