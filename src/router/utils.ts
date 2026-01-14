@@ -266,7 +266,7 @@ function initRouter() {
           name: "aiDrawing",
           component: () => import("@/views/aiDrawing/index.vue"),
           meta: {
-            title: "AI 绘图",
+            title: "AI绘图",
             showParent: false
           }
         }

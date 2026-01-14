@@ -22,17 +22,22 @@ const exportPNGLoading = ref<boolean>(false);
 const processTemplateImage = async () => {
   if (!props.templateImg) return;
 
+  const message = ElMessage.info({
+    message: "正在加载模板图片...",
+    duration: 0
+  });
   try {
-    ElMessage.info("正在加载模板图片...");
     const res: any = await downloadFile({ objectName: props.templateImg });
     const reader = new FileReader();
     reader.onloadend = () => {
       templateImgBase64.value = reader.result as string;
+      message.close();
       ElMessage.success("模板图片加载成功");
     };
     reader.readAsDataURL(res);
   } catch (error) {
     console.error("图片转换失败:", error);
+    message.close();
     ElMessage.error("模板图片加载失败，请检查URL是否正确");
   }
 };

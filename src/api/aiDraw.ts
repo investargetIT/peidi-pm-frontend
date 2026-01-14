@@ -1,7 +1,8 @@
 import { http } from "@/utils/http";
 
 const baseUrlApi = (url: string) => {
-  return `http://12.18.1.12:8091${url}`;
+  return `https://api.peidigroup.cn${url}`;
+  // return `http://12.18.1.12:8091${url}`;
 };
 
 export interface AiDrawPageRequest {
@@ -14,7 +15,8 @@ export interface AiDrawPageRequest {
 // 获取ai画图分页结果
 export const getAiDrawPage = (params: AiDrawPageRequest) => {
   return http.request("get", baseUrlApi("/ai/draw/page"), {
-    params
+    params,
+    timeout: 1000 * 30
   });
 };
 
@@ -44,7 +46,7 @@ export const uploadDraw = (data: FormData) => {
     headers: {
       "Content-Type": "multipart/form-data"
     },
-    timeout: 0
+    timeout: 1000 * 30
   });
 };
 
@@ -52,13 +54,15 @@ export const uploadDraw = (data: FormData) => {
 export const downloadFile = (params: { objectName: string }) => {
   return http.request("get", baseUrlApi("/ai/common/download"), {
     params,
-    responseType: "blob"
+    responseType: "blob",
+    timeout: 1000 * 30
   });
 };
 
 // 获取文件url
 export const getDownloadUrl = (params: { objectName: string }) => {
   return http.request("get", baseUrlApi("/ai/common/download-url"), {
-    params
+    params,
+    timeout: 1000 * 30
   });
 };

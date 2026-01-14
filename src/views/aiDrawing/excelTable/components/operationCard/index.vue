@@ -9,7 +9,6 @@ import {
 } from "../../utils/constants";
 import { type ExcelTableItem } from "../../type/index";
 import { newAiDraw, downloadFile } from "@/api/aiDraw";
-import { th } from "element-plus/es/locale/index.mjs";
 
 const props = defineProps({
   loading: {

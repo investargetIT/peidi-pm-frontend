@@ -4,18 +4,15 @@ import { ExcelTableItem } from "../type/index";
 // export const GRSAI_MODEL_NAME = "nano-banana-fast";
 export const GRSAI_MODEL_NAME = "nano-banana-pro";
 
-// 接口密钥
-export const GRSAI_API_KEY = "sk-f1a82e4ffc184a92a8422c593ce44b25"; // Dawn
-
 // 生成的图片数量
-// export const MAX_PIC_COUNT = 1;
+// export const MAX_PIC_COUNT = 2;
 export const MAX_PIC_COUNT = 3;
 
 // 最大重试次数
 export const MAX_RETRY_COUNT = 10;
 
 // 轮询间隔
-export const POLL_INTERVAL = 1000 * 60;
+export const POLL_INTERVAL = 1000 * 120;
 
 /**
  * 表格数据默认值

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { inject, ref } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessageBox } from "element-plus";
 import DevUpLoad from "@/views/aiDrawing/dev/components/devUpLoad.vue";
 import { Check, Close, Delete, Edit } from "@element-plus/icons-vue";
 import { type ExcelTableItem } from "../../type/index";
