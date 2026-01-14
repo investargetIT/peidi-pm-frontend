@@ -23,7 +23,7 @@ const processTemplateImage = async () => {
   if (!props.templateImg) return;
 
   const message = ElMessage.info({
-    message: "正在加载模板图片...",
+    message: "正在加载底图...",
     duration: 0
   });
   try {
@@ -32,13 +32,13 @@ const processTemplateImage = async () => {
     reader.onloadend = () => {
       templateImgBase64.value = reader.result as string;
       message.close();
-      ElMessage.success("模板图片加载成功");
+      ElMessage.success("底图加载成功");
     };
     reader.readAsDataURL(res);
   } catch (error) {
     console.error("图片转换失败:", error);
     message.close();
-    ElMessage.error("模板图片加载失败，请检查URL是否正确");
+    ElMessage.error("底图加载失败，请检查URL是否正确");
   }
 };
 
@@ -46,6 +46,7 @@ const processTemplateImage = async () => {
 watch(
   () => props.templateImg,
   () => {
+    if (!dialogVisible.value) return;
     templateImgBase64.value = DEFAULT_IMG;
     processTemplateImage();
   }
@@ -381,6 +382,7 @@ defineExpose({
       width="1200"
       :before-close="handleClose"
       append-to-body
+      :close-on-click-modal="false"
     >
       <div class="editor-container">
         <div class="toolbar">

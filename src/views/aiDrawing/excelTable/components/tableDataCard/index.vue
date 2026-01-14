@@ -9,7 +9,8 @@ import { generateID } from "../../utils/tools";
 import {
   LineMdLoadingTwotoneLoop,
   IconParkSolidGoodTwo,
-  RiImageEditFill
+  RiImageEditFill,
+  FluentSave32Filled
 } from "../../svg/index";
 import OnlineImage from "../onlineImage/index.vue";
 
@@ -46,7 +47,10 @@ const emit = defineEmits<{
 
 const updateTemplateImg = inject<Function>("updateTemplateImg");
 const handleEditImage = (row: ExcelTableItem, index: number | string) => {
-  updateTemplateImg(row.resultImages[index]);
+  updateTemplateImg(row.resultImages[index], 0, row);
+};
+const handleSaveImage = (row: ExcelTableItem, index: number | string) => {
+  updateTemplateImg(row.resultImages[index], 1, row);
 };
 
 //#region 动态编辑表格逻辑
@@ -499,7 +503,7 @@ const selectable = (row: ExcelTableItem, index: number) => {
         :resizable="false"
         prop="resultImages"
         label="结果图片"
-        width="120"
+        width="150"
         fixed="right"
       >
         <template #default="{ row, $index }">
@@ -531,6 +535,14 @@ const selectable = (row: ExcelTableItem, index: number) => {
                   size="small"
                 >
                   <RiImageEditFill class="w-[16px] h-[16px]" color="#000" />
+                </el-button>
+
+                <el-button
+                  text
+                  size="small"
+                  @click="handleSaveImage(row, index)"
+                >
+                  <FluentSave32Filled class="w-[16px] h-[16px]" color="#000" />
                 </el-button>
               </div>
             </div>
