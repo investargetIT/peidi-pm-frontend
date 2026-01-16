@@ -512,38 +512,62 @@ const selectable = (row: ExcelTableItem, index: number) => {
               <OnlineImage :url="image" />
 
               <div class="flex flex-col justify-around items-center gap-[12px]">
-                <el-button
-                  text
-                  @click="props.handleGoodsClick(row, index)"
-                  size="small"
+                <el-tooltip
+                  effect="dark"
+                  content="点赞的图片会告知AI模型，用于生成图片时参考"
+                  placement="right"
+                  :show-after="200"
                 >
-                  <IconParkSolidGoodTwo
-                    class="w-[16px] h-[16px]"
-                    color="#ccc"
-                    v-show="!row.betterTemplateImage[`${row.uiid}_${index}`]"
-                  />
-                  <IconParkSolidGoodTwo
-                    class="w-[16px] h-[16px]"
-                    color="green"
-                    v-show="row.betterTemplateImage[`${row.uiid}_${index}`]"
-                  />
-                </el-button>
+                  <el-button
+                    text
+                    @click="props.handleGoodsClick(row, index)"
+                    size="small"
+                  >
+                    <IconParkSolidGoodTwo
+                      class="w-[16px] h-[16px]"
+                      color="#ccc"
+                      v-show="!row.betterTemplateImage[`${row.uiid}_${index}`]"
+                    />
+                    <IconParkSolidGoodTwo
+                      class="w-[16px] h-[16px]"
+                      color="green"
+                      v-show="row.betterTemplateImage[`${row.uiid}_${index}`]"
+                    />
+                  </el-button>
+                </el-tooltip>
 
-                <el-button
-                  text
-                  @click="handleEditImage(row, index)"
-                  size="small"
+                <el-tooltip
+                  effect="dark"
+                  content="编辑图片，可导入素材拼接出图"
+                  placement="right"
+                  :show-after="200"
                 >
-                  <RiImageEditFill class="w-[16px] h-[16px]" color="#000" />
-                </el-button>
+                  <el-button
+                    text
+                    @click="handleEditImage(row, index)"
+                    size="small"
+                  >
+                    <RiImageEditFill class="w-[16px] h-[16px]" color="#000" />
+                  </el-button>
+                </el-tooltip>
 
-                <el-button
-                  text
-                  size="small"
-                  @click="handleSaveImage(row, index)"
+                <el-tooltip
+                  effect="dark"
+                  content="自动把素材贴入图片中，目前只适配京东模板"
+                  placement="right"
+                  :show-after="200"
                 >
-                  <FluentSave32Filled class="w-[16px] h-[16px]" color="#000" />
-                </el-button>
+                  <el-button
+                    text
+                    size="small"
+                    @click="handleSaveImage(row, index)"
+                  >
+                    <FluentSave32Filled
+                      class="w-[16px] h-[16px]"
+                      color="#000"
+                    />
+                  </el-button>
+                </el-tooltip>
               </div>
             </div>
           </div>

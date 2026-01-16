@@ -1,11 +1,32 @@
 <script lang="ts" setup>
-import { onMounted, ref, reactive, nextTick, onUnmounted, watch } from "vue";
+import {
+  onMounted,
+  ref,
+  reactive,
+  nextTick,
+  onUnmounted,
+  watch,
+  inject
+} from "vue";
 import { ElMessage } from "element-plus";
 import TEMP_IMG from "./imgs/temp.png";
 import DEFAULT_IMG from "./imgs/default.png";
 import html2canvas from "html2canvas";
 import { snapdom } from "@zumer/snapdom";
 import { downloadFile } from "@/api/aiDraw";
+
+// 注入缓存管理器
+const imageCacheManager = inject("imageCacheManager") as {
+  processImageWithCache: (
+    imageUrl: string,
+    callback?: (result: any) => void
+  ) => Promise<any>;
+  clearImageCache: (imageUrl: string) => Promise<boolean>;
+  clearAllImageCache: () => Promise<boolean>;
+  checkImageCache: (imageUrl: string) => Promise<boolean>;
+  getCompressedImage: (imageUrl: string) => Promise<string | null>;
+  getOriginalImage: (imageUrl: string) => Promise<string | null>;
+};
 
 const props = defineProps({
   templateImg: {
@@ -18,26 +39,58 @@ const exportContainer = ref(null);
 const templateImgBase64 = ref(DEFAULT_IMG); // 存储转换后的base64图片
 const exportPNGLoading = ref<boolean>(false);
 
-// 检查是否是URL并转换为base64
+// 用于跟踪当前的加载消息
+let currentLoadingMessage: any = null;
+
+// 检查是否是URL并转换为base64 - 优先使用缓存
 const processTemplateImage = async () => {
   if (!props.templateImg) return;
 
-  const message = ElMessage.info({
+  // 关闭之前的加载消息（如果有）
+  if (currentLoadingMessage) {
+    currentLoadingMessage.close();
+  }
+
+  currentLoadingMessage = ElMessage.info({
     message: "正在加载底图...",
     duration: 0
   });
+
   try {
-    const res: any = await downloadFile({ objectName: props.templateImg });
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      templateImgBase64.value = reader.result as string;
-      message.close();
-      ElMessage.success("底图加载成功");
-    };
-    reader.readAsDataURL(res);
+    // 优先使用缓存管理器加载图片
+    if (imageCacheManager) {
+      const result = await imageCacheManager.processImageWithCache(
+        props.templateImg,
+        result => {
+          templateImgBase64.value = result.originalBlob;
+          if (currentLoadingMessage) {
+            currentLoadingMessage.close();
+            currentLoadingMessage = null;
+          }
+          ElMessage.success("底图加载成功");
+        }
+      );
+      templateImgBase64.value = result.originalBlob;
+    } else {
+      // 如果缓存管理器不可用，使用原来的方式
+      const res: any = await downloadFile({ objectName: props.templateImg });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        templateImgBase64.value = reader.result as string;
+        if (currentLoadingMessage) {
+          currentLoadingMessage.close();
+          currentLoadingMessage = null;
+        }
+        ElMessage.success("底图加载成功");
+      };
+      reader.readAsDataURL(res);
+    }
   } catch (error) {
     console.error("图片转换失败:", error);
-    message.close();
+    if (currentLoadingMessage) {
+      currentLoadingMessage.close();
+      currentLoadingMessage = null;
+    }
     ElMessage.error("底图加载失败，请检查URL是否正确");
   }
 };
@@ -51,6 +104,34 @@ watch(
     processTemplateImage();
   }
 );
+
+const dialogVisible = ref(false);
+const currentImage = ref(TEMP_IMG);
+const isDragging = ref(false);
+const dragElement = ref(null);
+const selectedElementId = ref(null); // 当前选中的元素ID
+const dragOffset = ref({ x: 0, y: 0 }); // 拖动时的鼠标偏移量
+const containerRect = ref(null); // 缓存容器位置信息
+
+// 图片元素数据
+const imageElements = reactive([]);
+
+const handleClose = (done: () => void) => {
+  // 关闭加载消息（如果有）
+  if (currentLoadingMessage) {
+    currentLoadingMessage.close();
+    currentLoadingMessage = null;
+  }
+
+  // 清空图片元素
+  imageElements.length = 0;
+
+  // 重置模板图片
+  templateImgBase64.value = DEFAULT_IMG;
+
+  // 关闭弹窗
+  done();
+};
 
 const capture = () => {
   if (exportContainer.value) {
@@ -98,21 +179,6 @@ const handleCapture = async () => {
     ElMessage.success("图片捕获成功");
     exportPNGLoading.value = false;
   }
-};
-
-const dialogVisible = ref(false);
-const currentImage = ref(TEMP_IMG);
-const isDragging = ref(false);
-const dragElement = ref(null);
-const selectedElementId = ref(null); // 当前选中的元素ID
-const dragOffset = ref({ x: 0, y: 0 }); // 拖动时的鼠标偏移量
-const containerRect = ref(null); // 缓存容器位置信息
-
-// 图片元素数据
-const imageElements = reactive([]);
-
-const handleClose = (done: () => void) => {
-  done();
 };
 
 // 导入图片功能 - 生成图片元素
@@ -338,6 +404,29 @@ const exportAsPNG = () => {
   });
 };
 
+onMounted(() => {
+  processTemplateImage();
+  nextTick(() => {
+    updateContainerRect();
+    window.addEventListener("resize", handleResize);
+  });
+});
+
+// 组件卸载时清理
+onUnmounted(() => {
+  // 关闭加载消息（如果有）
+  if (currentLoadingMessage) {
+    currentLoadingMessage.close();
+    currentLoadingMessage = null;
+  }
+
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+  }
+  window.removeEventListener("resize", handleResize);
+  document.removeEventListener("mousemove", handleMouseMove);
+  document.removeEventListener("mouseup", handleMouseUp);
+});
 // 窗口大小变化时更新容器位置
 const handleResize = () => {
   updateContainerRect();

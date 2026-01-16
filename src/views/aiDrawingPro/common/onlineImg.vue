@@ -2,11 +2,16 @@
 import { ref, watch, inject } from "vue";
 import { ElMessage } from "element-plus";
 import { getDownloadUrl, downloadFile } from "@/api/aiDraw";
+import { dataURLtoBlob } from "../utils/compressImage";
 
 const props = defineProps({
   url: {
     type: String,
     required: true
+  },
+  size: {
+    type: String,
+    default: "120px"
   }
 });
 
@@ -27,16 +32,20 @@ const imageCacheManager = inject("imageCacheManager") as {
   getOriginalImage: (url: string) => Promise<string | null>;
 };
 
-const imageUrl = ref("");
-const imageDetailUrl = ref("");
+const compressedImageUrl = ref("");
+const originalImageUrl = ref("");
+const loading = ref(true); // 添加加载状态
 
 // 使用缓存处理图片加载
 watch(
   () => props.url,
   async newVal => {
-    imageUrl.value = "";
-    imageDetailUrl.value = "";
+    compressedImageUrl.value = "";
+    originalImageUrl.value = "";
+    loading.value = true; // 开始加载时显示骨架屏
+
     if (!newVal) {
+      loading.value = false;
       return;
     }
 
@@ -49,21 +58,24 @@ watch(
         const compressedImage =
           await imageCacheManager.getCompressedImage(newVal);
         if (compressedImage) {
-          imageUrl.value = compressedImage;
+          compressedImageUrl.value = compressedImage;
         }
 
         // 从缓存获取原图用于预览
         const originalImage = await imageCacheManager.getOriginalImage(newVal);
         if (originalImage) {
-          imageDetailUrl.value = originalImage;
+          originalImageUrl.value = originalImage;
         }
+
+        loading.value = false; // 缓存加载完成，隐藏骨架屏
       } else {
         // 缓存中不存在，异步处理图片并缓存
         imageCacheManager.processImageWithCache(
           newVal,
           (result: ImageDataResult) => {
-            imageUrl.value = result.compressedBlob;
-            imageDetailUrl.value = result.originalBlob;
+            compressedImageUrl.value = result.compressedBlob;
+            originalImageUrl.value = result.originalBlob;
+            loading.value = false; // 图片处理完成，隐藏骨架屏
           }
         );
       }
@@ -72,13 +84,15 @@ watch(
       if (!isCached) {
         const response: any = await getDownloadUrl({ objectName: newVal });
         if (response.data && response.success) {
-          imageUrl.value = response.data;
-          imageDetailUrl.value = response.data;
+          compressedImageUrl.value = response.data;
+          originalImageUrl.value = response.data;
+          loading.value = false; // 图片加载完成，隐藏骨架屏
         }
       }
     } catch (error) {
       console.error("图片加载失败:", error);
       ElMessage.error("图片加载失败");
+      loading.value = false; // 加载失败也要隐藏骨架屏
     }
   },
   {
@@ -142,63 +156,55 @@ const handleDownload = async (src: string) => {
     console.error("下载失败:", error);
   }
 };
-
-// 将base64数据转换为Blob（需要添加到组件中）
-const dataURLtoBlob = (dataURL: string): Blob => {
-  const arr = dataURL.split(",");
-  const mime = arr[0].match(/:(.*?);/)?.[1] || "image/png";
-  const bstr = atob(arr[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
-  }
-
-  return new Blob([u8arr], { type: mime });
-};
 </script>
 
 <template>
-  <el-image
-    :src="imageUrl"
-    fit="contain"
-    class="w-[70px] h-[70px]"
-    preview-teleported
-    :previewSrcList="[imageDetailUrl]"
+  <el-skeleton
+    :style="{ width: props.size, height: props.size }"
+    :loading="loading"
+    animated
   >
-    <template
-      #toolbar="{ actions, prev, next, reset, activeIndex, setActiveItem }"
-    >
-      <el-icon @click="actions('zoomOut')">
-        <ZoomOut />
-      </el-icon>
-      <el-icon
-        @click="
-          actions('zoomIn', {
-            enableTransition: false,
-            zoomRate: 2
-          })
-        "
-      >
-        <ZoomIn />
-      </el-icon>
-      <el-icon @click="actions('anticlockwise')">
-        <RefreshLeft />
-      </el-icon>
-      <el-icon @click="reset">
-        <Refresh />
-      </el-icon>
-      <el-icon @click="handleDownload(props.url)">
-        <Download />
-      </el-icon>
+    <template #template>
+      <el-skeleton-item
+        variant="image"
+        :style="{ width: props.size, height: props.size }"
+      />
     </template>
-    <template #error>
-      <div
-        class="w-[70px] h-[70px] flex items-center justify-center text-[#999] bg-[#ccc]"
+    <template #default>
+      <el-image
+        :src="compressedImageUrl"
+        fit="contain"
+        preview-teleported
+        :previewSrcList="[originalImageUrl]"
+        :style="{ width: props.size, height: props.size }"
       >
-        加载中...
-      </div>
+        <template
+          #toolbar="{ actions, prev, next, reset, activeIndex, setActiveItem }"
+        >
+          <el-icon @click="actions('zoomOut')">
+            <ZoomOut />
+          </el-icon>
+          <el-icon
+            @click="
+              actions('zoomIn', {
+                enableTransition: false,
+                zoomRate: 2
+              })
+            "
+          >
+            <ZoomIn />
+          </el-icon>
+          <el-icon @click="actions('anticlockwise')">
+            <RefreshLeft />
+          </el-icon>
+          <el-icon @click="reset">
+            <Refresh />
+          </el-icon>
+          <el-icon @click="handleDownload(props.url)">
+            <Download />
+          </el-icon>
+        </template>
+      </el-image>
     </template>
-  </el-image>
+  </el-skeleton>
 </template>

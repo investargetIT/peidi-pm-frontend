@@ -1,10 +1,28 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, computed, nextTick } from "vue";
+import { onMounted, ref, watch, computed, nextTick, inject } from "vue";
 import { ElMessage } from "element-plus";
-import { downloadFile } from "@/api/aiDraw";
 import DEFAULT_IMG from "../editDialog/imgs/default.png";
 import { ExcelTableItem } from "../excelTable/type";
 import { snapdom } from "@zumer/snapdom";
+
+// 定义图片数据返回类型
+interface ImageDataResult {
+  originalBlob: string; // 原图base64数据
+  compressedBlob: string; // 压缩图base64数据
+}
+
+// 注入顶层缓存管理函数
+const imageCacheManager = inject("imageCacheManager") as {
+  processImageWithCache: (
+    imageUrl: string,
+    callback?: (result: ImageDataResult) => void
+  ) => Promise<ImageDataResult>;
+  clearImageCache: (imageUrl: string) => Promise<boolean>;
+  clearAllImageCache: () => Promise<boolean>;
+  checkImageCache: (imageUrl: string) => Promise<boolean>;
+  getCompressedImage: (imageUrl: string) => Promise<string | null>;
+  getOriginalImage: (imageUrl: string) => Promise<string | null>;
+};
 
 const props = defineProps({
   templateImg: {
@@ -50,47 +68,17 @@ const getImagePosition = computed(() => {
   };
 });
 
-// 检查是否是URL并转换为base64
-async function processTemplateImage(
-  img: string,
-  callback: (base64: string) => void,
-  title: string = "底图"
-) {
-  if (!img) return;
-
-  const message = ElMessage.info({
-    message: `正在加载${title}...`,
-    duration: 0
-  });
-  try {
-    const res: any = await downloadFile({ objectName: img });
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      callback(reader.result as string);
-      message.close();
-      ElMessage.success(`${title}加载成功`);
-    };
-    reader.readAsDataURL(res);
-  } catch (error) {
-    console.error("图片转换失败:", error);
-    message.close();
-    ElMessage.error(`${title}加载失败，请检查URL是否正确`);
-  }
-}
-
 // 监听templateImg变化
 watch(
   () => props.templateImg,
   () => {
     if (!assemblingVisible.value) return;
     templateImgBase64.value = DEFAULT_IMG;
-    processTemplateImage(
-      props.templateImg,
-      base64 => {
-        templateImgBase64.value = base64;
-      },
-      "底图"
-    );
+
+    // 使用缓存管理函数加载底图
+    imageCacheManager.processImageWithCache(props.templateImg, result => {
+      templateImgBase64.value = result.originalBlob;
+    });
   }
 );
 
@@ -105,23 +93,31 @@ watch(
 
     console.log("模板行数据:", props.templateRow);
 
-    processTemplateImage(
-      props.templateRow.productImage[0],
-      base64 => {
-        productImgBase64.value = base64;
-      },
-      "产品图片"
-    );
-
-    props.templateRow.fullGiftImages.forEach((item, index) => {
-      processTemplateImage(
-        item,
-        base64 => {
-          fullGiftImgsBase64.value[index] = base64;
-        },
-        `赠品图片${index + 1}`
+    // 使用缓存管理函数加载产品图片
+    if (
+      props.templateRow.productImage &&
+      props.templateRow.productImage.length > 0
+    ) {
+      imageCacheManager.processImageWithCache(
+        props.templateRow.productImage[0],
+        result => {
+          productImgBase64.value = result.originalBlob;
+        }
       );
-    });
+    }
+
+    // 批量加载赠品图片
+    if (
+      props.templateRow.fullGiftImages &&
+      props.templateRow.fullGiftImages.length > 0
+    ) {
+      // 由于缓存管理器没有processImagesWithCache函数，改为逐个加载
+      props.templateRow.fullGiftImages.forEach((imageUrl, index) => {
+        imageCacheManager.processImageWithCache(imageUrl, result => {
+          fullGiftImgsBase64.value[index] = result.originalBlob;
+        });
+      });
+    }
   },
   {
     deep: true
@@ -229,11 +225,12 @@ defineExpose({
 .export-container {
   display: flex; /* 添加flex布局 */
   align-items: flex-start; /* 顶部对齐 */
+  position: relative;
 }
 
 .product-img-container {
   position: absolute;
-  top: 459px;
+  top: 420px;
   left: 390px;
   width: 750px;
   height: 500px;
@@ -250,8 +247,8 @@ defineExpose({
 
 .full-gift-img-container {
   position: absolute;
-  top: 670px;
-  left: 106px;
+  top: 645px;
+  left: 100px;
   // background-color: red;
   width: 260px;
   height: 150px;

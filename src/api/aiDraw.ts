@@ -55,13 +55,29 @@ export const downloadFile = (params: { objectName: string }) => {
   return http.request("get", baseUrlApi("/ai/common/download"), {
     params,
     responseType: "blob",
-    timeout: 1000 * 60
+    timeout: 1000 * 60 * 5
   });
 };
 
 // 获取文件url
 export const getDownloadUrl = (params: { objectName: string }) => {
   return http.request("get", baseUrlApi("/ai/common/download-url"), {
+    params,
+    timeout: 1000 * 30
+  });
+};
+
+// 新增素材
+export const newMaterial = (data: { objectName: string; type: string }) => {
+  return http.request("post", baseUrlApi("/ai/draw/materials/new"), {
+    data,
+    timeout: 1000 * 60
+  });
+};
+
+// 分页素材库结果
+export const getMaterialPage = (params: AiDrawPageRequest) => {
+  return http.request("get", baseUrlApi("/ai/draw/materials/page"), {
     params,
     timeout: 1000 * 30
   });
