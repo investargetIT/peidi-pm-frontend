@@ -14,6 +14,14 @@ const props = defineProps({
   successCallback: {
     type: Function,
     default: () => {}
+  },
+  idx: {
+    type: String,
+    default: "1"
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -58,7 +66,8 @@ const handleError = (
 
 <template>
   <div class="mb-[16px]">
-    <el-card shadow="never" style="border-radius: 10px">
+    <el-card shadow="never" style="border-radius: 10px" class="">
+      <div class="numCircle">{{ idx }}</div>
       <div>{{ title }}</div>
       <el-upload
         drag
@@ -69,6 +78,7 @@ const handleError = (
         :before-upload="beforeUpload"
         :on-success="handleSuccess"
         :on-error="handleError"
+        :disabled="disabled"
       >
         <el-icon class="el-icon--upload"><upload-filled /></el-icon>
         <div class="el-upload__text">拖放文件到这里，或 <em>点击上传</em></div>
@@ -81,3 +91,18 @@ const handleError = (
     </el-card>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.numCircle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #e7e7e7;
+  color: #409eff;
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+</style>

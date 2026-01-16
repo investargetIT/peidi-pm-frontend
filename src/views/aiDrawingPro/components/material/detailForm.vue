@@ -91,7 +91,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
 
             newMaterial({
               objectName: ruleForm.imageUrl,
-              type: ruleForm.type
+              type: JSON.stringify({ mtype: ruleForm.type })
             })
               .then((res: any) => {
                 if (res.code === 200) {

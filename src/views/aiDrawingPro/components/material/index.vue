@@ -5,7 +5,6 @@ import { getMaterialPage } from "@/api/aiDraw";
 import { MATERIAL_LIBRARY_TABS } from "../../config/material";
 import PictureCard from "./pictureCard.vue";
 import DetailForm from "./detailForm.vue";
-import { c } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
 
 const radio = ref();
 const materialList = ref({});
@@ -21,12 +20,16 @@ const fetchMaterialPage = () => {
       if (res.code === 200) {
         const materialListTemp = {};
         res.data.records.forEach((item: any) => {
-          if (!materialListTemp[item.type]) {
-            materialListTemp[item.type] = [item];
-          } else {
-            materialListTemp[item.type].push(item);
+          const mtype = JSON.parse(item.type)?.mtype;
+          if (mtype) {
+            if (!materialListTemp[mtype]) {
+              materialListTemp[mtype] = [item];
+            } else {
+              materialListTemp[mtype].push(item);
+            }
           }
         });
+
         materialList.value = materialListTemp;
 
         if (!radio.value) {

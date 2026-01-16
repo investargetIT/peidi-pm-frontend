@@ -7,34 +7,41 @@ import NavBar from "./navBar.vue";
 import type { TabsPaneContext } from "element-plus";
 import { storageLocal } from "@pureadmin/utils";
 
-const PERMISSION_ID_LIST = [
-  "1897890298264596481", // 林双叶
-  "1870023775338692610", // 大树
-  "1869635118983348225", // 肖嘉玲
-
+const DEV_ID = [
   "1926449443739600965", // 沈皓钰
   "1850741012504838145", // 张思宇
   "1887377779519434753" // 王家琦
 ];
-const hasExportPermission = ref(false);
+
+const PERMISSION_ID_LIST = {
+  // 报表导出
+  reportExport: [
+    ...DEV_ID,
+    "1897890298264596481", // 林双叶
+    "1870023775338692610", // 大树
+    "1869635118983348225" // 肖嘉玲
+  ],
+  // 文件上传
+  fileUpload: [
+    ...DEV_ID,
+    "1848656573381541890", // 方云
+    "1874711258007646210" // 范振吉
+  ]
+};
 
 const activeName = ref("excamination");
+const userId = ref("");
 
 const handleClick = (tab: TabsPaneContext, event: Event) => {
   // console.log(tab, event)
 };
 
-const checkPermission = () => {
+const checkPermission = (name: string) => {
   const temp: any = storageLocal().getItem("user-check-info");
   // console.log("injectPermissionIdList", temp);
-  hasExportPermission.value = temp?.id
-    ? PERMISSION_ID_LIST.includes(temp.id)
-    : false;
+  userId.value = temp?.id || "";
+  return temp?.id ? PERMISSION_ID_LIST[name].includes(temp.id) : false;
 };
-
-onMounted(() => {
-  checkPermission();
-});
 </script>
 
 <template>
@@ -50,15 +57,24 @@ onMounted(() => {
         <Examination v-if="activeName === 'excamination'" />
       </el-tab-pane>
 
-      <el-tab-pane label="数据上传" name="fileUpload" lazy>
-        <FileUpload v-if="activeName === 'fileUpload'" />
+      <el-tab-pane
+        label="数据上传"
+        name="fileUpload"
+        lazy
+        v-if="checkPermission('fileUpload')"
+      >
+        <FileUpload
+          v-if="activeName === 'fileUpload'"
+          :userId="userId"
+          :DEV_ID="DEV_ID"
+        />
       </el-tab-pane>
 
       <el-tab-pane
         label="报表导出"
         name="reportExport"
         lazy
-        v-if="hasExportPermission"
+        v-if="checkPermission('reportExport')"
       >
         <ReportExport v-if="activeName === 'reportExport'" />
       </el-tab-pane>
