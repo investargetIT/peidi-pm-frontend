@@ -3,6 +3,7 @@ import { ref, watch, inject } from "vue";
 import { ElMessage } from "element-plus";
 import { getDownloadUrl, downloadFile } from "@/api/aiDraw";
 import { dataURLtoBlob } from "../utils/compressImage";
+import { type ImageDataResult } from "../utils/compressImage";
 
 const props = defineProps({
   url: {
@@ -14,12 +15,6 @@ const props = defineProps({
     default: "120px"
   }
 });
-
-// 定义图片数据返回类型
-interface ImageDataResult {
-  originalBlob: string; // 原图base64数据
-  compressedBlob: string; // 压缩图base64数据
-}
 
 // 注入顶层缓存管理函数
 const imageCacheManager = inject("imageCacheManager") as {

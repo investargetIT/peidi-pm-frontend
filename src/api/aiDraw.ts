@@ -15,8 +15,7 @@ export interface AiDrawPageRequest {
 // 获取ai画图分页结果
 export const getAiDrawPage = (params: AiDrawPageRequest) => {
   return http.request("get", baseUrlApi("/ai/draw/page"), {
-    params,
-    timeout: 1000 * 30
+    params
   });
 };
 
@@ -45,8 +44,7 @@ export const uploadDraw = (data: FormData) => {
     data,
     headers: {
       "Content-Type": "multipart/form-data"
-    },
-    timeout: 1000 * 30
+    }
   });
 };
 
@@ -62,8 +60,7 @@ export const downloadFile = (params: { objectName: string }) => {
 // 获取文件url
 export const getDownloadUrl = (params: { objectName: string }) => {
   return http.request("get", baseUrlApi("/ai/common/download-url"), {
-    params,
-    timeout: 1000 * 30
+    params
   });
 };
 
@@ -75,10 +72,27 @@ export const newMaterial = (data: { objectName: string; type: string }) => {
   });
 };
 
+// 删除素材
+export const deleteMaterial = (data: { id: number | string }) => {
+  return http.request("post", baseUrlApi("/ai/draw/materials/delete"), {
+    data
+  });
+};
+
+// 修改素材
+export const updateMaterial = (data: {
+  id: number | string;
+  objectName: string;
+  type: string;
+}) => {
+  return http.request("post", baseUrlApi("/ai/draw/materials/update"), {
+    data
+  });
+};
+
 // 分页素材库结果
 export const getMaterialPage = (params: AiDrawPageRequest) => {
   return http.request("get", baseUrlApi("/ai/draw/materials/page"), {
-    params,
-    timeout: 1000 * 30
+    params
   });
 };

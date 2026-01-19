@@ -264,7 +264,7 @@ function initRouter() {
         {
           path: "/aiDrawing/index",
           name: "aiDrawing",
-          component: () => import("@/views/aiDrawing/index.vue"),
+          component: () => import("@/views/aiDrawingPro/index.vue"),
           meta: {
             title: "AI绘图",
             showParent: false

@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
+import RiAddLine from "@iconify-icons/ri/add-line";
 import { getMaterialPage } from "@/api/aiDraw";
 import { MATERIAL_LIBRARY_TABS } from "../../config/material";
 import PictureCard from "./pictureCard.vue";
 import DetailForm from "./detailForm.vue";
+import ContactForm from "./contactForm.vue";
 
 const radio = ref();
 const materialList = ref({});
 const cardData = ref([]);
 const detailFormRef = ref(null);
+const contactFormRef = ref(null);
 
 const fetchMaterialPage = () => {
   getMaterialPage({
@@ -62,10 +65,15 @@ watch(
 
 const updateCardData = () => {
   cardData.value = materialList.value[radio.value] || [];
+  // console.log("cardData.value:", cardData.value);
 };
 
 const handleAddMaterial = () => {
   detailFormRef.value.initDetailForm();
+};
+
+const handleContact = (data: any) => {
+  contactFormRef.value.initContactForm(data);
 };
 </script>
 
@@ -83,8 +91,11 @@ const handleAddMaterial = () => {
         </el-radio-button>
       </el-radio-group>
 
-      <el-button type="primary" @click="handleAddMaterial"
-        >+ 添加素材</el-button
+      <el-button type="primary" @click="handleAddMaterial">
+        <template #icon>
+          <IconifyIconOffline :icon="RiAddLine" />
+        </template>
+        添加素材</el-button
       >
     </div>
 
@@ -92,13 +103,28 @@ const handleAddMaterial = () => {
 
     <div>
       <el-space wrap :size="'large'">
-        <PictureCard v-for="item in cardData" :key="item.id" :data="item" />
+        <PictureCard
+          v-for="item in cardData"
+          :key="item.id"
+          :data="item"
+          :fetchMaterialPage="fetchMaterialPage"
+          :handleContact="handleContact"
+        />
       </el-space>
     </div>
 
     <div>
       <DetailForm
         ref="detailFormRef"
+        :materialList="materialList"
+        :fetchMaterialPage="fetchMaterialPage"
+        :selectedRadio="radio"
+      />
+    </div>
+
+    <div>
+      <ContactForm
+        ref="contactFormRef"
         :materialList="materialList"
         :fetchMaterialPage="fetchMaterialPage"
       />

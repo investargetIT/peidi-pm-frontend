@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { provide } from "vue";
+import { provide, ref } from "vue";
 import { downloadFile } from "@/api/aiDraw";
 import { ElMessage } from "element-plus";
 import Material from "./components/material/index.vue";
@@ -131,11 +131,17 @@ provide("imageCacheManager", {
   getOriginalImage
 });
 //#endregion
+
+const activeTab = ref("Material");
 </script>
 
 <template>
-  <el-tabs type="border-card">
-    <el-tab-pane label="素材库"><Material /></el-tab-pane>
-    <el-tab-pane label="绘图"><Drawing /></el-tab-pane>
+  <el-tabs
+    type="border-card"
+    v-model="activeTab"
+    class="peidi-el-tabs-modern-tabs"
+  >
+    <el-tab-pane label="素材库" name="Material"><Material /></el-tab-pane>
+    <el-tab-pane label="绘图" name="Drawing"><Drawing /></el-tab-pane>
   </el-tabs>
 </template>

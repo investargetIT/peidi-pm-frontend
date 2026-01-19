@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from "vue";
+import { reactive, ref, nextTick } from "vue";
 import {
   ElMessage,
   FormInstance,
@@ -26,6 +26,10 @@ const props = defineProps({
   fetchMaterialPage: {
     type: Function,
     required: true
+  },
+  selectedRadio: {
+    type: String,
+    required: true
   }
 });
 
@@ -34,6 +38,16 @@ const loading = ref(false);
 
 const initDetailForm = () => {
   dialogVisible.value = true;
+
+  nextTick(() => {
+    ruleFormRef.value?.resetFields();
+    ruleForm.imageUrl = "";
+    uploadRef.value?.clearFiles();
+
+    if (props.selectedRadio) {
+      ruleForm.type = props.selectedRadio;
+    }
+  });
 };
 
 const ruleFormRef = ref<FormInstance>();
@@ -54,7 +68,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
   await formEl.validate((valid, fields) => {
     if (valid) {
       loading.value = true;
-      console.log("提交!", ruleForm);
+      // console.log("提交!", ruleForm);
 
       // 首先检查图片名称是否存在
       for (const key in props.materialList) {
@@ -180,6 +194,7 @@ defineExpose({
             :limit="1"
             :on-exceed="handleExceed"
             :on-change="handleChange"
+            class="peidi-aiDrawingPro-material-detailForm-upload"
           >
             <template #trigger>
               <el-icon><Plus /></el-icon>
@@ -208,3 +223,14 @@ defineExpose({
     </el-dialog>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.peidi-aiDrawingPro-material-detailForm-upload {
+  :deep(.el-upload-list__item-preview) {
+    display: none !important;
+  }
+  :deep(.el-upload-list__item-delete) {
+    margin-left: 0;
+  }
+}
+</style>
