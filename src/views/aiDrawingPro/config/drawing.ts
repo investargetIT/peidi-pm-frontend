@@ -12,7 +12,7 @@ export const MAX_PIC_COUNT = 1;
 export const MAX_RETRY_COUNT = 10;
 
 // 轮询间隔
-export const POLL_INTERVAL = 1000 * 10;
+export const POLL_INTERVAL = 1000 * 120;
 
 /**
  * 表格数据默认值
@@ -39,6 +39,7 @@ export const EXCEL_TABLE_ITEM_DEFAULT: ExcelTableItem = {
   activityTime: "活动时间：12/15 00:00:00 - 12/25 23:59:59" as string, // 活动时间
   remark: "" as string, // 备注
   resultImages: [] as string[], // 生成的图片
-  // 更好的模板图
-  betterTemplateImage: {} as object
+  betterTemplateImage: {} as object, // 更好的模板图
+  shopLogoImage: [] as string[], // 店铺LOGO
+  brandLogoImage: [] as string[] // 品牌LOGO
 };

@@ -132,7 +132,7 @@ provide("imageCacheManager", {
 });
 //#endregion
 
-const activeTab = ref("Material");
+const activeTab = ref("Drawing");
 </script>
 
 <template>

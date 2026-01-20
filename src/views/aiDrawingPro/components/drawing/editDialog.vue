@@ -11,9 +11,9 @@ import {
 import { ElMessage } from "element-plus";
 import DEFAULT_IMG from "../../assests/images/default.png";
 import { snapdom } from "@zumer/snapdom";
-import { downloadFile } from "@/api/aiDraw";
+import { loadImage } from "../../utils/imageLoader";
 import { type ImageDataResult } from "../../utils/compressImage";
-import { ExcelTableItem } from "../../type/drawing";
+import { type ExcelTableItem } from "../../type/drawing";
 
 // 注入顶层缓存管理函数
 const imageCacheManager = inject("imageCacheManager") as {
@@ -34,60 +34,37 @@ const exportContainer = ref(null);
 const templateImgBase64 = ref(DEFAULT_IMG); // 存储转换后的base64图片
 const exportPNGLoading = ref<boolean>(false);
 
-// 用于跟踪当前的加载消息
-let currentLoadingMessage: any = null;
+// 用于存储当前加载请求的取消函数
+let currentLoadRequest: { cancel: () => void } | null = null;
 
 // 检查是否是URL并转换为base64 - 优先使用缓存
 const processTemplateImage = async () => {
   const resultImage = selectedRow.value?.resultImages?.[selectedIndex.value];
   if (!resultImage) return;
 
-  // 关闭之前的加载消息（如果有）
-  if (currentLoadingMessage) {
-    currentLoadingMessage.close();
+  // 取消之前的加载请求（如果存在）
+  if (currentLoadRequest) {
+    currentLoadRequest.cancel();
+    currentLoadRequest = null;
   }
 
-  currentLoadingMessage = ElMessage.info({
-    message: "正在加载素材...",
-    duration: 0
-  });
-
   try {
-    // 优先使用缓存管理器加载图片
-    if (imageCacheManager) {
-      const result = await imageCacheManager.processImageWithCache(
-        resultImage,
-        result => {
-          templateImgBase64.value = result.originalBlob;
-          if (currentLoadingMessage) {
-            currentLoadingMessage.close();
-            currentLoadingMessage = null;
-          }
-          ElMessage.success("底图加载成功");
-        }
-      );
-      templateImgBase64.value = result.originalBlob;
-    } else {
-      // 如果缓存管理器不可用，使用原来的方式
-      const res: any = await downloadFile({ objectName: resultImage });
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        templateImgBase64.value = reader.result as string;
-        if (currentLoadingMessage) {
-          currentLoadingMessage.close();
-          currentLoadingMessage = null;
-        }
-        ElMessage.success("素材加载成功");
-      };
-      reader.readAsDataURL(res);
-    }
+    // 使用新的可取消的loadImage函数
+    const loadRequest = loadImage(resultImage, imageCacheManager, {
+      loadingMessage: "正在加载底图...",
+      successMessage: "底图加载成功",
+      errorMessage: "底图加载失败，请检查URL是否正确"
+    });
+
+    currentLoadRequest = loadRequest;
+    templateImgBase64.value = await loadRequest.promise;
+    currentLoadRequest = null; // 加载完成后清除引用
   } catch (error) {
-    console.error("图片转换失败:", error);
-    if (currentLoadingMessage) {
-      currentLoadingMessage.close();
-      currentLoadingMessage = null;
+    // 如果是取消错误，不显示错误消息
+    if (error.message !== "请求已取消") {
+      console.error("底图加载失败:", error);
     }
-    ElMessage.error("素材加载失败，请检查URL是否正确");
+    currentLoadRequest = null;
   }
 };
 
@@ -364,26 +341,11 @@ const handleCapture = async () => {
 };
 
 onMounted(() => {
-  processTemplateImage();
+  // processTemplateImage();
   nextTick(() => {
-    updateContainerRect();
+    // updateContainerRect();
     window.addEventListener("resize", handleResize);
   });
-});
-// 组件卸载时清理
-onUnmounted(() => {
-  // 关闭加载消息（如果有）
-  if (currentLoadingMessage) {
-    currentLoadingMessage.close();
-    currentLoadingMessage = null;
-  }
-
-  if (animationFrameId) {
-    cancelAnimationFrame(animationFrameId);
-  }
-  window.removeEventListener("resize", handleResize);
-  document.removeEventListener("mousemove", handleMouseMove);
-  document.removeEventListener("mouseup", handleMouseUp);
 });
 
 const handleOpen = (row: ExcelTableItem, index: number | string) => {
@@ -397,25 +359,41 @@ const handleOpen = (row: ExcelTableItem, index: number | string) => {
     selectedRow.value = row;
     selectedIndex.value = index;
     processTemplateImage();
+    updateContainerRect();
   });
 };
 
 const handleClose = (done: () => void) => {
-  // 关闭加载消息（如果有）
-  if (currentLoadingMessage) {
-    currentLoadingMessage.close();
-    currentLoadingMessage = null;
+  // 取消当前的图片加载请求
+  if (currentLoadRequest) {
+    currentLoadRequest.cancel();
+    currentLoadRequest = null;
   }
 
   // 清空图片元素
   imageElements.length = 0;
-
   // 重置模板图片
   templateImgBase64.value = DEFAULT_IMG;
 
   // 关闭弹窗
   done();
 };
+
+// 组件卸载时清理
+onUnmounted(() => {
+  // 取消当前的图片加载请求
+  if (currentLoadRequest) {
+    currentLoadRequest.cancel();
+    currentLoadRequest = null;
+  }
+
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+  }
+  window.removeEventListener("resize", handleResize);
+  document.removeEventListener("mousemove", handleMouseMove);
+  document.removeEventListener("mouseup", handleMouseUp);
+});
 
 defineExpose({
   open: (row: ExcelTableItem, index: number | string) => {
@@ -429,15 +407,26 @@ defineExpose({
     <el-dialog
       v-model="dialogVisible"
       title="编辑图片"
-      width="1200"
+      width="700"
       :before-close="handleClose"
       append-to-body
       :close-on-click-modal="false"
+      align-center
     >
       <div class="editor-container">
         <div class="toolbar">
-          <el-button type="primary" @click="importImage">导入素材</el-button>
-          <span class="tip">导入的素材将作为可拖动的元素添加到画布中</span>
+          <div>
+            <el-button type="primary" @click="importImage">导入素材</el-button>
+            <span class="tip">导入的素材将作为可拖动的元素添加到画布中</span>
+          </div>
+
+          <el-button
+            type="primary"
+            @click="exportAsPNG"
+            :loading="exportPNGLoading"
+          >
+            导出PNG
+          </el-button>
         </div>
 
         <div
@@ -508,20 +497,6 @@ defineExpose({
           </div>
         </div>
       </div>
-
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-
-          <el-button
-            type="primary"
-            @click="exportAsPNG"
-            :loading="exportPNGLoading"
-          >
-            导出PNG
-          </el-button>
-        </div>
-      </template>
     </el-dialog>
   </div>
 </template>
@@ -538,6 +513,7 @@ defineExpose({
   border-bottom: 1px solid #eee;
   margin-bottom: 10px;
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 15px;
 }
@@ -651,11 +627,5 @@ defineExpose({
   top: -4px;
   left: -4px;
   cursor: nw-resize;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
 }
 </style>

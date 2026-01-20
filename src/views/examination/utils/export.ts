@@ -7,6 +7,7 @@ import { saveAs } from "file-saver";
  * @param columns 列配置
  * @param fileName 文件名
  * @param sheetName 工作表名
+ * @param monthList 月份列表
  */
 export const exportToExcel = async (
   data: any[],
@@ -17,7 +18,8 @@ export const exportToExcel = async (
     format?: (value: any) => string;
   }>,
   fileName: string = "导出数据",
-  sheetName: string = "Sheet1"
+  sheetName: string = "Sheet1",
+  monthList: string[] = []
 ) => {
   try {
     // 创建工作簿
@@ -113,10 +115,30 @@ export const exportToExcel = async (
         })
       );
 
-      // 交替行颜色
-      dataRow.eachCell((cell, colNumber) => {
-        cell.style = rowIndex % 2 === 0 ? dataStyle : alternateRowStyle;
-      });
+      // 交替行颜色 - 修复空单元格样式问题
+      for (let colNumber = 1; colNumber <= columns.length; colNumber++) {
+        const cell = dataRow.getCell(colNumber);
+        // 使用深拷贝避免样式对象引用问题
+        const currentStyle =
+          rowIndex % 2 === 0
+            ? JSON.parse(JSON.stringify(dataStyle))
+            : JSON.parse(JSON.stringify(alternateRowStyle));
+        cell.style = currentStyle;
+
+        const propTemp = columns[colNumber - 1].prop;
+        if (propTemp === "dataSum" || monthList.includes(propTemp)) {
+          cell.value = Number(cell.value);
+          if (!isNaN(cell.value)) {
+            const absoluteValue = Math.abs(cell.value);
+            // 直接设置格式字符串
+            if (absoluteValue >= 10000) {
+              cell.numFmt = '0\\.0,"万""元"';
+            } else {
+              cell.numFmt = "";
+            }
+          }
+        }
+      }
       dataRow.height = 22;
     });
 
@@ -166,22 +188,22 @@ export const exportExaminationTable = async (
     {
       prop: "dataSum",
       label: "当前数据合计",
-      width: 15,
-      format: (value: any) => {
-        return formatNumber(value);
-      }
+      width: 15
     },
     ...monthList.map(month => ({
       prop: month,
       label: month,
-      width: 12,
-      format: (value: any) => {
-        return formatNumber(value);
-      }
+      width: 12
     }))
   ];
 
-  await exportToExcel(tableData, columns, "绩效数据报表", "绩效数据");
+  await exportToExcel(
+    tableData,
+    columns,
+    "绩效数据报表",
+    "绩效数据",
+    monthList
+  );
 };
 
 export function formatNumber(value: any) {

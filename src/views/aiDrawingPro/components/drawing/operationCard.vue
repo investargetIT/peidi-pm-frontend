@@ -122,18 +122,20 @@ const formatParamsToPromises = async (
         },
         brand: {
           logo: "meatyway",
-          position: "top_left"
+          position: "top_left",
+          change: "删除掉图片，要和底图和谐"
         },
         event_badge: {
           id: "double_festival",
           type: "image",
-          image_ref: "提供的URL里的第2张图",
+          image_ref: "double_festival_logo",
           position: "top_left",
           anchor: "canvas",
           offset: { x: 200, y: 0 },
           scale: 1.0,
           priority: "high",
-          replaceable: true
+          replaceable: true,
+          change: "删除掉图片，要和底图和谐"
         },
         badge: {
           type: "official_flagship",
@@ -142,7 +144,8 @@ const formatParamsToPromises = async (
           style: {
             shape: "circle",
             color: "gold_black"
-          }
+          },
+          change: "删除掉图片，要和底图和谐"
         },
         title: {
           text: `“${item.normalSellingPoints}”`,
@@ -162,9 +165,10 @@ const formatParamsToPromises = async (
           }
         },
         product: {
-          image: "提供的URL里的第3张图，把第3张图原封不动放到指定位置即可",
+          image: "rabbit_spine_honey_pack",
           position: "center",
-          shadow: "soft"
+          shadow: "soft",
+          change: "删除掉图片，要和底图和谐"
         },
         promo_box: {
           position: "left_center",
@@ -178,7 +182,13 @@ const formatParamsToPromises = async (
             gift_items: {
               layout: "horizontal",
               spacing: "small",
-              item: `删除掉原先的图片内容，并且用提供的URL里的第4张到第${4 + fullGiftImagesLen - 1}张图片，只需要把它们做缩放然后原封不动地从左到右，从上到下，堆叠起来，图片上的字体一定要保持原图，不能有改动或变形！`
+              items: [
+                { image_ref: "gift_food_1" },
+                { image_ref: "gift_food_2" },
+                { image_ref: "gift_food_3" },
+                { image_ref: "gift_food_4" }
+              ],
+              change: "删除掉图片，要和底图和谐"
             }
           }
         },
@@ -209,10 +219,12 @@ const formatParamsToPromises = async (
     }
     async function formatUrls() {
       const temp = [
-        ...item.templateImage,
-        ...item.campaignLogoImage,
         ...item.productImage,
-        ...item.fullGiftImages
+        ...item.templateImage,
+        ...item.fullGiftImages,
+        ...item.campaignLogoImage,
+        ...item.brandLogoImage,
+        ...item.shopLogoImage
       ];
 
       const betterTemplateImage = item.betterTemplateImage;
@@ -256,36 +268,107 @@ const formatParamsToPromises = async (
       model: GRSAI_MODEL_NAME,
 
       prompt: `
-        【最高优先级 · 系统约束】
+        你是一名专业的电商主图设计与模板复用 AI，
+        当前任务是【模板图片修改 / 清洗任务】，不是重新生成图片。
+
+        ====================
+        一、最高优先级 · 系统约束（必须遵守）
+        ====================
         1. 本任务是“模板图片修改任务”，不是重新生成图片。
-        2. 仅允许修改 new_dsl 与 old_dsl 存在差异的字段。
+        2. 仅允许修改 new_dsl 与 old_dsl 存在差异的字段所对应的图像元素。
         3. old_dsl 未提及的任何元素，必须与模板图保持 100% 一致，不得修改。
         4. 严禁重新渲染、重绘或生成任何已有文字内容。
-        5. 生成最高清的图片，把小字体放大。
-        7. 如果有备注，必须严格按照备注说明执行。
+        5. 所有文字必须保持原有排版结构与字体风格（江城圆体）。
+        6. 抹除操作仅针对图片类元素，不得误删文字、色块或信息区块。
+        7. 若存在备注说明，备注说明优先级仅次于本系统约束，必须严格执行。
 
-        【模板与图片规则】
-        1. 提供的第 1 张图为基础模板图，其结构与元素以 old_dsl 为准。
-        2. 提供的第 2 张图用于 event_badge.image_ref，必须完整替换该元素，颜色与样式保持与原图保持一致。
-        3. 若传入图片数量 > ${3 + fullGiftImagesLen}，则多余图片为历史合格结果，仅用于参考风格，不作为修改对象。
+        ====================
+        二、总体目标
+        ====================
+        在保持模板整体版式、色彩体系、文字结构与信息层级完全不变的前提下，
+        抹除指定的图片类元素，使模板成为可长期复用的“干净母版”。
 
-        【执行指令（仅做差异修改）】
-        1. 对比 new_dsl 与 old_dsl，仅修改存在差异的字段对应的图像元素。
-        2. 所有修改均应在原图基础上进行“局部替换”，不得影响其他元素。
+        ⚠️ 核心原则：
+        - 文字信息优先级最高（文字可修改但不可被误删）
+        - 仅抹除图片、贴图、LOGO 等图像素材
+        - 抹除区域必须与原背景自然融合，不得出现涂抹痕迹
 
-        【文字清晰度强制要求（仅适用于已有文字）】
-        - 已有文字必须保持印刷级清晰度，不得模糊、变形或错字。
-        - 字体保持模板图原样（江城圆体），禁止替换字体。
-        - 笔画清晰、不粘连，边缘锐利。
+        ====================
+        三、图片输入与使用规则（非常重要）
+        ====================
+        已传入图片说明：
+
+        1️⃣ 第 1 张：产品图片（默认不使用，除非备注中明确要求）
+        2️⃣ 第 2 张：基础模板图（✅ 默认唯一用于修改与输出的模板）
+        3️⃣ 第 3 张：赠品图片（默认不使用）
+        4️⃣ 第 4 张：活动 LOGO（默认不使用）
+        5️⃣ 第 5 张：品牌 LOGO（默认不使用）
+        6️⃣ 第 6 张：店铺 LOGO（默认不使用）
+        7️⃣ 第 7 张及之后的所有图片：
+          - 为历史生成中效果良好、结构成熟的【优质模板参考图】
+          - 仅用于参考抹除方式、背景融合效果与结构合理性
+          - ❌ 不得直接复制、粘贴或替换其中任何元素
+          - ❌ 不作为输出图或素材来源
+
+        默认规则：
+        - 若备注中未明确指定使用某张图片，则只允许使用第 2 张模板图
+        - 其余图片一律视为“不可直接使用素材”
+
+        ====================
+        四、需要抹除的模板元素（精确规则）
+        ====================
+        请在模板图中执行以下抹除操作：
+
+        1️⃣ 模板图【中间左侧红色边框区域】：
+          - 抹除其中所有【图片类元素】（赠品图、产品图、插画贴图等）
+          - 必须完整保留该区域内：
+            - 所有文字内容
+            - 数字、符号
+            - “赠”字角标
+            - 文案底色、边框与排版样式
+
+        2️⃣ 模板图【中间左侧】若存在独立产品图片：
+          - 仅抹除产品图片本体
+          - 不得影响周围文字或装饰元素
+
+        3️⃣ 模板图【中间右侧】：
+          - 抹除草坪上的产品图片
+          - 同时抹除该产品所依附的草坪区域
+          - 抹除后该区域需自然过渡为背景，不得残留草坪或阴影痕迹
+
+        4️⃣ 模板图【右上角】：
+          - 抹除店铺 LOGO（仅图形本体）
+          - 背景需连续、自然
+
+        5️⃣ 模板图【左上角】：
+          - 抹除品牌 LOGO（图形本体）
+          - 抹除活动 LOGO / 活动标识（图形本体）
+          - 不得影响顶部背景纹理与装饰结构
+
+        ====================
+        五、文字清晰度与汉字纠错强制要求
+        ====================
+        - 所有已有文字必须保持印刷级清晰度
+        - 不得模糊、变形、错字或笔画粘连
+        - 字体保持模板原样（江城圆体）
 
         【汉字特殊注意（纠错提示）】
-        - “爵”：上中下结构，上部为扁“罒”，非“目”，整体修长。
-        - “宴”：宝盖头（宀）下为“日”+“安”。
+        - “爵”：上中下结构，上部为扁“罒”，非“目”，整体修长
+        - “宴”：宝盖头（宀）下为“日” + “安”
 
-        【输入参数】
+        ====================
+        六、输入参数（仅作为执行依据）
+        ====================
         - old_dsl: ${old_dsl}
         - new_dsl: ${new_dsl}
         - 备注说明: ${item.remark}
+
+        ====================
+        七、最终输出要求
+        ====================
+        - 仅输出修改后的模板图
+        - 不新增任何未说明的元素
+        - 输出结果应为可长期复用的“干净模板母版”
       `,
 
       aspectRatio: "1:1",

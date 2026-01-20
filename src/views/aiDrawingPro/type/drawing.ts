@@ -22,4 +22,8 @@ export interface ExcelTableItem {
   resultImages: string[];
   // 更好的模板图
   betterTemplateImage: object;
+  // 店铺LOGO
+  shopLogoImage: string[];
+  // 品牌LOGO
+  brandLogoImage: string[];
 }

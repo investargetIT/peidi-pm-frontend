@@ -6,12 +6,12 @@ import { Check, Close, Delete, Edit } from "@element-plus/icons-vue";
 import { type ExcelTableItem } from "../../type/index";
 import { EXCEL_TABLE_ITEM_DEFAULT } from "../../utils/constants";
 import { generateID } from "../../utils/tools";
-import {
-  LineMdLoadingTwotoneLoop,
-  IconParkSolidGoodTwo,
-  RiImageEditFill,
-  FluentSave32Filled
-} from "../../svg/index";
+// import {
+//   LineMdLoadingTwotoneLoop,
+//   IconParkSolidGoodTwo,
+//   RiImageEditFill,
+//   FluentSave32Filled
+// } from "../../svg/index";
 import OnlineImage from "../onlineImage/index.vue";
 
 const props = defineProps({

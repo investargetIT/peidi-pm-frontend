@@ -8,11 +8,16 @@ import PictureCard from "./pictureCard.vue";
 import DetailForm from "./detailForm.vue";
 import ContactForm from "./contactForm.vue";
 
-const radio = ref();
+const radio = ref(null);
 const materialList = ref({});
 const cardData = ref([]);
 const detailFormRef = ref(null);
 const contactFormRef = ref(null);
+
+const updateCardData = () => {
+  cardData.value = materialList.value[radio.value] || [];
+  // console.log("cardData.value:", cardData.value);
+};
 
 const fetchMaterialPage = () => {
   getMaterialPage({
@@ -62,11 +67,6 @@ watch(
   },
   { immediate: true }
 );
-
-const updateCardData = () => {
-  cardData.value = materialList.value[radio.value] || [];
-  // console.log("cardData.value:", cardData.value);
-};
 
 const handleAddMaterial = () => {
   detailFormRef.value.initDetailForm();
