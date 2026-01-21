@@ -59,12 +59,138 @@ const processTemplateImage = async () => {
     currentLoadRequest = loadRequest;
     templateImgBase64.value = await loadRequest.promise;
     currentLoadRequest = null; // 加载完成后清除引用
+
+    await importMaterialElements();
   } catch (error) {
     // 如果是取消错误，不显示错误消息
     if (error.message !== "请求已取消") {
       console.error("底图加载失败:", error);
     }
     currentLoadRequest = null;
+  }
+};
+
+// 导入指定素材功能
+const importMaterialElements = async () => {
+  // 清空现有元素
+  imageElements.length = 0;
+
+  // 定义素材列表和对应的初始位置和尺寸
+  const materials = [
+    {
+      field: "productImage",
+      name: "产品图片",
+      position: { x: 247, y: 221 }, // 左上角
+      size: { width: 384, height: 312 } // 产品图片较大
+    },
+    {
+      field: "fullGiftImages",
+      name: "全场满赠图片",
+      position: { x: 47, y: 349 }, // 右上角
+      size: { width: 160, height: 120 } // 赠品图片中等大小
+    },
+    {
+      field: "campaignLogoImage",
+      name: "活动LOGO",
+      position: { x: 170, y: 13 }, // 左下角
+      size: { width: 95, height: 95 } // LOGO较小
+    },
+    {
+      field: "brandLogoImage",
+      name: "品牌LOGO",
+      position: { x: 58, y: 13 }, // 右下角
+      size: { width: 95, height: 95 } // LOGO较小
+    },
+    {
+      field: "shopLogoImage",
+      name: "店铺LOGO",
+      position: { x: 468, y: -5 }, // 中心位置
+      size: { width: 200, height: 200 } // 店铺LOGO中等大小
+    }
+  ];
+
+  // 使用Promise.all来等待所有图片加载完成
+  const loadPromises = materials.map(async material => {
+    const images = selectedRow.value?.[material.field];
+    if (images && Array.isArray(images) && images.length > 0) {
+      // 只取第一张图片
+      const imageUrl = images[0];
+      if (imageUrl) {
+        try {
+          // 使用loadImage函数加载图片
+          const loadRequest = loadImage(imageUrl, imageCacheManager, {
+            loadingMessage: `正在加载${material.name}...`,
+            errorMessage: `${material.name}加载失败`
+          });
+
+          const base64Data = await loadRequest.promise;
+
+          // 返回一个Promise，等待图片加载完成
+          return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+              const newImageElement = {
+                id: Date.now() + Math.random(), // 使用更随机的ID
+                x: material.position.x,
+                y: material.position.y,
+                width: material.size.width,
+                height: material.size.height,
+                src: base64Data,
+                dragging: false,
+                originalWidth: img.width,
+                originalHeight: img.height,
+                selected: false,
+                name: material.name
+              };
+              imageElements.push(newImageElement);
+              resolve({ success: true, material: material.name });
+            };
+            img.onerror = () => {
+              resolve({
+                success: false,
+                material: material.name,
+                error: "图片加载失败"
+              });
+            };
+            img.src = base64Data;
+          });
+        } catch (error) {
+          console.warn(`加载 ${material.name} 失败:`, error);
+          return {
+            success: false,
+            material: material.name,
+            error: error.message
+          };
+        }
+      }
+    }
+    return { success: false, material: material.name, error: "素材为空" };
+  });
+
+  try {
+    // 等待所有图片加载完成
+    const results = await Promise.all(loadPromises);
+
+    // 统计成功和失败的素材数量
+    const successfulLoads = results.filter(
+      (result: any) => result.success
+    ).length;
+    const failedLoads = results.filter((result: any) => !result.success).length;
+    const totalMaterials = materials.length;
+
+    // 根据加载结果显示相应的消息
+    if (successfulLoads === 0) {
+      ElMessage.warning("没有找到可导入的素材");
+    } else if (successfulLoads === totalMaterials) {
+      ElMessage.success(`成功导入 ${successfulLoads} 个素材`);
+    } else {
+      ElMessage.info(
+        `成功导入 ${successfulLoads} 个素材，${failedLoads} 个素材加载失败或为空`
+      );
+    }
+  } catch (error) {
+    console.error("导入素材时发生错误:", error);
+    ElMessage.error("导入素材时发生错误");
   }
 };
 
@@ -298,9 +424,8 @@ const exportAsPNG = () => {
   deselectAll();
 
   nextTick(() => {
-    setTimeout(() => {
-      handleCapture();
-    }, 1000);
+    handleCapture();
+    // setTimeout(() => {}, 1000);
   });
 };
 const handleCapture = async () => {
@@ -317,7 +442,7 @@ const handleCapture = async () => {
   try {
     // 核心捕获逻辑
     const capture = await snapdom(exportContainer.value, {
-      scale: 1.5,
+      scale: 4096 / 668,
       dpr: window.devicePixelRatio,
       backgroundColor: "#ffffff"
     });

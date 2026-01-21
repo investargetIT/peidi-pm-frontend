@@ -141,7 +141,7 @@ const activeTab = ref("Drawing");
     v-model="activeTab"
     class="peidi-el-tabs-modern-tabs"
   >
-    <el-tab-pane label="素材库" name="Material"><Material /></el-tab-pane>
     <el-tab-pane label="绘图" name="Drawing"><Drawing /></el-tab-pane>
+    <el-tab-pane label="素材库" name="Material"><Material /></el-tab-pane>
   </el-tabs>
 </template>

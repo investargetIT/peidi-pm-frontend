@@ -6,7 +6,7 @@ import OperationCard from "./operationCard.vue";
 import TableDataCard from "./tableDataCard.vue";
 import EditDialog from "./editDialog.vue";
 import { ExcelTableItem } from "../../type/drawing";
-import { POLL_INTERVAL } from "../../config/drawing";
+import { POLL_INTERVAL, EXCEL_TABLE_ITEM_DEFAULT } from "../../config/drawing";
 
 const loading = ref<boolean>(false);
 const handleLoadingStatus = (status: boolean) => {
@@ -48,6 +48,22 @@ const handleEditStatus = (status: boolean) => {
 
 const materialList = ref<any>({});
 
+// 比较数据结构并补充缺失的key
+const compareAndCompleteData = (data: any): ExcelTableItem => {
+  const completedData = { ...EXCEL_TABLE_ITEM_DEFAULT };
+  
+  // 遍历默认结构的所有key
+  Object.keys(EXCEL_TABLE_ITEM_DEFAULT).forEach(key => {
+    // 如果数据中存在该key，则使用数据的值
+    if (data.hasOwnProperty(key)) {
+      completedData[key] = data[key];
+    }
+    // 如果数据中不存在该key，则使用默认值（已经通过展开操作设置）
+  });
+  
+  return completedData;
+};
+
 //#region 轮询逻辑
 const pollForUpdatesTimer = ref(null);
 const isPolling = ref<boolean>(false);
@@ -70,12 +86,17 @@ const fetchAiDrawPage = () => {
             if (item.status === 0) {
               isPollingTemp = true;
             }
-            temp.push({
-              ...JSON.parse(item.fields || "{}"),
+            
+            // 解析字段数据并与默认结构比较
+            const parsedFields = JSON.parse(item.fields || "{}");
+            const completedData = compareAndCompleteData({
+              ...parsedFields,
               resultImages: JSON.parse(item.imgs || "[]"),
               status: item.status,
               uuid: item.uuid || null
             });
+            
+            temp.push(completedData);
             if (item.uuid) {
               uuIds.push(item.uuid);
             }
@@ -89,7 +110,7 @@ const fetchAiDrawPage = () => {
         tableData.value = [...tableLocalData, ...temp];
         isPolling.value = isPollingTemp;
 
-        // console.log("表格数据:", tableData.value);
+        console.log("表格数据:", tableData.value);
       } else {
         ElMessage.error("获取ai画图分页结果失败:" + res.msg);
       }
@@ -163,7 +184,7 @@ watch(
 const editDialogRef = ref<typeof EditDialog>();
 
 const updateTemplateImg = (row: ExcelTableItem, index: number | string) => {
-  console.log("编辑弹窗打开:", row, index);
+  // console.log("编辑弹窗打开:", row, index);
 
   editDialogRef.value?.open(row, index);
 };

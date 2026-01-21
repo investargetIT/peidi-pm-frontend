@@ -7,7 +7,12 @@ class CancellablePromise<T> implements PromiseLike<T> {
   private promise: Promise<T>;
   private rejectFn: (reason?: any) => void;
 
-  constructor(executor: (resolve: (value: T) => void, reject: (reason?: any) => void) => void) {
+  constructor(
+    executor: (
+      resolve: (value: T) => void,
+      reject: (reason?: any) => void
+    ) => void
+  ) {
     this.promise = new Promise<T>((resolve, reject) => {
       this.rejectFn = reject;
       executor(resolve, reject);
@@ -21,7 +26,9 @@ class CancellablePromise<T> implements PromiseLike<T> {
     return this.promise.then(onfulfilled, onrejected);
   }
 
-  catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null): Promise<T | TResult> {
+  catch<TResult = never>(
+    onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null
+  ): Promise<T | TResult> {
     return this.promise.catch(onrejected);
   }
 
@@ -63,7 +70,7 @@ export const loadImage = (
 ): { promise: Promise<string>; cancel: () => void } => {
   const {
     loadingMessage = "正在加载图片...",
-    successMessage = "图片加载成功",
+    successMessage = null,
     errorMessage = "图片加载失败，请检查URL是否正确"
   } = options;
 
@@ -77,50 +84,55 @@ export const loadImage = (
     duration: 0
   });
 
-  const cancellablePromise = new CancellablePromise<string>(async (resolve, reject) => {
-    try {
-      let base64Data: string;
+  const cancellablePromise = new CancellablePromise<string>(
+    async (resolve, reject) => {
+      try {
+        let base64Data: string;
 
-      // 优先使用缓存管理器加载图片
-      if (imageCacheManager?.processImageWithCache) {
-        const result = await imageCacheManager.processImageWithCache(imageUrl);
-        base64Data = result.originalBlob;
-      } else {
-        // 如果缓存管理器不可用，使用原来的方式
-        const res: any = await downloadFile({ objectName: imageUrl });
-        base64Data = await new Promise((resolveReader, rejectReader) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolveReader(reader.result as string);
-          reader.onerror = rejectReader;
-          reader.readAsDataURL(res);
-        });
+        // 优先使用缓存管理器加载图片
+        if (imageCacheManager?.processImageWithCache) {
+          const result =
+            await imageCacheManager.processImageWithCache(imageUrl);
+          base64Data = result.originalBlob;
+        } else {
+          // 如果缓存管理器不可用，使用原来的方式
+          const res: any = await downloadFile({ objectName: imageUrl });
+          base64Data = await new Promise((resolveReader, rejectReader) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolveReader(reader.result as string);
+            reader.onerror = rejectReader;
+            reader.readAsDataURL(res);
+          });
+        }
+
+        // 如果请求已被取消，直接返回
+        if (cancellablePromise.cancelled) {
+          return;
+        }
+
+        // 关闭加载消息并显示成功消息
+        loadingMsg.close();
+        if (successMessage) {
+          ElMessage.success(successMessage);
+        }
+
+        resolve(base64Data);
+      } catch (error) {
+        // 如果请求已被取消，不显示错误消息
+        if (cancellablePromise.cancelled) {
+          return;
+        }
+
+        console.error("图片加载失败:", error);
+
+        // 关闭加载消息并显示错误消息
+        loadingMsg.close();
+        ElMessage.error(errorMessage);
+
+        reject(error);
       }
-
-      // 如果请求已被取消，直接返回
-      if (cancellablePromise.cancelled) {
-        return;
-      }
-
-      // 关闭加载消息并显示成功消息
-      loadingMsg.close();
-      ElMessage.success(successMessage);
-
-      resolve(base64Data);
-    } catch (error) {
-      // 如果请求已被取消，不显示错误消息
-      if (cancellablePromise.cancelled) {
-        return;
-      }
-
-      console.error("图片加载失败:", error);
-
-      // 关闭加载消息并显示错误消息
-      loadingMsg.close();
-      ElMessage.error(errorMessage);
-
-      reject(error);
     }
-  });
+  );
 
   return {
     promise: cancellablePromise as Promise<string>,
