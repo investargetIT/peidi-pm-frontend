@@ -254,3 +254,17 @@ export const getExaminationRecordResult = params => {
     timeout: 1000 * 60
   });
 };
+
+// 下载文件
+export const downloadFile = (params: { objectName: string }) => {
+  return http.request("get", baseUrlApi("/common/download"), {
+    params,
+    timeout: 1000 * 60,
+    responseType: "blob"
+  });
+};
+
+// 天猫分店铺spu毛利文件上传(财务上传)路径
+export const getUploadExaminationPath = () => {
+  return http.request("get", baseUrlApi("/kpi-examination/upload/examination"));
+};

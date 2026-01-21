@@ -252,16 +252,21 @@ function initRouter() {
         icon: "ri:input-method-line",
         title: "",
         rank: 22,
-        showLink:
-          storageLocal().getItem("user-check-info")?.id === "1926449443739600965" // 沈皓钰
+        showLink: [
+          "1887377779519434753", // 王家琦
+          "1926449443739600965", // 沈皓钰
+          "1846392647319093250", // Summer
+          "1874713377599172609", // 熊玉葵
+          "1919685162362777602" // 张悦
+        ].includes((storageLocal().getItem("user-check-info") as any).id)
       },
       children: [
         {
           path: "/aiDrawing/index",
           name: "aiDrawing",
-          component: () => import("@/views/aiDrawing/index.vue"),
+          component: () => import("@/views/aiDrawingPro/index.vue"),
           meta: {
-            title: "AI 绘图",
+            title: "AI绘图",
             showParent: false
           }
         }

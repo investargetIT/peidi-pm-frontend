@@ -19,7 +19,7 @@ import { emitter } from "@/utils/mitt.ts";
 // 相关配置请参考：www.axios-js.com/zh-cn/docs/#axios-request-config-1
 const defaultConfig: AxiosRequestConfig = {
   // 请求超时时间
-  timeout: 10000,
+  timeout: 1000 * 30,
   headers: {
     Accept: "application/json, text/plain, */*",
     "Content-Type": "application/json",
@@ -175,7 +175,7 @@ class PureHttp {
       PureHttp.axiosInstance
         .request(config)
         .then((response: undefined) => {
-          console.log("response", response);
+          // console.log("response", response);
           resolve(response);
         })
         .catch(error => {

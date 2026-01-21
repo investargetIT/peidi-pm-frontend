@@ -1,15 +1,13 @@
 <template>
   <div class="examination-list">
+    <!-- 月份选择器 -->
+    <el-date-picker v-model="selectedMonth" type="month" placeholder="选择月份" :clearable="false"
+      :disabled-date="disabledDate" class="mb-[20px]" />
     <!-- 修改月份选择器 -->
-    <el-select v-model="selectedMonth" placeholder="选择月份" @change="filterByMonth" class="mb-[20px]">
-      <el-option
-        v-for="month in months"
-        :key="month.value"
-        :label="month.label"
-        :value="month.value"
-      />
-    </el-select>
-    
+    <!-- <el-select v-model="selectedMonth" placeholder="选择月份" @change="filterByMonth" class="mb-[20px]">
+      <el-option v-for="month in months" :key="month.value" :label="month.label" :value="month.value" />
+    </el-select> -->
+
     <el-table :data="filteredExamList" border style="width: 100%">
       <el-table-column prop="userName" label="姓名" />
       <el-table-column prop="month" label="月份" />
@@ -38,13 +36,7 @@
       <el-table-column prop="achieved" label="完成值">
         <template #default="{ row }">
           <div v-if="row.isEditingAchieved" class="edit-cell">
-            <el-input
-              v-model="row.achieved"
-              type="number"
-              step="0.01"
-              @blur="handleSave(row, 'achieved')"
-              v-focus
-            />
+            <el-input v-model="row.achieved" type="number" step="0.01" @blur="handleSave(row, 'achieved')" v-focus />
           </div>
           <div v-else class="cell-content" @dblclick="handleEdit(row, 'achieved')">
             {{ row.achieved }}
@@ -56,12 +48,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { getExaminationList, getModifyUser, updateExamination } from '@/api/pmApi.ts' // 添加 getModifyUser 和 updateExamination 导入
-import { ElMessage } from 'element-plus'
+import { dayjs, ElMessage } from 'element-plus'
 
 const examList = ref([])
-const selectedMonth = ref(null)
+const selectedMonth = ref(dayjs().format('YYYY-MM'))
 // 修改 months 数组，使其值与 examList 中的 month 属性的月份部分匹配
 const months = ref([
   { label: '1月', value: '01' },
@@ -79,6 +71,14 @@ const months = ref([
 ])
 const filteredExamList = ref([])
 
+// 禁用当月之后的每个月
+const disabledDate = (time) => {
+  // 获取当月的第一天
+  const currentMonth = dayjs().startOf('month')
+  // 如果选择的日期在当月之后，则禁用
+  return dayjs(time).isAfter(currentMonth, 'month')
+}
+
 // 自定义指令：自动聚焦
 const vFocus = {
   mounted: (el) => el.querySelector('input').focus()
@@ -94,7 +94,7 @@ const fetchExamList = async () => {
     // const manageName = '范振吉'
     // const manageName = '王家琦'
     console.log('manageName', manageName);
-    
+
     // 调用 getModifyUser 并打印结果
     const res1 = await getModifyUser({ manageName })
     const userResult = res1.data
@@ -105,13 +105,13 @@ const fetchExamList = async () => {
       pageSize: 1000,
       searchStr: JSON.stringify([
         {
-          searchName:'month',
-          searchValue: `${new Date().getFullYear()}-${selectedMonth.value}`,
-          searchType:'like'
+          searchName: 'month',
+          searchValue: `${dayjs(selectedMonth.value).format('YYYY-MM')}`,
+          searchType: 'like'
         }
       ])
     })
-    
+
     // 为每条数据添加编辑状态标记
     examList.value = res.data.records.map(item => ({
       ...item,
@@ -122,9 +122,9 @@ const fetchExamList = async () => {
     // 过滤 examList，只保留在 userResult 中存在的 examinationTypeId
     // 如果examinationTypeId的值是'all'，则保留所有数据
     // 如果userResult是空数组，则不能查看任何数据
-    const tempArr = userResult.length === 0 ? [] : examList.value.filter(exam => 
-      userResult.some(user => (user.examinationTypeId == exam.examinationTypeId || 
-      user.examinationTypeId === 'all'))
+    const tempArr = userResult.length === 0 ? [] : examList.value.filter(exam =>
+      userResult.some(user => (user.examinationTypeId == exam.examinationTypeId ||
+        user.examinationTypeId === 'all'))
     );
     filteredExamList.value = tempArr;
     console.log(filteredExamList);
@@ -176,7 +176,7 @@ const handleSave = async (row, field) => {
 
     // 调用更新API
     const response = await updateExamination(updateData)
-    
+
     // 检查返回的 code
     if (response.code === 200) {
       ElMessage.success('保存成功')
@@ -196,19 +196,27 @@ const handleSave = async (row, field) => {
   }
 }
 
-// 过滤 examList 以匹配选定的月份
-const filterByMonth = () => {
-  fetchExamList()
-}
+// 监听 selectedMonth 变化
+watch(selectedMonth, (newMonth, oldMonth) => {
+  if (newMonth) {
+    fetchExamList()
+  }
+}, { immediate: true })
 
-// 在获取数据后初始化过滤列表
-onMounted(() => {
-  // 获取当前月份并设置为默认选中
-  const currentMonth = new Date().getMonth() + 1
-  selectedMonth.value = currentMonth < 10 ? `0${currentMonth}` : `${currentMonth}`
+// // 过滤 examList 以匹配选定的月份
+// const filterByMonth = () => {
+//   fetchExamList()
+// }
 
-  fetchExamList();
-})
+// // 在获取数据后初始化过滤列表
+// onMounted(() => {
+//   // 获取当前月份并设置为默认选中
+//   // const currentMonth = new Date().getMonth() + 1
+//   // selectedMonth.value = currentMonth < 10 ? `0${currentMonth}` : `${currentMonth}`
+//   selectedMonth.value = dayjs().format('YYYY-MM')
+
+//   fetchExamList();
+// })
 </script>
 
 <style scoped>

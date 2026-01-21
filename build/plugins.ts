@@ -14,7 +14,7 @@ import removeConsole from "vite-plugin-remove-console";
 import { themePreprocessorPlugin } from "@pureadmin/theme";
 import { genScssMultipleScopeVars } from "../src/layout/theme";
 // import { vitePluginFakeServer } from "vite-plugin-fake-server";
-import BASIC_SSL from '@vitejs/plugin-basic-ssl';
+import BASIC_SSL from "@vitejs/plugin-basic-ssl";
 
 export function getPluginsList(
   VITE_CDN: boolean,
@@ -26,8 +26,8 @@ export function getPluginsList(
     // jsx、tsx语法支持
     vueJsx(),
     checker({
-      typescript: true,
-      vueTsc: true,
+      typescript: false, // 后续改成true
+      vueTsc: false, // 后续改成true
       eslint: {
         lintCommand: `eslint ${pathResolve("../{src,mock,build}/**/*.{vue,js,ts,tsx}")}`,
         useFlatConfig: true

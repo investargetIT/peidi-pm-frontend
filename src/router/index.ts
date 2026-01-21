@@ -30,6 +30,7 @@ import {
   removeToken,
   multipleTabsKey
 } from "@/utils/auth";
+import { isDevEnv } from "@/utils/debug";
 
 import pdIcon from "../assets/png/prodIcon.png";
 import priceIcon from "../assets/png/priceIcon.png";
@@ -40,7 +41,7 @@ import suplierIcon from "../assets/png/suplierIcon.png";
  * 如何排除文件请看：https://cn.vitejs.dev/guide/features.html#negative-patterns
  */
 const modules: Record<string, any> = import.meta.glob(
-  ["./modules/**/*.ts", "!./modules/**/error.ts", "!./modules/**/remaining.ts"],
+  ["./modules/**/*.ts", "!./modules/**/remaining.ts"],
   {
     eager: true
   }
@@ -127,7 +128,7 @@ const routes = [
   //       name: "aiDrawing",
   //       component: () => import("@/views/aiDrawing/index.vue"),
   //       meta: {
-  //         title: "AI 绘图",
+  //         title: "AI绘图",
   //         showParent: false
   //       }
   //     }
@@ -150,9 +151,10 @@ const routes = [
     component: () => import("@/views/debug/index.vue"),
     hidden: true,
     meta: {
+      icon: "ri:bug-line",
       title: "调试页面",
       rank: 1002,
-      showLink: false // 方式4：自定义hideInMenu属性
+      showLink: isDevEnv() // 方式4：自定义hideInMenu属性
     }
   },
   {

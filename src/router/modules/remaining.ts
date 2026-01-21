@@ -34,7 +34,7 @@ export default [
     meta: {
       title: "考核页面",
       icon: "flowbite:address-book-outline",
-      showParent: false,
+      // showParent: false,
       showLink: false
     }
   }

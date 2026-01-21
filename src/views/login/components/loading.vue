@@ -1,5 +1,5 @@
 <script setup lang="ts"></script>
 
 <template>
-  <div>debug</div>
+  <div>Loading</div>
 </template>

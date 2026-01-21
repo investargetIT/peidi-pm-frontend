@@ -22,6 +22,9 @@ import "element-plus/dist/index.css";
 import "./assets/iconfont/iconfont.js";
 import "./assets/iconfont/iconfont.css";
 
+// 导入自定义el-tabs样式
+import "./style/pd-el-tabs.scss";
+
 const app = createApp(App);
 
 // 自定义指令
