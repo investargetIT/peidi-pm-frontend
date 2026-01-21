@@ -52,7 +52,10 @@ const handleSearchParams = () => {
 // 处理重置操作
 const handleReset = () => {
   searchForm.value = {
-    userName: ""
+    userName: "",
+    examinationType: "",
+    department1: "",
+    department2: ""
   };
   fetchResultList();
 };

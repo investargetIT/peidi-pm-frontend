@@ -58,7 +58,11 @@ const handleDelete = () => {
   <div>
     <el-card shadow="hover" style="width: 240px">
       <template #header>
-        <span>{{ getNameFromObjectName(props.data.objectName) }}</span>
+        <el-text class="w-full" truncated size="large">
+          <span class="text-[#000] font-bold text-[14px]">{{
+            getNameFromObjectName(props.data.objectName)
+          }}</span>
+        </el-text>
       </template>
       <template #footer>
         <div>

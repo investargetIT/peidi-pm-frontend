@@ -30,17 +30,15 @@ const PERMISSION_ID_LIST = {
 };
 
 const activeName = ref("excamination");
-const userId = ref("");
+const userInfo: any = storageLocal().getItem("user-check-info");
+const userId = ref(userInfo?.id ?? "");
 
 const handleClick = (tab: TabsPaneContext, event: Event) => {
   // console.log(tab, event)
 };
 
 const checkPermission = (name: string) => {
-  const temp: any = storageLocal().getItem("user-check-info");
-  // console.log("injectPermissionIdList", temp);
-  userId.value = temp?.id || "";
-  return temp?.id ? PERMISSION_ID_LIST[name].includes(temp.id) : false;
+  return userId.value ? PERMISSION_ID_LIST[name].includes(userId.value) : false;
 };
 </script>
 

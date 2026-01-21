@@ -36,6 +36,8 @@ const exportPNGLoading = ref<boolean>(false);
 
 // 用于存储当前加载请求的取消函数
 let currentLoadRequest: { cancel: () => void } | null = null;
+// 用于存储素材加载请求的取消函数数组
+const materialLoadRequests = ref<Array<{ cancel: () => void }>>([]);
 
 // 检查是否是URL并转换为base64 - 优先使用缓存
 const processTemplateImage = async () => {
@@ -74,6 +76,9 @@ const processTemplateImage = async () => {
 const importMaterialElements = async () => {
   // 清空现有元素
   imageElements.length = 0;
+  // 清空之前的素材加载请求
+  materialLoadRequests.value.forEach(request => request.cancel());
+  materialLoadRequests.value = [];
 
   // 定义素材列表和对应的初始位置和尺寸
   const materials = [
@@ -123,7 +128,15 @@ const importMaterialElements = async () => {
             errorMessage: `${material.name}加载失败`
           });
 
+          // 存储加载请求以便后续取消
+          materialLoadRequests.value.push(loadRequest);
+
           const base64Data = await loadRequest.promise;
+
+          // 如果请求已被取消，直接返回
+          if (materialLoadRequests.value.length === 0) {
+            return { success: false, material: material.name, error: "操作已取消" };
+          }
 
           // 返回一个Promise，等待图片加载完成
           return new Promise(resolve => {
@@ -155,7 +168,10 @@ const importMaterialElements = async () => {
             img.src = base64Data;
           });
         } catch (error) {
-          console.warn(`加载 ${material.name} 失败:`, error);
+          // 如果是取消错误，不显示警告
+          if (error.message !== "请求已取消") {
+            console.warn(`加载 ${material.name} 失败:`, error);
+          }
           return {
             success: false,
             material: material.name,
@@ -189,8 +205,11 @@ const importMaterialElements = async () => {
       );
     }
   } catch (error) {
-    console.error("导入素材时发生错误:", error);
-    ElMessage.error("导入素材时发生错误");
+    // 如果是取消错误，不显示错误消息
+    if (error.message !== "请求已取消") {
+      console.error("导入素材时发生错误:", error);
+      ElMessage.error("导入素材时发生错误");
+    }
   }
 };
 
@@ -318,15 +337,9 @@ const handleMouseMove = (event: MouseEvent) => {
     const x = event.clientX - containerRect.value.left - dragOffset.value.x;
     const y = event.clientY - containerRect.value.top - dragOffset.value.y;
 
-    // 限制在容器范围内
-    dragElement.value.x = Math.max(
-      0,
-      Math.min(containerRect.value.width - dragElement.value.width, x)
-    );
-    dragElement.value.y = Math.max(
-      0,
-      Math.min(containerRect.value.height - dragElement.value.height, y)
-    );
+    // 移除位置限制，允许元素移动到画布之外
+    dragElement.value.x = x;
+    dragElement.value.y = y;
   });
 };
 
@@ -454,7 +467,7 @@ const handleCapture = async () => {
     await capture.download({
       //@ts-ignore
       format: "png",
-      filename: "AI_Generated_Image"
+      filename: `${selectedRow.value.productName || "AI_Generated_Image"}.png`
     });
   } catch (err) {
     console.error("Capture error:", err);

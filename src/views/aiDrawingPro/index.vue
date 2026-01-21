@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { provide, ref } from "vue";
+import { provide, ref, watch } from "vue";
 import { downloadFile } from "@/api/aiDraw";
 import { ElMessage } from "element-plus";
 import Material from "./components/material/index.vue";
@@ -45,25 +45,30 @@ const processImageWithCache = async (
 
     return new Promise((resolve, reject) => {
       reader.onloadend = async () => {
-        const originalBlob = reader.result as string;
+        try {
+          const originalBlob = reader.result as string;
 
-        // 使用统一的图片压缩处理函数
-        const result = await processImageCompression(
-          originalBlob,
-          imageUrl,
-          0.5
-        );
+          // 使用统一的图片压缩处理函数
+          const result = await processImageCompression(
+            originalBlob,
+            imageUrl,
+            0.5
+          );
 
-        // 存储到缓存（包含原图和压缩图）
-        await imageCache.storeImage(
-          imageUrl,
-          result.originalBlob,
-          result.compressedBlob
-        );
-        // console.log(`已缓存:`, imageUrl);
+          // 存储到缓存（包含原图和压缩图）
+          await imageCache.storeImage(
+            imageUrl,
+            result.originalBlob,
+            result.compressedBlob
+          );
+          // console.log(`已缓存:`, imageUrl);
 
-        if (callback) callback(result);
-        resolve(result);
+          if (callback) callback(result);
+          resolve(result);
+        } catch (err) {
+          ElMessage.error(`图片${imageUrl}处理失败: ${err}`);
+          reject(err);
+        }
       };
 
       reader.onerror = error => {
@@ -132,7 +137,16 @@ provide("imageCacheManager", {
 });
 //#endregion
 
+const drawingTab = ref(null);
 const activeTab = ref("Drawing");
+
+watch(activeTab, (newVal, oldVal) => {
+  if (newVal !== oldVal) {
+    if (newVal === "Drawing") {
+      drawingTab.value?.fetchMaterialPage();
+    }
+  }
+});
 </script>
 
 <template>
@@ -141,7 +155,9 @@ const activeTab = ref("Drawing");
     v-model="activeTab"
     class="peidi-el-tabs-modern-tabs"
   >
-    <el-tab-pane label="绘图" name="Drawing"><Drawing /></el-tab-pane>
+    <el-tab-pane label="绘图" name="Drawing"
+      ><Drawing ref="drawingTab"
+    /></el-tab-pane>
     <el-tab-pane label="素材库" name="Material"><Material /></el-tab-pane>
   </el-tabs>
 </template>

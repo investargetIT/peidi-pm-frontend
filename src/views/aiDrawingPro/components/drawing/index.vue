@@ -110,7 +110,7 @@ const fetchAiDrawPage = () => {
         tableData.value = [...tableLocalData, ...temp];
         isPolling.value = isPollingTemp;
 
-        console.log("表格数据:", tableData.value);
+        // console.log("表格数据:", tableData.value);
       } else {
         ElMessage.error("获取ai画图分页结果失败:" + res.msg);
       }
@@ -190,6 +190,10 @@ const updateTemplateImg = (row: ExcelTableItem, index: number | string) => {
 };
 provide("updateTemplateImg", updateTemplateImg);
 //#endregion
+
+defineExpose({
+  fetchMaterialPage
+});
 </script>
 
 <template>
