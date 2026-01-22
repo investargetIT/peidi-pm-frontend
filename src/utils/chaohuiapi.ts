@@ -1,15 +1,19 @@
 import Axios from "axios";
-import { ElLoading } from "element-plus";
-export const default_upload_url = "/web_packages/test/uploadFile";
+import { jsonp } from "vue-jsonp";
 import { message } from "@/utils/message";
-import { pingIP, getYourIP, pingIP2 } from "@/utils/ip";
+import { pingIP } from "@/utils/ip";
+import { ElMessage } from "element-plus";
+
+export const default_upload_url = "/web_packages/test/uploadFile";
 
 const DINGTALK_CORP_ID = "dingfc722e531a4125b735c2f4657eb6378f";
 const port = 5001;
 const USERNAME = "夏琰";
 const PASSWORD = "X81y0122";
+
 let sid = "";
 let ipThis = "";
+
 const ips = ["192.168.110.252", "12.18.1.16", "192.168.1.252"];
 const ipsName = [
   {
@@ -25,9 +29,9 @@ const ipsName = [
     name: "A区"
   }
 ];
-import { jsonp } from "vue-jsonp";
 
 const testResults: any = [];
+
 // 定义一个标识来判断当前是否使用了内网地址
 let isUsingInternalIP = true;
 
@@ -36,7 +40,6 @@ let downloadUrl = "http://pm.peidigroup.cn/nas"; // 固定为外网地址，不�
 let uploadUrl = "http://pm.peidigroup.cn/nas"; // 上传地址：会根据内外网判断而变化
 // let uploadUrl = "http://12.18.1.16:6001";
 // let uploadUrl = "/nasapi"
-// console.log("uploadUrl", uploadUrl);
 
 const testIPWithJsonp = ip => {
   return new Promise((resolve, reject) => {
@@ -106,7 +109,7 @@ export const testAllIPs = async () => {
     resolve(chaohuilogin());
   });
 };
-// getYourIP();
+
 // 登陆
 export const chaohuilogin = () => {
   // debugger;
@@ -120,7 +123,7 @@ export const chaohuilogin = () => {
     Axios.get(
       `${uploadUrl}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=${USERNAME}&passwd=${PASSWORD}&session=FileStation&format=cookie`,
       {
-        timeout: 3000
+        timeout: 1000 * 10
       }
     )
       .then(res => {
@@ -172,6 +175,11 @@ export const chaohuilogin = () => {
 
 // 下载
 export const chaohuiDownload = filename => {
+  const messageInfo = ElMessage({
+    message: `正在下载 ${filename} ，请稍后...`,
+    type: "info",
+    duration: 0
+  });
   const encodedFilename = encodeURIComponent(filename);
   console.log(
     "filename",
@@ -183,7 +191,7 @@ export const chaohuiDownload = filename => {
     `${downloadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=${"/web_packages/test/uploadFile"}/${encodedFilename}&_sid=${sid}`,
     {
       responseType: "blob",
-      timeout: 1000 * 60 * 30
+      timeout: 0
     }
   )
     .then(res => {
@@ -195,9 +203,15 @@ export const chaohuiDownload = filename => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(objectURL); // 释放临时URL对象
+      message(`文件 ${filename} 下载完成`, {
+        type: "success"
+      });
     })
     .catch(err => {
       localStorage.removeItem("ipThis");
       testAllIPs();
+    })
+    .finally(() => {
+      messageInfo.close();
     });
 };

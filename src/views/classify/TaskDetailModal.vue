@@ -257,7 +257,7 @@ import {
   testAllIPs,
   default_upload_url,
   chaohuiDownload
-} from "../../utils/chaohuiapi";
+} from "../../utils/chaohuiapi_pro";
 import {
   canUpdateTaskStatus,
   canAddTaskRecord,
