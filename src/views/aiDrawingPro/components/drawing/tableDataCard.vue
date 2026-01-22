@@ -295,7 +295,7 @@ const handleProductImageChange = () => {
       </el-table-column>
 
       <!-- 全场满赠-标题 -->
-      <el-table-column
+      <!-- <el-table-column
         :resizable="false"
         prop="fullGiftTitle"
         label="全场满赠-标题"
@@ -314,10 +314,10 @@ const handleProductImageChange = () => {
             {{ row.fullGiftTitle }}
           </template>
         </template>
-      </el-table-column>
+      </el-table-column> -->
 
       <!-- 全场满赠-描述 -->
-      <el-table-column
+      <!-- <el-table-column
         :resizable="false"
         prop="fullGiftDescription"
         label="全场满赠-描述"
@@ -336,10 +336,10 @@ const handleProductImageChange = () => {
             {{ row.fullGiftDescription }}
           </template>
         </template>
-      </el-table-column>
+      </el-table-column> -->
 
       <!-- 全场满赠-标签 -->
-      <el-table-column
+      <!-- <el-table-column
         :resizable="false"
         prop="fullGiftTags"
         label="全场满赠-标签"
@@ -358,7 +358,7 @@ const handleProductImageChange = () => {
             {{ row.fullGiftTags }}
           </template>
         </template>
-      </el-table-column>
+      </el-table-column> -->
 
       <!-- 到手价-标题 -->
       <el-table-column
@@ -599,7 +599,7 @@ const handleProductImageChange = () => {
       </el-table-column>
 
       <!-- 品牌LOGO -->
-      <el-table-column
+      <!-- <el-table-column
         :resizable="false"
         prop="brandLogoImage"
         label="品牌LOGO"
@@ -639,7 +639,7 @@ const handleProductImageChange = () => {
             </div>
           </template>
         </template>
-      </el-table-column>
+      </el-table-column> -->
 
       <!-- 店铺LOGO -->
       <el-table-column

@@ -85,27 +85,27 @@ const importMaterialElements = async () => {
     {
       field: "productImage",
       name: "产品图片",
-      position: { x: 247, y: 221 }, // 左上角
-      size: { width: 384, height: 312 } // 产品图片较大
+      position: { x: 231, y: 221 }, // 左上角
+      size: { width: 416, height: 356 } // 产品图片较大
     },
     {
       field: "fullGiftImages",
       name: "全场满赠图片",
-      position: { x: 47, y: 349 }, // 右上角
-      size: { width: 160, height: 120 } // 赠品图片中等大小
+      position: { x: 6, y: 269 }, // 右上角
+      size: { width: 243, height: 218 } // 赠品图片中等大小
     },
     {
       field: "campaignLogoImage",
       name: "活动LOGO",
-      position: { x: 170, y: 13 }, // 左下角
-      size: { width: 95, height: 95 } // LOGO较小
+      position: { x: 64, y: -21 }, // 左下角
+      size: { width: 231, height: 160 } // LOGO较小
     },
-    {
-      field: "brandLogoImage",
-      name: "品牌LOGO",
-      position: { x: 58, y: 13 }, // 右下角
-      size: { width: 95, height: 95 } // LOGO较小
-    },
+    // {
+    //   field: "brandLogoImage",
+    //   name: "品牌LOGO",
+    //   position: { x: 67, y: 6 }, // 右下角
+    //   size: { width: 95, height: 95 } // LOGO较小
+    // },
     {
       field: "shopLogoImage",
       name: "店铺LOGO",

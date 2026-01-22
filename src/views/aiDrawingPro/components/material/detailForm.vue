@@ -12,7 +12,6 @@ import {
 import { MATERIAL_LIBRARY_TABS } from "../../config/material";
 import { getNameFromObjectName } from "../../utils/general/index";
 import { uploadDraw, newMaterial } from "@/api/aiDraw";
-import propTypes from "@/utils/propTypes";
 
 const TYPE_OPTIONS = MATERIAL_LIBRARY_TABS.map(item => ({
   label: item.label,
