@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { inject, ref } from "vue";
-import { ElMessageBox } from "element-plus";
+import { ElMessageBox, ElMessage } from "element-plus";
+import * as XLSX from "xlsx";
 import RiAddLine from "@iconify-icons/ri/add-line";
+import RiFileUploadLine from "@iconify-icons/ri/file-upload-line";
 import { Check, Close, Delete, Edit } from "@element-plus/icons-vue";
 import { type ExcelTableItem } from "../../type/drawing";
 import { EXCEL_TABLE_ITEM_DEFAULT } from "../../config/drawing";
@@ -146,19 +148,158 @@ const handleProductImageChange = () => {
     return [];
   }
 };
+
+const handleUploadExcel = () => {
+  // 创建隐藏的文件输入元素
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".xlsx,.xls,.csv";
+  input.style.display = "none";
+
+  input.onchange = e => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    // 验证文件类型
+    if (!file.name.match(/\.(xlsx|xls|csv)$/)) {
+      ElMessage.error("请上传Excel文件（.xlsx、.xls或.csv格式）");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+
+        // 获取第一个工作表
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // 将工作表转换为JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        if (jsonData.length === 0) {
+          ElMessage.warning("Excel文件中没有数据");
+          return;
+        }
+
+        // 解析Excel数据并转换为表格数据格式
+        const parsedData = parseExcelData(jsonData);
+        if (parsedData.length > 0) {
+          // 将解析的数据添加到表格中
+          const newData = [...parsedData, ...props.tableData];
+          emit("update:tableData", newData);
+          ElMessage.success(`成功导入 ${parsedData.length} 条数据`);
+        } else {
+          ElMessage.warning("Excel数据格式不正确，请检查列名");
+        }
+      } catch (error) {
+        console.error("Excel解析错误:", error);
+        ElMessage.error("Excel文件解析失败，请检查文件格式");
+      }
+    };
+
+    reader.onerror = () => {
+      ElMessage.error("文件读取失败");
+    };
+
+    reader.readAsArrayBuffer(file);
+
+    // 清理输入元素
+    document.body.removeChild(input);
+  };
+
+  input.oncancel = () => {
+    document.body.removeChild(input);
+  };
+
+  document.body.appendChild(input);
+  input.click();
+};
+
+// Excel数据解析函数
+const parseExcelData = (jsonData: any[]): ExcelTableItem[] => {
+  const result: ExcelTableItem[] = [];
+
+  for (const row of jsonData) {
+    try {
+      const tableItem: ExcelTableItem = {
+        ...EXCEL_TABLE_ITEM_DEFAULT,
+        uiid: generateID(),
+        productName: row["产品名"] || "",
+        highlightedSellingPoints: row["产品卖点-高亮"] || "",
+        normalSellingPoints: row["产品卖点-全部"] || "",
+        handPriceTitle: row["到手价-标题"] || "",
+        handPrice: row["到手价-价格"] || "",
+        profitPoints: row["利益点"] || "",
+        activityTime: row["活动时间"] || "",
+        remark: row["补充描述"] || "",
+        imageSize: row["输出分辨率"] || "",
+
+        productImage: row["产品图片"]
+          ? [findMaterialImage(props.materialList, "product", row["产品图片"])]
+          : [],
+        templateImage: row["模板图片"]
+          ? [findMaterialImage(props.materialList, "template", row["模板图片"])]
+          : [],
+        fullGiftImages: row["全场满赠-图片"]
+          ? [findMaterialImage(props.materialList, "gift", row["全场满赠-图片"])]
+          : [],
+        campaignLogoImage: row["活动LOGO"]
+          ? [findMaterialImage(props.materialList, "activityLogo", row["活动LOGO"])]
+          : [],
+        shopLogoImage: row["店铺LOGO"]
+          ? [findMaterialImage(props.materialList, "shopLogo", row["店铺LOGO"])]
+          : []
+      };
+
+      result.push(tableItem);
+    } catch (error) {
+      console.error("解析Excel行数据错误:", error);
+    }
+  }
+
+  return result;
+};
+
+// 在素材库寻找是否有符合要求的图片
+const findMaterialImage = (
+  materialList: any,
+  imageType: string,
+  imageUrl: string
+) => {
+  const material = materialList[imageType]?.find((item: any) =>
+    item.objectName.includes("/" + imageUrl + ".")
+  );
+  console.log(materialList, imageType, imageUrl, material);
+  return material?.objectName || null;
+};
 </script>
 
 <template>
   <el-card shadow="never" style="border-radius: 10px">
     <div class="flex justify-end mb-[8px]">
-      <el-button
-        type="primary"
-        @click="handleAddRow"
-        :disabled="editingRowIndex !== null || loading"
-      >
-        <template #icon> <IconifyIconOffline :icon="RiAddLine" /> </template
-        >添加数据
-      </el-button>
+      <el-space>
+        <el-button
+          type="primary"
+          @click="handleUploadExcel"
+          :disabled="editingRowIndex !== null || loading"
+        >
+          <template #icon>
+            <IconifyIconOffline :icon="RiFileUploadLine" />
+          </template>
+          上传Excel
+        </el-button>
+        <el-button
+          type="primary"
+          @click="handleAddRow"
+          :disabled="editingRowIndex !== null || loading"
+        >
+          <template #icon> <IconifyIconOffline :icon="RiAddLine" /> </template>
+          添加数据
+        </el-button>
+      </el-space>
     </div>
 
     <el-table

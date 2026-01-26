@@ -53,7 +53,7 @@ export const downloadFile = (params: { objectName: string }) => {
   return http.request("get", baseUrlApi("/ai/common/download"), {
     params,
     responseType: "blob",
-    timeout: 1000 * 60 * 5
+    timeout: 0
   });
 };
 
