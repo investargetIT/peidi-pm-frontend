@@ -5,8 +5,12 @@ import { getAiDrawPage, getMaterialPage } from "@/api/aiDraw";
 import OperationCard from "./operationCard.vue";
 import TableDataCard from "./tableDataCard.vue";
 import EditDialog from "./editDialog.vue";
+import Pagination from "./pagination.vue";
 import { ExcelTableItem } from "../../type/drawing";
 import { POLL_INTERVAL, EXCEL_TABLE_ITEM_DEFAULT } from "../../config/drawing";
+
+// 表格数据请求loading状态
+const loadingTableData = ref<boolean>(false);
 
 const loading = ref<boolean>(false);
 const handleLoadingStatus = (status: boolean) => {
@@ -51,7 +55,7 @@ const materialList = ref<any>({});
 // 比较数据结构并补充缺失的key
 const compareAndCompleteData = (data: any): ExcelTableItem => {
   const completedData = { ...EXCEL_TABLE_ITEM_DEFAULT };
-  
+
   // 遍历默认结构的所有key
   Object.keys(EXCEL_TABLE_ITEM_DEFAULT).forEach(key => {
     // 如果数据中存在该key，则使用数据的值
@@ -60,7 +64,7 @@ const compareAndCompleteData = (data: any): ExcelTableItem => {
     }
     // 如果数据中不存在该key，则使用默认值（已经通过展开操作设置）
   });
-  
+
   return completedData;
 };
 
@@ -72,12 +76,22 @@ const isPolling = ref<boolean>(false);
 //#region 请求相关
 // 获取ai画图分页结果
 const fetchAiDrawPage = () => {
+  loadingTableData.value = true;
   getAiDrawPage({
-    pageNo: 1,
-    pageSize: 9999
+    pageNo: paginationConfig.value.currentPage,
+    pageSize: paginationConfig.value.pageSize
   })
     .then((res: any) => {
       if (res.code === 200) {
+        // 如果当前页大于总页数，重置为最后一页 排除总页数为0的情况
+        if (res.data?.current > res.data?.pages && res.data?.total !== 0) {
+          paginationConfig.value.currentPage = res.data?.pages;
+          return;
+        }
+
+        // 更新总页数
+        paginationConfig.value.total = res.data?.total || 0;
+
         let isPollingTemp = false;
         const temp = [];
         const uuIds = [];
@@ -86,7 +100,7 @@ const fetchAiDrawPage = () => {
             if (item.status === 0) {
               isPollingTemp = true;
             }
-            
+
             // 解析字段数据并与默认结构比较
             const parsedFields = JSON.parse(item.fields || "{}");
             const completedData = compareAndCompleteData({
@@ -95,7 +109,7 @@ const fetchAiDrawPage = () => {
               status: item.status,
               uuid: item.uuid || null
             });
-            
+
             temp.push(completedData);
             if (item.uuid) {
               uuIds.push(item.uuid);
@@ -118,6 +132,9 @@ const fetchAiDrawPage = () => {
     .catch(err => {
       console.log("获取ai画图分页结果失败", err);
       ElMessage.error("获取ai画图分页结果失败:" + err.message);
+    })
+    .finally(() => {
+      loadingTableData.value = false;
     });
 };
 provide("fetchAiDrawPage", fetchAiDrawPage);
@@ -191,6 +208,28 @@ const updateTemplateImg = (row: ExcelTableItem, index: number | string) => {
 provide("updateTemplateImg", updateTemplateImg);
 //#endregion
 
+//#region 分页逻辑
+const paginationConfig = ref({
+  currentPage: 1,
+  pageSize: 3,
+  total: 0
+});
+
+watch(
+  [
+    () => paginationConfig.value.currentPage,
+    () => paginationConfig.value.pageSize
+  ],
+  ([newCurrentPage, newPageSize], [oldCurrentPage, oldPageSize]) => {
+    if (newCurrentPage !== oldCurrentPage || newPageSize !== oldPageSize) {
+      // console.log("分页参数改变:", newCurrentPage, newPageSize);
+      fetchAiDrawPage();
+    }
+  },
+  { immediate: true }
+);
+//#endregion
+
 defineExpose({
   fetchMaterialPage
 });
@@ -208,12 +247,18 @@ defineExpose({
 
     <TableDataCard
       :loading="loading"
+      :loadingTableData="loadingTableData"
       v-model:tableData="tableData"
       :handleEditStatus="handleEditStatus"
       :handleGoodsClick="handleGoodsClick"
       :handleSelectionChange="handleSelectionChange"
       :selectedIds="selectedIds"
       :materialList="materialList"
+    />
+
+    <Pagination
+      v-model:paginationConfig="paginationConfig"
+      :loadingTableData="loadingTableData"
     />
 
     <div>

@@ -14,6 +14,7 @@ import { snapdom } from "@zumer/snapdom";
 import { loadImage } from "../../utils/imageLoader";
 import { type ImageDataResult } from "../../utils/compressImage";
 import { type ExcelTableItem } from "../../type/drawing";
+import { blobManager } from "../../utils/blobManager";
 
 // 注入顶层缓存管理函数
 const imageCacheManager = inject("imageCacheManager") as {
@@ -52,6 +53,7 @@ const processTemplateImage = async () => {
 
   try {
     // 使用新的可取消的loadImage函数
+    console.log("editDialog_导入底图:", resultImage);
     const loadRequest = loadImage(resultImage, imageCacheManager, {
       loadingMessage: "正在加载底图...",
       successMessage: "底图加载成功",
@@ -109,7 +111,7 @@ const importMaterialElements = async () => {
     {
       field: "shopLogoImage",
       name: "店铺LOGO",
-      position: { x: 468, y: -5 }, // 中心位置
+      position: { x: 464, y: -39 }, // 中心位置
       size: { width: 200, height: 200 } // 店铺LOGO中等大小
     }
   ];
@@ -131,11 +133,15 @@ const importMaterialElements = async () => {
           // 存储加载请求以便后续取消
           materialLoadRequests.value.push(loadRequest);
 
-          const base64Data = await loadRequest.promise;
+          const base64Data: any = await loadRequest.promise;
 
           // 如果请求已被取消，直接返回
           if (materialLoadRequests.value.length === 0) {
-            return { success: false, material: material.name, error: "操作已取消" };
+            return {
+              success: false,
+              material: material.name,
+              error: "操作已取消"
+            };
           }
 
           // 返回一个Promise，等待图片加载完成
@@ -431,6 +437,8 @@ const handleResize = () => {
   updateContainerRect();
 };
 
+const exportSize = ref("800");
+
 // 导出为PNG
 const exportAsPNG = () => {
   exportPNGLoading.value = true;
@@ -455,7 +463,7 @@ const handleCapture = async () => {
   try {
     // 核心捕获逻辑
     const capture = await snapdom(exportContainer.value, {
-      scale: 4096 / 668,
+      scale: Number(exportSize.value) / 668,
       dpr: window.devicePixelRatio,
       backgroundColor: "#ffffff"
     });
@@ -555,16 +563,28 @@ defineExpose({
         <div class="toolbar">
           <div>
             <el-button type="primary" @click="importImage">导入素材</el-button>
-            <span class="tip">导入的素材将作为可拖动的元素添加到画布中</span>
+            <span class="tip"> 导入的素材将作为可拖动的元素添加到画布中</span>
           </div>
 
-          <el-button
-            type="primary"
-            @click="exportAsPNG"
-            :loading="exportPNGLoading"
-          >
-            导出PNG
-          </el-button>
+          <div>
+            <el-select
+              v-model="exportSize"
+              placeholder="请选择导出尺寸"
+              style="width: 120px; margin-right: 10px"
+            >
+              <el-option label="800*800" value="800"></el-option>
+              <el-option label="1400*1400" value="1400"></el-option>
+              <el-option label="2048*2048" value="2048"></el-option>
+              <el-option label="4096*4096" value="4096"></el-option>
+            </el-select>
+            <el-button
+              type="primary"
+              @click="exportAsPNG"
+              :loading="exportPNGLoading"
+            >
+              导出PNG
+            </el-button>
+          </div>
         </div>
 
         <div

@@ -5,22 +5,23 @@ import { ElMessage } from "element-plus";
 import Material from "./components/material/index.vue";
 import Drawing from "./components/drawing/index.vue";
 import { imageCache } from "./utils/imageCache/index";
-import {
-  processImageCompression,
-  type ImageDataResult
-} from "./utils/compressImage/index";
+import { processImageCompression } from "./utils/compressImage/index";
+import { blobManager } from "./utils/blobManager";
+import { requestQueueManager } from "./utils/requestQueue";
 
-//#region 图片缓存逻辑
+// 自定义缓存图片类型
+export interface ImageCacheData {
+  originalBlob: Blob;
+  compressedBlob: Blob;
+}
+
+//#region 图片缓存逻辑（使用带去重功能的通用请求队列）
 /**
- * 统一的图片缓存管理函数
- * @param imageUrl 图片URL或路径
- * @param callback 图片加载完成后的回调函数
- * @returns Promise<ImageDataResult> 返回包含原图和压缩图的对象
+ * 图片请求处理函数
+ * @param imageUrl 图片URL
+ * @returns Promise<ImageCacheData>
  */
-const processImageWithCache = async (
-  imageUrl: string,
-  callback?: (result: ImageDataResult) => void
-): Promise<ImageDataResult> => {
+const imageRequestHandler = async (imageUrl: string): Promise<ImageCacheData> => {
   if (!imageUrl) {
     throw new Error("图片URL不能为空");
   }
@@ -29,59 +30,98 @@ const processImageWithCache = async (
   const cachedImageData = await imageCache.getImageData(imageUrl);
   if (cachedImageData) {
     // console.log(`从缓存加载:`, imageUrl);
-    const result: ImageDataResult = {
+    return {
       originalBlob: cachedImageData.originalBlob,
-      compressedBlob:
-        cachedImageData.compressedBlob || cachedImageData.originalBlob
+      compressedBlob: cachedImageData.compressedBlob || cachedImageData.originalBlob
     };
-    if (callback) callback(result);
-    return result;
   }
 
   // 缓存中不存在，从服务器下载并缓存
   try {
     const res: any = await downloadFile({ objectName: imageUrl });
-    const reader = new FileReader();
-
-    return new Promise((resolve, reject) => {
-      reader.onloadend = async () => {
-        try {
-          const originalBlob = reader.result as string;
-
-          // 使用统一的图片压缩处理函数
-          const result = await processImageCompression(
-            originalBlob,
-            imageUrl,
-            0.5
-          );
-
-          // 存储到缓存（包含原图和压缩图）
-          await imageCache.storeImage(
-            imageUrl,
-            result.originalBlob,
-            result.compressedBlob
-          );
-          // console.log(`已缓存:`, imageUrl);
-
-          if (callback) callback(result);
-          resolve(result);
-        } catch (err) {
-          ElMessage.error(`图片${imageUrl}处理失败: ${err}`);
-          reject(err);
-        }
-      };
-
-      reader.onerror = error => {
-        ElMessage.error(`图片${imageUrl}加载失败: ${error}`);
-        reject(new Error(`图片${imageUrl}加载失败: ${error}`));
-      };
-
+    const originalBase64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error(`图片${imageUrl}加载失败`));
       reader.readAsDataURL(res);
     });
+
+    // 使用统一的图片压缩处理函数
+    const compressionResult = await processImageCompression(
+      originalBase64,
+      imageUrl,
+      0.5
+    );
+
+    // 存储到缓存
+    await imageCache.storeImage(
+      imageUrl,
+      compressionResult.originalBase64,
+      compressionResult.compressedBase64
+    );
+
+    // 从缓存获取最终数据
+    const finalCachedImageData = await imageCache.getImageData(imageUrl);
+    if (finalCachedImageData) {
+      // console.log(`图片 ${imageUrl} 下载并缓存成功`);
+      return {
+        originalBlob: finalCachedImageData.originalBlob,
+        compressedBlob: finalCachedImageData.compressedBlob || finalCachedImageData.originalBlob
+      };
+    } else {
+      throw new Error(`图片${imageUrl}缓存失败`);
+    }
   } catch (error) {
     ElMessage.error(`图片${imageUrl}加载失败: ${error}`);
     throw error;
   }
+};
+
+/**
+ * 统一的图片缓存管理函数（使用带去重功能的通用请求队列）
+ * @param imageUrl 图片URL或路径
+ * @param callback 图片加载完成后的回调函数
+ * @returns Promise<ImageCacheData> 返回包含原图和压缩图的对象
+ */
+const processImageWithCache = async (
+  imageUrl: string,
+  callback?: (result: ImageCacheData) => void
+): Promise<ImageCacheData> => {
+  if (!imageUrl) {
+    throw new Error("图片URL不能为空");
+  }
+
+  // 使用带去重功能的通用请求队列管理器处理请求
+  const result = await requestQueueManager.addRequest(
+    `image`, // 使用统一的ID，便于去重
+    imageUrl, // 参数（图片URL）
+    imageRequestHandler // 处理函数
+  );
+  
+  // 执行回调函数
+  if (callback) {
+    callback(result);
+  }
+  
+  return result;
+};
+
+/**
+ * 检查图片请求是否正在进行中
+ * @param imageUrl 图片URL
+ * @returns 是否正在进行中
+ */
+const isImageLoading = (imageUrl: string): boolean => {
+  return requestQueueManager.isRequestPending('image', imageUrl);
+};
+
+/**
+ * 取消特定的图片加载请求
+ * @param imageUrl 图片URL
+ * @returns 是否取消成功
+ */
+const cancelImageLoading = (imageUrl: string): boolean => {
+  return requestQueueManager.cancelRequest('image', imageUrl);
 };
 
 /**
@@ -114,7 +154,7 @@ const checkImageCache = async (imageUrl: string): Promise<boolean> => {
  * @returns Promise<string | null> 压缩图base64数据
  */
 const getCompressedImage = async (imageUrl: string): Promise<string | null> => {
-  return await imageCache.getImage(imageUrl, "compressedBlob");
+  return await imageCache.getImageURL(imageUrl, "compressedBlob");
 };
 
 /**
@@ -123,7 +163,7 @@ const getCompressedImage = async (imageUrl: string): Promise<string | null> => {
  * @returns Promise<string | null> 原图base64数据
  */
 const getOriginalImage = async (imageUrl: string): Promise<string | null> => {
-  return await imageCache.getImage(imageUrl, "originalBlob");
+  return await imageCache.getImageURL(imageUrl, "originalBlob");
 };
 
 // 向子组件提供缓存管理函数
@@ -133,7 +173,16 @@ provide("imageCacheManager", {
   clearAllImageCache,
   checkImageCache,
   getCompressedImage,
-  getOriginalImage
+  getOriginalImage,
+  // 提供队列管理功能
+  getQueueStatus: () => requestQueueManager.getQueueStatus(),
+  clearQueue: () => requestQueueManager.clearQueue(),
+  cancelRequest: (id: string, params?: any) => requestQueueManager.cancelRequest(id, params),
+  setMaxConcurrent: (max: number) => requestQueueManager.setMaxConcurrent(max),
+  // 新增的去重相关功能
+  isImageLoading,
+  cancelImageLoading,
+  getRunningRequests: () => requestQueueManager.getRunningRequests()
 });
 //#endregion
 

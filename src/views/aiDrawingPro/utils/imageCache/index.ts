@@ -1,19 +1,20 @@
 /**
  * 图片缓存工具类 - 基于IndexedDB的图片存储管理
- * 支持图片base64数据的存储、检索和删除
+ * 支持图片Blob数据的存储、检索和删除
  */
+import { blobManager } from "../blobManager";
 
 interface ImageData {
   id: string;
-  originalBlob: string; // 源文件base64数据
-  compressedBlob: string; // 压缩后的base64数据
+  originalBlob: Blob; // 源文件Blob数据
+  compressedBlob: Blob; // 压缩后的Blob数据
   timestamp: number; // 存储时间戳
 }
 
 class ImageCache {
   private dbName: string = "ImageCacheDB";
   private storeName: string = "images";
-  private version: number = 1;
+  private version: number = 2; // 增加版本号以触发数据库升级
   private db: IDBDatabase | null = null;
 
   /**
@@ -37,31 +38,45 @@ class ImageCache {
       request.onupgradeneeded = event => {
         const db = (event.target as IDBOpenDBRequest).result;
 
-        // 创建对象存储空间
-        if (!db.objectStoreNames.contains(this.storeName)) {
-          const store = db.createObjectStore(this.storeName, { keyPath: "id" });
-          // 创建索引以便按id快速查找
-          store.createIndex("id", "id", { unique: true });
-          store.createIndex("timestamp", "timestamp", { unique: false });
+        // 删除旧的对象存储空间（如果存在）
+        if (db.objectStoreNames.contains(this.storeName)) {
+          db.deleteObjectStore(this.storeName);
         }
+
+        // 创建新的对象存储空间
+        const store = db.createObjectStore(this.storeName, { keyPath: "id" });
+        // 创建索引以便按id快速查找
+        store.createIndex("id", "id", { unique: true });
+        store.createIndex("timestamp", "timestamp", { unique: false });
       };
     });
   }
 
   /**
-   * 存储图片数据
+   * 存储图片数据（支持base64字符串或Blob对象）
    * @param id 图片ID (如: "/ai/1.png")
-   * @param originalBlob 源文件base64格式的图片数据
-   * @param compressedBlob 压缩后的base64数据（可选）
+   * @param originalData 源文件数据（base64字符串或Blob对象）
+   * @param compressedData 压缩后的数据（base64字符串或Blob对象）
    * @returns Promise<boolean> 存储是否成功
    */
   public async storeImage(
     id: string,
-    originalBlob: string,
-    compressedBlob: string
+    originalData: string | Blob,
+    compressedData: string | Blob
   ): Promise<boolean> {
     try {
       const db = await this.initDB();
+
+      // 转换数据为Blob对象
+      const originalBlob =
+        typeof originalData === "string"
+          ? blobManager.base64ToBlob(originalData)
+          : originalData;
+
+      const compressedBlob =
+        typeof compressedData === "string"
+          ? blobManager.base64ToBlob(compressedData)
+          : compressedData;
 
       return new Promise((resolve, reject) => {
         const transaction = db.transaction([this.storeName], "readwrite");
@@ -86,15 +101,37 @@ class ImageCache {
   }
 
   /**
-   * 根据ID查找图片数据
+   * 根据ID查找图片数据并返回Blob URL
    * @param id 图片ID
    * @param type 图片类型：'originalBlob' | 'compressedBlob'，默认为'compressedBlob'
-   * @returns Promise<string | null> 返回base64数据，未找到返回null
+   * @returns Promise<string | null> 返回Blob URL，未找到返回null
    */
-  public async getImage(
+  public async getImageURL(
     id: string,
     type: "originalBlob" | "compressedBlob" = "compressedBlob"
   ): Promise<string | null> {
+    try {
+      const blob = await this.getImageBlob(id, type);
+      if (!blob) return null;
+
+      // 使用Blob管理器创建URL并管理引用
+      return blobManager.createBlobURL(id, blob);
+    } catch (error) {
+      console.error("获取图片URL失败:", error);
+      return null;
+    }
+  }
+
+  /**
+   * 根据ID查找图片Blob对象
+   * @param id 图片ID
+   * @param type 图片类型：'originalBlob' | 'compressedBlob'，默认为'compressedBlob'
+   * @returns Promise<Blob | null> 返回Blob对象，未找到返回null
+   */
+  public async getImageBlob(
+    id: string,
+    type: "originalBlob" | "compressedBlob" = "compressedBlob"
+  ): Promise<Blob | null> {
     try {
       const db = await this.initDB();
 
@@ -111,7 +148,7 @@ class ImageCache {
             return;
           }
 
-          let data: string | undefined;
+          let data: Blob | undefined;
           switch (type) {
             case "compressedBlob":
               data = result.compressedBlob;
@@ -129,6 +166,14 @@ class ImageCache {
       console.error("获取图片失败:", error);
       return null;
     }
+  }
+
+  /**
+   * 释放图片URL引用
+   * @param id 图片ID
+   */
+  public releaseImageURL(id: string): void {
+    blobManager.releaseBlobURL(id);
   }
 
   /**
@@ -166,6 +211,9 @@ class ImageCache {
    */
   public async deleteImage(id: string): Promise<boolean> {
     try {
+      // 先释放URL引用
+      blobManager.releaseBlobURL(id);
+
       const db = await this.initDB();
 
       return new Promise((resolve, reject) => {
@@ -189,6 +237,9 @@ class ImageCache {
    */
   public async clearAll(): Promise<boolean> {
     try {
+      // 释放所有URL引用
+      blobManager.releaseAll();
+
       const db = await this.initDB();
 
       return new Promise((resolve, reject) => {
@@ -213,8 +264,8 @@ class ImageCache {
    */
   public async hasImage(id: string): Promise<boolean> {
     try {
-      const image = await this.getImage(id);
-      return image !== null;
+      const imageData = await this.getImageData(id);
+      return imageData !== null;
     } catch (error) {
       console.error("检查图片存在性失败:", error);
       return false;
@@ -238,15 +289,9 @@ class ImageCache {
         request.onsuccess = () => {
           const images: ImageData[] = request.result;
           const total = images.length;
-          // 估算总大小（字节）
+          // 计算总大小（字节）
           const size = images.reduce((acc, img) => {
-            // base64数据大小估算：每字符约0.75字节
-            return (
-              acc +
-              Math.floor(
-                (img.originalBlob.length + img.compressedBlob.length) * 0.75
-              )
-            );
+            return acc + img.originalBlob.size + img.compressedBlob.size;
           }, 0);
 
           resolve({ total, size });
@@ -258,6 +303,14 @@ class ImageCache {
       console.error("获取缓存统计失败:", error);
       return { total: 0, size: 0 };
     }
+  }
+
+  /**
+   * 获取Blob管理器统计信息
+   * @returns { total: number, size: number } Blob管理器统计
+   */
+  public getBlobManagerStats(): { total: number; size: number } {
+    return blobManager.getStats();
   }
 }
 

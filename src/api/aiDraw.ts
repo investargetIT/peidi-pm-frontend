@@ -15,7 +15,8 @@ export interface AiDrawPageRequest {
 // 获取ai画图分页结果
 export const getAiDrawPage = (params: AiDrawPageRequest) => {
   return http.request("get", baseUrlApi("/ai/draw/page"), {
-    params
+    params,
+    timeout: 0
   });
 };
 
@@ -60,7 +61,8 @@ export const downloadFile = (params: { objectName: string }) => {
 // 获取文件url
 export const getDownloadUrl = (params: { objectName: string }) => {
   return http.request("get", baseUrlApi("/ai/common/download-url"), {
-    params
+    params,
+    timeout: 0
   });
 };
 
@@ -93,6 +95,7 @@ export const updateMaterial = (data: {
 // 分页素材库结果
 export const getMaterialPage = (params: AiDrawPageRequest) => {
   return http.request("get", baseUrlApi("/ai/draw/materials/page"), {
-    params
+    params,
+    timeout: 0
   });
 };

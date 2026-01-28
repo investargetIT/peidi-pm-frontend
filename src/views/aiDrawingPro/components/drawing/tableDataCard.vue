@@ -4,6 +4,7 @@ import { ElMessageBox, ElMessage } from "element-plus";
 import * as XLSX from "xlsx";
 import RiAddLine from "@iconify-icons/ri/add-line";
 import RiFileUploadLine from "@iconify-icons/ri/file-upload-line";
+import RiFileDownloadLine from "@iconify-icons/ri/file-download-line";
 import { Check, Close, Delete, Edit } from "@element-plus/icons-vue";
 import { type ExcelTableItem } from "../../type/drawing";
 import { EXCEL_TABLE_ITEM_DEFAULT } from "../../config/drawing";
@@ -15,6 +16,10 @@ const props = defineProps({
   loading: {
     type: Boolean,
     required: true
+  },
+  loadingTableData: {
+    type: Boolean,
+    default: false
   },
   tableData: {
     type: Array as PropType<ExcelTableItem[]>,
@@ -126,6 +131,7 @@ const selectable = (row: ExcelTableItem, index: number) => {
   return !(props.loading || row.status === 0);
 };
 
+//#region 上传表格逻辑
 // 处理产品图片选择变化
 const handleProductImageChange = () => {
   const product = props.materialList["product"].find(
@@ -227,15 +233,19 @@ const parseExcelData = (jsonData: any[]): ExcelTableItem[] => {
       const tableItem: ExcelTableItem = {
         ...EXCEL_TABLE_ITEM_DEFAULT,
         uiid: generateID(),
-        productName: row["产品名"] || "",
-        highlightedSellingPoints: row["产品卖点-高亮"] || "",
-        normalSellingPoints: row["产品卖点-全部"] || "",
-        handPriceTitle: row["到手价-标题"] || "",
-        handPrice: row["到手价-价格"] || "",
-        profitPoints: row["利益点"] || "",
-        activityTime: row["活动时间"] || "",
-        remark: row["补充描述"] || "",
-        imageSize: row["输出分辨率"] || "",
+        productName: row["产品名"] || EXCEL_TABLE_ITEM_DEFAULT.productName,
+        highlightedSellingPoints:
+          row["产品卖点-高亮"] ||
+          EXCEL_TABLE_ITEM_DEFAULT.highlightedSellingPoints,
+        normalSellingPoints:
+          row["产品卖点-全部"] || EXCEL_TABLE_ITEM_DEFAULT.normalSellingPoints,
+        handPriceTitle:
+          row["到手价-标题"] || EXCEL_TABLE_ITEM_DEFAULT.handPriceTitle,
+        handPrice: row["到手价-价格"] || EXCEL_TABLE_ITEM_DEFAULT.handPrice,
+        profitPoints: row["利益点"] || EXCEL_TABLE_ITEM_DEFAULT.profitPoints,
+        activityTime: row["活动时间"] || EXCEL_TABLE_ITEM_DEFAULT.activityTime,
+        remark: row["补充描述"] || EXCEL_TABLE_ITEM_DEFAULT.remark,
+        imageSize: row["输出分辨率"] || EXCEL_TABLE_ITEM_DEFAULT.imageSize,
 
         productImage: row["产品图片"]
           ? [findMaterialImage(props.materialList, "product", row["产品图片"])]
@@ -244,10 +254,22 @@ const parseExcelData = (jsonData: any[]): ExcelTableItem[] => {
           ? [findMaterialImage(props.materialList, "template", row["模板图片"])]
           : [],
         fullGiftImages: row["全场满赠-图片"]
-          ? [findMaterialImage(props.materialList, "gift", row["全场满赠-图片"])]
+          ? [
+              findMaterialImage(
+                props.materialList,
+                "gift",
+                row["全场满赠-图片"]
+              )
+            ]
           : [],
         campaignLogoImage: row["活动LOGO"]
-          ? [findMaterialImage(props.materialList, "activityLogo", row["活动LOGO"])]
+          ? [
+              findMaterialImage(
+                props.materialList,
+                "activityLogo",
+                row["活动LOGO"]
+              )
+            ]
           : [],
         shopLogoImage: row["店铺LOGO"]
           ? [findMaterialImage(props.materialList, "shopLogo", row["店铺LOGO"])]
@@ -275,12 +297,46 @@ const findMaterialImage = (
   console.log(materialList, imageType, imageUrl, material);
   return material?.objectName || null;
 };
+//#endregion
+
+// 处理下载模板
+const handleDownloadTemplate = () => {
+  try {
+    const message = ElMessage({
+      message: "正在下载模板文件...",
+      type: "info",
+      duration: 0
+    });
+
+    const link = document.createElement("a");
+    link.href = "/AI_Draw/AI_京东模板.xlsx";
+    link.setAttribute("download", "AI_京东模板.xlsx");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    message.close();
+    ElMessage.success("模板文件下载成功");
+  } catch (error) {
+    ElMessage.error("模板文件下载失败：" + error.message);
+  }
+};
 </script>
 
 <template>
   <el-card shadow="never" style="border-radius: 10px">
     <div class="flex justify-end mb-[8px]">
       <el-space>
+        <el-button
+          color="#217346"
+          @click="handleDownloadTemplate"
+          :disabled="editingRowIndex !== null || loading"
+        >
+          <template #icon>
+            <IconifyIconOffline :icon="RiFileDownloadLine" />
+          </template>
+          下载Excel
+        </el-button>
         <el-button
           type="primary"
           @click="handleUploadExcel"
@@ -316,7 +372,9 @@ const findMaterialImage = (
         fontSize: '12px'
       }"
       row-key="uiid"
-      height="800"
+      height="700"
+      v-loading="loadingTableData"
+      element-loading-text="数据加载中..."
     >
       <el-table-column
         type="selection"

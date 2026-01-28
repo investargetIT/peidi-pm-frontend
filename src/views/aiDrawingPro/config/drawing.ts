@@ -5,8 +5,8 @@ import { ExcelTableItem } from "../type/drawing";
 export const GRSAI_MODEL_NAME = "nano-banana-pro";
 
 // 生成的图片数量
-export const MAX_PIC_COUNT = 1;
-// export const MAX_PIC_COUNT = 3;
+// export const MAX_PIC_COUNT = 1;
+export const MAX_PIC_COUNT = 3;
 
 // 最大重试次数
 export const MAX_RETRY_COUNT = 10;
