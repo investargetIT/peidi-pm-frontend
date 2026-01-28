@@ -99,3 +99,11 @@ export const getMaterialPage = (params: AiDrawPageRequest) => {
     timeout: 0
   });
 };
+
+// 中转 请求AI接口
+export const transferDraw = (data: { urlParam: string }) => {
+  return http.request("post", baseUrlApi("/ai/draw/transfer"), {
+    data,
+    timeout: 0
+  });
+};

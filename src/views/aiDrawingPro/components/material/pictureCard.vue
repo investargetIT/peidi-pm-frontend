@@ -17,6 +17,10 @@ const props = defineProps({
   handleContact: {
     type: Function,
     required: true
+  },
+  handleCreate: {
+    type: Function,
+    required: true
   }
 });
 
@@ -72,8 +76,17 @@ const handleDelete = () => {
             @click="props.handleContact(props.data)"
             text
             v-if="getMTType === 'product'"
-            >关联</el-button
           >
+            关联
+          </el-button>
+          <el-button
+            type="success"
+            @click="props.handleCreate(props.data)"
+            text
+            v-if="getMTType === 'template'"
+          >
+            创意
+          </el-button>
         </div>
       </template>
 

@@ -4,6 +4,7 @@ import { downloadFile } from "@/api/aiDraw";
 import { ElMessage } from "element-plus";
 import Material from "./components/material/index.vue";
 import Drawing from "./components/drawing/index.vue";
+import Creative from "./components/creative/index.vue";
 import { imageCache } from "./utils/imageCache/index";
 import { processImageCompression } from "./utils/compressImage/index";
 import { blobManager } from "./utils/blobManager";
@@ -21,7 +22,9 @@ export interface ImageCacheData {
  * @param imageUrl 图片URL
  * @returns Promise<ImageCacheData>
  */
-const imageRequestHandler = async (imageUrl: string): Promise<ImageCacheData> => {
+const imageRequestHandler = async (
+  imageUrl: string
+): Promise<ImageCacheData> => {
   if (!imageUrl) {
     throw new Error("图片URL不能为空");
   }
@@ -32,7 +35,8 @@ const imageRequestHandler = async (imageUrl: string): Promise<ImageCacheData> =>
     // console.log(`从缓存加载:`, imageUrl);
     return {
       originalBlob: cachedImageData.originalBlob,
-      compressedBlob: cachedImageData.compressedBlob || cachedImageData.originalBlob
+      compressedBlob:
+        cachedImageData.compressedBlob || cachedImageData.originalBlob
     };
   }
 
@@ -66,7 +70,9 @@ const imageRequestHandler = async (imageUrl: string): Promise<ImageCacheData> =>
       // console.log(`图片 ${imageUrl} 下载并缓存成功`);
       return {
         originalBlob: finalCachedImageData.originalBlob,
-        compressedBlob: finalCachedImageData.compressedBlob || finalCachedImageData.originalBlob
+        compressedBlob:
+          finalCachedImageData.compressedBlob ||
+          finalCachedImageData.originalBlob
       };
     } else {
       throw new Error(`图片${imageUrl}缓存失败`);
@@ -97,12 +103,12 @@ const processImageWithCache = async (
     imageUrl, // 参数（图片URL）
     imageRequestHandler // 处理函数
   );
-  
+
   // 执行回调函数
   if (callback) {
     callback(result);
   }
-  
+
   return result;
 };
 
@@ -112,7 +118,7 @@ const processImageWithCache = async (
  * @returns 是否正在进行中
  */
 const isImageLoading = (imageUrl: string): boolean => {
-  return requestQueueManager.isRequestPending('image', imageUrl);
+  return requestQueueManager.isRequestPending("image", imageUrl);
 };
 
 /**
@@ -121,7 +127,7 @@ const isImageLoading = (imageUrl: string): boolean => {
  * @returns 是否取消成功
  */
 const cancelImageLoading = (imageUrl: string): boolean => {
-  return requestQueueManager.cancelRequest('image', imageUrl);
+  return requestQueueManager.cancelRequest("image", imageUrl);
 };
 
 /**
@@ -177,7 +183,8 @@ provide("imageCacheManager", {
   // 提供队列管理功能
   getQueueStatus: () => requestQueueManager.getQueueStatus(),
   clearQueue: () => requestQueueManager.clearQueue(),
-  cancelRequest: (id: string, params?: any) => requestQueueManager.cancelRequest(id, params),
+  cancelRequest: (id: string, params?: any) =>
+    requestQueueManager.cancelRequest(id, params),
   setMaxConcurrent: (max: number) => requestQueueManager.setMaxConcurrent(max),
   // 新增的去重相关功能
   isImageLoading,
@@ -186,16 +193,27 @@ provide("imageCacheManager", {
 });
 //#endregion
 
-const drawingTab = ref(null);
+const drawingTabRef = ref(null);
+const materialTabRef = ref(null);
 const activeTab = ref("Drawing");
 
 watch(activeTab, (newVal, oldVal) => {
   if (newVal !== oldVal) {
     if (newVal === "Drawing") {
-      drawingTab.value?.fetchMaterialPage();
+      drawingTabRef.value?.fetchMaterialPage();
+    }
+    if (newVal === "Material") {
+      materialTabRef.value?.fetchMaterialPage();
     }
   }
 });
+
+const creativeTabRef = ref(null);
+const initCreativeStudio = (url: string) => {
+  activeTab.value = "Creative";
+  creativeTabRef.value?.initCreativeStudio(url);
+};
+provide("initCreativeStudio", initCreativeStudio);
 </script>
 
 <template>
@@ -205,8 +223,13 @@ watch(activeTab, (newVal, oldVal) => {
     class="peidi-el-tabs-modern-tabs"
   >
     <el-tab-pane label="绘图" name="Drawing"
-      ><Drawing ref="drawingTab" />
+      ><Drawing ref="drawingTabRef" />
     </el-tab-pane>
-    <el-tab-pane label="素材库" name="Material"><Material /></el-tab-pane>
+    <el-tab-pane label="素材库" name="Material"
+      ><Material ref="materialTabRef" />
+    </el-tab-pane>
+    <el-tab-pane label="创意工作室" name="Creative"
+      ><Creative ref="creativeTabRef"
+    /></el-tab-pane>
   </el-tabs>
 </template>
