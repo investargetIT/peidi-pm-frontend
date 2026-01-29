@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { inject, onMounted, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import RiAddLine from "@iconify-icons/ri/add-line";
 import { getMaterialPage } from "@/api/aiDraw";
@@ -7,6 +7,8 @@ import { MATERIAL_LIBRARY_TABS } from "../../config/material";
 import PictureCard from "./pictureCard.vue";
 import DetailForm from "./detailForm.vue";
 import ContactForm from "./contactForm.vue";
+
+const initCreativeStudio = inject<Function>("initCreativeStudio");
 
 const radio = ref(null);
 const materialList = ref({});
@@ -75,6 +77,19 @@ const handleAddMaterial = () => {
 const handleContact = (data: any) => {
   contactFormRef.value.initContactForm(data);
 };
+
+const handleCreate = (data: any) => {
+  // console.log("handleCreate:", data);
+  if (!data?.objectName) {
+    ElMessage.error("素材名称不能为空");
+    return;
+  }
+  initCreativeStudio(data.objectName);
+};
+
+defineExpose({
+  fetchMaterialPage
+});
 </script>
 
 <template>
@@ -109,6 +124,7 @@ const handleContact = (data: any) => {
           :data="item"
           :fetchMaterialPage="fetchMaterialPage"
           :handleContact="handleContact"
+          :handleCreate="handleCreate"
         />
       </el-space>
     </div>

@@ -159,7 +159,7 @@ defineExpose({
           />
         </el-form-item>
 
-        <el-form-item label="品牌LOGO" prop="brandLogo">
+        <!-- <el-form-item label="品牌LOGO" prop="brandLogo">
           <el-select
             v-model="ruleForm.brandLogo"
             placeholder="请选择"
@@ -177,7 +177,7 @@ defineExpose({
             size="100px"
             v-if="ruleForm.brandLogo"
           />
-        </el-form-item>
+        </el-form-item> -->
 
         <el-form-item>
           <div class="flex justify-end w-full">

@@ -2,8 +2,8 @@
 import { ref, watch, inject } from "vue";
 import { ElMessage } from "element-plus";
 import { getDownloadUrl, downloadFile } from "@/api/aiDraw";
-import { dataURLtoBlob } from "../utils/compressImage";
 import { type ImageDataResult } from "../utils/compressImage";
+import { blobManager } from "../utils/blobManager";
 
 const props = defineProps({
   url: {
@@ -65,14 +65,7 @@ watch(
         loading.value = false; // 缓存加载完成，隐藏骨架屏
       } else {
         // 缓存中不存在，异步处理图片并缓存
-        imageCacheManager.processImageWithCache(
-          newVal,
-          (result: ImageDataResult) => {
-            compressedImageUrl.value = result.compressedBlob;
-            originalImageUrl.value = result.originalBlob;
-            loading.value = false; // 图片处理完成，隐藏骨架屏
-          }
-        );
+        imageCacheManager.processImageWithCache(newVal);
       }
 
       // 如果缓存中不存在，获取下载URL用于预览
@@ -112,7 +105,7 @@ const handleDownload = async (src: string) => {
 
     if (cachedOriginalImage) {
       // 从缓存下载
-      const blob = dataURLtoBlob(cachedOriginalImage);
+      const blob = blobManager.base64ToBlob(cachedOriginalImage);
       const url = URL.createObjectURL(blob);
 
       const a = document.createElement("a");

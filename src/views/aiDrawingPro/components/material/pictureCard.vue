@@ -17,6 +17,10 @@ const props = defineProps({
   handleContact: {
     type: Function,
     required: true
+  },
+  handleCreate: {
+    type: Function,
+    required: true
   }
 });
 
@@ -58,7 +62,11 @@ const handleDelete = () => {
   <div>
     <el-card shadow="hover" style="width: 240px">
       <template #header>
-        <span>{{ getNameFromObjectName(props.data.objectName) }}</span>
+        <el-text class="w-full" truncated size="large">
+          <span class="text-[#000] font-bold text-[14px]">{{
+            getNameFromObjectName(props.data.objectName)
+          }}</span>
+        </el-text>
       </template>
       <template #footer>
         <div>
@@ -68,8 +76,17 @@ const handleDelete = () => {
             @click="props.handleContact(props.data)"
             text
             v-if="getMTType === 'product'"
-            >关联</el-button
           >
+            关联
+          </el-button>
+          <el-button
+            type="success"
+            @click="props.handleCreate(props.data)"
+            text
+            v-if="getMTType === 'template'"
+          >
+            创意
+          </el-button>
         </div>
       </template>
 

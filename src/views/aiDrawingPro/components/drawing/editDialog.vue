@@ -14,6 +14,7 @@ import { snapdom } from "@zumer/snapdom";
 import { loadImage } from "../../utils/imageLoader";
 import { type ImageDataResult } from "../../utils/compressImage";
 import { type ExcelTableItem } from "../../type/drawing";
+import { blobManager } from "../../utils/blobManager";
 
 // 注入顶层缓存管理函数
 const imageCacheManager = inject("imageCacheManager") as {
@@ -36,6 +37,8 @@ const exportPNGLoading = ref<boolean>(false);
 
 // 用于存储当前加载请求的取消函数
 let currentLoadRequest: { cancel: () => void } | null = null;
+// 用于存储素材加载请求的取消函数数组
+const materialLoadRequests = ref<Array<{ cancel: () => void }>>([]);
 
 // 检查是否是URL并转换为base64 - 优先使用缓存
 const processTemplateImage = async () => {
@@ -50,6 +53,7 @@ const processTemplateImage = async () => {
 
   try {
     // 使用新的可取消的loadImage函数
+    console.log("editDialog_导入底图:", resultImage);
     const loadRequest = loadImage(resultImage, imageCacheManager, {
       loadingMessage: "正在加载底图...",
       successMessage: "底图加载成功",
@@ -74,37 +78,40 @@ const processTemplateImage = async () => {
 const importMaterialElements = async () => {
   // 清空现有元素
   imageElements.length = 0;
+  // 清空之前的素材加载请求
+  materialLoadRequests.value.forEach(request => request.cancel());
+  materialLoadRequests.value = [];
 
   // 定义素材列表和对应的初始位置和尺寸
   const materials = [
     {
       field: "productImage",
       name: "产品图片",
-      position: { x: 247, y: 221 }, // 左上角
-      size: { width: 384, height: 312 } // 产品图片较大
+      position: { x: 231, y: 221 }, // 左上角
+      size: { width: 416, height: 356 } // 产品图片较大
     },
     {
       field: "fullGiftImages",
       name: "全场满赠图片",
-      position: { x: 47, y: 349 }, // 右上角
-      size: { width: 160, height: 120 } // 赠品图片中等大小
+      position: { x: 6, y: 269 }, // 右上角
+      size: { width: 243, height: 218 } // 赠品图片中等大小
     },
     {
       field: "campaignLogoImage",
       name: "活动LOGO",
-      position: { x: 170, y: 13 }, // 左下角
-      size: { width: 95, height: 95 } // LOGO较小
+      position: { x: 64, y: -21 }, // 左下角
+      size: { width: 231, height: 160 } // LOGO较小
     },
-    {
-      field: "brandLogoImage",
-      name: "品牌LOGO",
-      position: { x: 58, y: 13 }, // 右下角
-      size: { width: 95, height: 95 } // LOGO较小
-    },
+    // {
+    //   field: "brandLogoImage",
+    //   name: "品牌LOGO",
+    //   position: { x: 67, y: 6 }, // 右下角
+    //   size: { width: 95, height: 95 } // LOGO较小
+    // },
     {
       field: "shopLogoImage",
       name: "店铺LOGO",
-      position: { x: 468, y: -5 }, // 中心位置
+      position: { x: 464, y: -39 }, // 中心位置
       size: { width: 200, height: 200 } // 店铺LOGO中等大小
     }
   ];
@@ -123,7 +130,19 @@ const importMaterialElements = async () => {
             errorMessage: `${material.name}加载失败`
           });
 
-          const base64Data = await loadRequest.promise;
+          // 存储加载请求以便后续取消
+          materialLoadRequests.value.push(loadRequest);
+
+          const base64Data: any = await loadRequest.promise;
+
+          // 如果请求已被取消，直接返回
+          if (materialLoadRequests.value.length === 0) {
+            return {
+              success: false,
+              material: material.name,
+              error: "操作已取消"
+            };
+          }
 
           // 返回一个Promise，等待图片加载完成
           return new Promise(resolve => {
@@ -155,7 +174,10 @@ const importMaterialElements = async () => {
             img.src = base64Data;
           });
         } catch (error) {
-          console.warn(`加载 ${material.name} 失败:`, error);
+          // 如果是取消错误，不显示警告
+          if (error.message !== "请求已取消") {
+            console.warn(`加载 ${material.name} 失败:`, error);
+          }
           return {
             success: false,
             material: material.name,
@@ -189,8 +211,11 @@ const importMaterialElements = async () => {
       );
     }
   } catch (error) {
-    console.error("导入素材时发生错误:", error);
-    ElMessage.error("导入素材时发生错误");
+    // 如果是取消错误，不显示错误消息
+    if (error.message !== "请求已取消") {
+      console.error("导入素材时发生错误:", error);
+      ElMessage.error("导入素材时发生错误");
+    }
   }
 };
 
@@ -318,15 +343,9 @@ const handleMouseMove = (event: MouseEvent) => {
     const x = event.clientX - containerRect.value.left - dragOffset.value.x;
     const y = event.clientY - containerRect.value.top - dragOffset.value.y;
 
-    // 限制在容器范围内
-    dragElement.value.x = Math.max(
-      0,
-      Math.min(containerRect.value.width - dragElement.value.width, x)
-    );
-    dragElement.value.y = Math.max(
-      0,
-      Math.min(containerRect.value.height - dragElement.value.height, y)
-    );
+    // 移除位置限制，允许元素移动到画布之外
+    dragElement.value.x = x;
+    dragElement.value.y = y;
   });
 };
 
@@ -418,6 +437,8 @@ const handleResize = () => {
   updateContainerRect();
 };
 
+const exportSize = ref("800");
+
 // 导出为PNG
 const exportAsPNG = () => {
   exportPNGLoading.value = true;
@@ -442,7 +463,7 @@ const handleCapture = async () => {
   try {
     // 核心捕获逻辑
     const capture = await snapdom(exportContainer.value, {
-      scale: 4096 / 668,
+      scale: Number(exportSize.value) / 668,
       dpr: window.devicePixelRatio,
       backgroundColor: "#ffffff"
     });
@@ -454,7 +475,7 @@ const handleCapture = async () => {
     await capture.download({
       //@ts-ignore
       format: "png",
-      filename: "AI_Generated_Image"
+      filename: `${selectedRow.value.productName || "AI_Generated_Image"}.png`
     });
   } catch (err) {
     console.error("Capture error:", err);
@@ -542,16 +563,28 @@ defineExpose({
         <div class="toolbar">
           <div>
             <el-button type="primary" @click="importImage">导入素材</el-button>
-            <span class="tip">导入的素材将作为可拖动的元素添加到画布中</span>
+            <span class="tip"> 导入的素材将作为可拖动的元素添加到画布中</span>
           </div>
 
-          <el-button
-            type="primary"
-            @click="exportAsPNG"
-            :loading="exportPNGLoading"
-          >
-            导出PNG
-          </el-button>
+          <div>
+            <el-select
+              v-model="exportSize"
+              placeholder="请选择导出尺寸"
+              style="width: 120px; margin-right: 10px"
+            >
+              <el-option label="800*800" value="800"></el-option>
+              <el-option label="1400*1400" value="1400"></el-option>
+              <el-option label="2048*2048" value="2048"></el-option>
+              <el-option label="4096*4096" value="4096"></el-option>
+            </el-select>
+            <el-button
+              type="primary"
+              @click="exportAsPNG"
+              :loading="exportPNGLoading"
+            >
+              导出PNG
+            </el-button>
+          </div>
         </div>
 
         <div

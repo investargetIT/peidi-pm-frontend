@@ -1,12 +1,13 @@
 import Compressor from "compressorjs";
 import UPNG from "upng-js";
+import { blobManager } from "../blobManager";
 
 /**
  * 图片数据返回类型
  */
 export interface ImageDataResult {
-  originalBlob: string; // 原图base64数据
-  compressedBlob: string; // 压缩图base64数据
+  originalBase64: string; // 原图base64数据
+  compressedBase64: string; // 压缩图base64数据
 }
 
 /**
@@ -21,7 +22,7 @@ export const compressImage = (
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     // 将base64转换为Blob
-    const blob = dataURLtoBlob(base64Data);
+    const blob = blobManager.base64ToBlob(base64Data);
 
     new Compressor(blob, {
       quality,
@@ -42,25 +43,6 @@ export const compressImage = (
       }
     });
   });
-};
-
-/**
- * 将base64数据转换为Blob
- * @param dataURL base64数据
- * @returns Blob对象
- */
-export const dataURLtoBlob = (dataURL: string): Blob => {
-  const arr = dataURL.split(",");
-  const mime = arr[0].match(/:(.*?);/)?.[1] || "image/png";
-  const bstr = atob(arr[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
-  }
-
-  return new Blob([u8arr], { type: mime });
 };
 
 /**
@@ -91,13 +73,13 @@ export const compressPNG = async (file: File): Promise<File> => {
 
 /**
  * 智能图片压缩函数 - 根据图片类型选择压缩方式
- * @param originalBlob 原始base64图片数据
+ * @param originalBase64 原始base64图片数据
  * @param imageUrl 图片URL（用于判断文件类型）
  * @param quality 通用压缩质量 (0-1)，默认0.5
  * @returns Promise<string> 压缩后的base64数据
  */
 export const smartCompressImage = async (
-  originalBlob: string,
+  originalBase64: string,
   imageUrl: string,
   quality: number = 0.5
 ): Promise<string> => {
@@ -105,7 +87,7 @@ export const smartCompressImage = async (
   if (imageUrl.toLowerCase().endsWith(".png")) {
     try {
       // 将base64转换为File对象进行PNG压缩
-      const blob = dataURLtoBlob(originalBlob);
+      const blob = blobManager.base64ToBlob(originalBase64);
       const pngFile = new File([blob], "image.png", {
         type: "image/png"
       });
@@ -126,37 +108,41 @@ export const smartCompressImage = async (
     } catch (error) {
       console.warn("PNG图片压缩失败，使用通用压缩:", error);
       // PNG压缩失败时使用通用压缩
-      return await compressImage(originalBlob, quality);
+      return await compressImage(originalBase64, quality);
     }
   } else {
     // 非PNG图片直接使用通用压缩
-    return await compressImage(originalBlob, quality);
+    return await compressImage(originalBase64, quality);
   }
 };
 
 /**
  * 统一的图片压缩处理函数
- * @param originalBlob 原始base64图片数据
+ * @param originalBase64 原始base64图片数据
  * @param imageUrl 图片URL（用于判断文件类型）
  * @param quality 通用压缩质量 (0-1)，默认0.5
  * @returns Promise<ImageDataResult> 返回包含原图和压缩图的对象
  */
 export const processImageCompression = async (
-  originalBlob: string,
+  originalBase64: string,
   imageUrl: string,
   quality: number = 0.5
 ): Promise<ImageDataResult> => {
-  let compressedBlob = originalBlob;
+  let compressedBase64 = originalBase64;
 
   try {
-    compressedBlob = await smartCompressImage(originalBlob, imageUrl, quality);
+    compressedBase64 = await smartCompressImage(
+      originalBase64,
+      imageUrl,
+      quality
+    );
   } catch (error) {
     console.warn("图片压缩失败，使用原始图片:", error);
-    compressedBlob = originalBlob;
+    compressedBase64 = originalBase64;
   }
 
   return {
-    originalBlob,
-    compressedBlob
+    originalBase64,
+    compressedBase64
   };
 };

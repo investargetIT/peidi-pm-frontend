@@ -19,8 +19,8 @@ export const MATERIAL_LIBRARY_TABS = [
     label: "店铺LOGO",
     name: "shopLogo"
   },
-  {
-    label: "品牌LOGO",
-    name: "brandLogo"
-  }
+  // {
+  //   label: "品牌LOGO",
+  //   name: "brandLogo"
+  // }
 ];

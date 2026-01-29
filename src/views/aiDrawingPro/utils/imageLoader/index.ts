@@ -1,5 +1,6 @@
 import { downloadFile } from "@/api/aiDraw";
 import { ElMessage } from "element-plus";
+import { blobManager } from "../blobManager";
 
 // 创建一个可取消的Promise包装器
 class CancellablePromise<T> implements PromiseLike<T> {
@@ -67,7 +68,7 @@ export const loadImage = (
     successMessage?: string;
     errorMessage?: string;
   } = {}
-): { promise: Promise<string>; cancel: () => void } => {
+): { promise: Promise<string | Blob>; cancel: () => void } => {
   const {
     loadingMessage = "正在加载图片...",
     successMessage = null,
@@ -93,7 +94,9 @@ export const loadImage = (
         if (imageCacheManager?.processImageWithCache) {
           const result =
             await imageCacheManager.processImageWithCache(imageUrl);
-          base64Data = result.originalBlob;
+          if (result?.originalBlob) {
+            base64Data = imageCacheManager.getOriginalImage(imageUrl);
+          }
         } else {
           // 如果缓存管理器不可用，使用原来的方式
           const res: any = await downloadFile({ objectName: imageUrl });
@@ -135,7 +138,7 @@ export const loadImage = (
   );
 
   return {
-    promise: cancellablePromise as Promise<string>,
+    promise: cancellablePromise as Promise<string | Blob>,
     cancel: () => {
       cancellablePromise.cancel();
       loadingMsg.close(); // 取消时关闭加载消息

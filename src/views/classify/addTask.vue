@@ -18,7 +18,7 @@ import {
   testAllIPs,
   default_upload_url,
   chaohuiDownload
-} from "../../utils/chaohuiapi";
+} from "../../utils/chaohuiapi_pro";
 import Axios from "axios";
 import { message } from "@/utils/message";
 import { ElLoading, ElMessageBox } from "element-plus";
