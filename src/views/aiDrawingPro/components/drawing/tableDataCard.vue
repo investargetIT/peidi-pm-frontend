@@ -248,31 +248,23 @@ const parseExcelData = (jsonData: any[]): ExcelTableItem[] => {
         imageSize: row["输出分辨率"] || EXCEL_TABLE_ITEM_DEFAULT.imageSize,
 
         productImage: row["产品图片"]
-          ? [findMaterialImage(props.materialList, "product", row["产品图片"])]
+          ? findMaterialImage(props.materialList, "product", row["产品图片"])
           : [],
         templateImage: row["模板图片"]
-          ? [findMaterialImage(props.materialList, "template", row["模板图片"])]
+          ? findMaterialImage(props.materialList, "template", row["模板图片"])
           : [],
         fullGiftImages: row["全场满赠-图片"]
-          ? [
-              findMaterialImage(
-                props.materialList,
-                "gift",
-                row["全场满赠-图片"]
-              )
-            ]
+          ? findMaterialImage(props.materialList, "gift", row["全场满赠-图片"])
           : [],
         campaignLogoImage: row["活动LOGO"]
-          ? [
-              findMaterialImage(
-                props.materialList,
-                "activityLogo",
-                row["活动LOGO"]
-              )
-            ]
+          ? findMaterialImage(
+              props.materialList,
+              "activityLogo",
+              row["活动LOGO"]
+            )
           : [],
         shopLogoImage: row["店铺LOGO"]
-          ? [findMaterialImage(props.materialList, "shopLogo", row["店铺LOGO"])]
+          ? findMaterialImage(props.materialList, "shopLogo", row["店铺LOGO"])
           : []
       };
 
@@ -294,8 +286,14 @@ const findMaterialImage = (
   const material = materialList[imageType]?.find((item: any) =>
     item.objectName.includes("/" + imageUrl + ".")
   );
-  console.log(materialList, imageType, imageUrl, material);
-  return material?.objectName || null;
+  // console.log(
+  //   "在素材库寻找是否有符合要求的图片:",
+  //   materialList,
+  //   imageType,
+  //   imageUrl,
+  //   material
+  // );
+  return material?.objectName ? [material?.objectName] : [];
 };
 //#endregion
 

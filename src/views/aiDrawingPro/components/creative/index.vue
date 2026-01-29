@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, onUnmounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   downloadFile,
@@ -55,8 +55,8 @@ const handleFileChange = file => {
   const url = URL.createObjectURL(file.raw);
 
   // 如果之前有上传的图片，释放旧的URL对象
-  if (uploadedImage.value) {
-    URL.revokeObjectURL(uploadedImage.value);
+  if (imageUrl.value) {
+    URL.revokeObjectURL(imageUrl.value);
   }
 
   // 更新上传的图片和URL
@@ -65,6 +65,17 @@ const handleFileChange = file => {
 
   return false; // 阻止自动上传
 };
+
+onUnmounted(() => {
+  // 释放上传图片的URL
+  if (imageUrl.value) {
+    URL.revokeObjectURL(imageUrl.value);
+  }
+  // 释放结果图片的URL（如果有的话）
+  if (resultPicture.value && resultPicture.value.startsWith("blob:")) {
+    URL.revokeObjectURL(resultPicture.value);
+  }
+});
 
 //#region 调用AI接口逻辑
 // 直接对接AI服务器的方法，保留原始逻辑，以后可能会用到
@@ -191,9 +202,7 @@ const handleGenerateClick = async () => {
           ElMessage.success("生成完成");
         } else {
           ElMessage.error("生成失败:" + "Gemini timeout...");
-          return;
         }
-        ElMessage.success("生成完成");
       } else {
         ElMessage.error("生成失败:" + res.message);
       }
@@ -233,7 +242,7 @@ const formatParams = async () => {
 
 // 下载图片
 const handleDownloadClick = () => {
-  ElMessage({
+  const msg = ElMessage({
     message: "图片下载中，请稍后...",
     duration: 0
   });
@@ -243,7 +252,8 @@ const handleDownloadClick = () => {
     })
     .catch(() => {
       ElMessage.error("图片下载失败");
-    });
+    })
+    .finally(() => msg.close());
 };
 
 // 保存到素材库

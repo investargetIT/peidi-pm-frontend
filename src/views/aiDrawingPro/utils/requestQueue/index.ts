@@ -231,20 +231,9 @@ export class RequestQueueManager {
 
     this.currentRunning++;
 
-    // 创建执行Promise - 修复变量提升问题
-    let executionPromise: Promise<T>;
-    executionPromise = (async () => {
+    const startTime = Date.now();
+    const executionPromise = (async () => {
       try {
-        // 记录开始时间
-        const startTime = Date.now();
-
-        // 添加到正在执行的请求映射
-        this.runningRequests.set(requestKey, {
-          id: queueItem.id,
-          promise: executionPromise,
-          startTime
-        });
-
         // console.log(`开始执行请求 ${queueItem.id}，当前运行数: ${this.currentRunning}`);
 
         // 调用外部传入的处理函数
@@ -261,6 +250,13 @@ export class RequestQueueManager {
         this.completeRequest(requestKey);
       }
     })();
+
+    // 在 promise 已创建后立即登记，闭合竞态窗口
+    this.runningRequests.set(requestKey, {
+      id: queueItem.id,
+      promise: executionPromise,
+      startTime
+    });
 
     // 等待请求完成
     await executionPromise;

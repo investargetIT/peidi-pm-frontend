@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { PropType } from "vue";
+
 const props = defineProps({
   paginationConfig: {
     type: Object as PropType<{

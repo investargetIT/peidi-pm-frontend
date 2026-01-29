@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { provide, ref, watch } from "vue";
+import { onUnmounted, provide, ref, watch } from "vue";
 import { downloadFile } from "@/api/aiDraw";
 import { ElMessage } from "element-plus";
 import Material from "./components/material/index.vue";
@@ -214,6 +214,11 @@ const initCreativeStudio = (url: string) => {
   creativeTabRef.value?.initCreativeStudio(url);
 };
 provide("initCreativeStudio", initCreativeStudio);
+
+// 在组件卸载时清理所有 Blob URL
+onUnmounted(() => {
+  blobManager.releaseAll();
+});
 </script>
 
 <template>
@@ -222,14 +227,14 @@ provide("initCreativeStudio", initCreativeStudio);
     v-model="activeTab"
     class="peidi-el-tabs-modern-tabs"
   >
-    <el-tab-pane label="绘图" name="Drawing"
-      ><Drawing ref="drawingTabRef" />
+    <el-tab-pane label="绘图" name="Drawing" lazy>
+      <Drawing ref="drawingTabRef" />
     </el-tab-pane>
-    <el-tab-pane label="素材库" name="Material"
-      ><Material ref="materialTabRef" />
+    <el-tab-pane label="素材库" name="Material" lazy>
+      <Material ref="materialTabRef" />
     </el-tab-pane>
-    <el-tab-pane label="创意工作室" name="Creative"
-      ><Creative ref="creativeTabRef"
-    /></el-tab-pane>
+    <el-tab-pane label="创意工作室" name="Creative">
+      <Creative ref="creativeTabRef" />
+    </el-tab-pane>
   </el-tabs>
 </template>

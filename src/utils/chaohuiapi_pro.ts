@@ -61,6 +61,8 @@ export const chaohuilogin = () => {
             sid,
             postUrl: `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Upload&method=upload&version=2&_sid=${sid}`
           });
+        } else {
+          reject(new Error("登录失败：未获取到 SID"));
         }
       })
       .catch(err => {
@@ -75,6 +77,8 @@ export const chaohuilogin = () => {
                 sid,
                 postUrl: `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Upload&method=upload&version=2&_sid=${sid}`
               });
+            } else {
+              reject(new Error("登录失败：未获取到 SID"));
             }
           })
           .catch(err => {
@@ -84,6 +88,7 @@ export const chaohuilogin = () => {
                 type: "error"
               }
             );
+            reject(err);
           });
       });
   });

@@ -225,8 +225,7 @@ watch(
       // console.log("分页参数改变:", newCurrentPage, newPageSize);
       fetchAiDrawPage();
     }
-  },
-  { immediate: true }
+  }
 );
 //#endregion
 
