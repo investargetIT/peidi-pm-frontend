@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import OnlineImg from "../../common/onlineImg.vue";
+import ClickRateCharts from "./clickRateCharts.vue";
 import { getNameFromObjectName } from "../../utils/general/index";
 import { deleteMaterial } from "@/api/aiDraw";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -19,6 +20,10 @@ const props = defineProps({
     required: true
   },
   handleCreate: {
+    type: Function,
+    required: true
+  },
+  handleClickRate: {
     type: Function,
     required: true
   }
@@ -87,11 +92,25 @@ const handleDelete = () => {
           >
             创意
           </el-button>
+          <el-button
+            type="warning"
+            @click="props.handleClickRate(props.data)"
+            text
+            v-if="getMTType === 'resultImage'"
+          >
+            点击率
+          </el-button>
         </div>
       </template>
 
-      <div class="flex justify-center items-center">
-        <OnlineImg :url="props.data.objectName" size="180px" />
+      <div class="flex flex-col justify-center items-center">
+        <div>
+          <OnlineImg :url="props.data.objectName" size="200px" />
+        </div>
+
+        <div class="w-full mt-[10px]" v-if="getMTType === 'resultImage'">
+          <ClickRateCharts :sourceData="props.data" />
+        </div>
       </div>
     </el-card>
   </div>

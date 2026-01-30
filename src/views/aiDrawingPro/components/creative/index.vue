@@ -19,6 +19,7 @@ import {
 import { fileToBase64, downloadImageFromUrl } from "../../utils/general";
 import { imageCache } from "../../utils/imageCache";
 import { blobManager } from "../../utils/blobManager";
+import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterialLibrary";
 
 const loading = ref(false);
 const aiModel = ref("nano-banana-pro");
@@ -258,102 +259,12 @@ const handleDownloadClick = () => {
 
 // 保存到素材库
 const handleSaveToMaterialLibraryClick = () => {
-  ElMessageBox.prompt("请输入模板素材名称", "保存到素材库", {
-    confirmButtonText: "保存",
-    cancelButtonText: "取消",
-    inputPattern: /.+/,
-    inputErrorMessage: "请输入模板素材名称",
-    beforeClose: async (action, instance, done) => {
-      try {
-        if (action === "confirm") {
-          const materialName = instance?.inputValue;
-          // console.log("materialName:", materialName);
+  if (!resultPicture.value) {
+    ElMessage.warning("没有可保存的图片");
+    return;
+  }
 
-          instance.confirmButtonLoading = true;
-
-          // 获取素材列表 - 获取全部素材（设置一个较大的pageSize）
-          const materialListResponse: any = await getMaterialPage({
-            pageNo: 1,
-            pageSize: 1,
-            searchStr: JSON.stringify({
-              searchName: "objectName",
-              searchType: "like",
-              searchValue: "/" + materialName + "."
-            })
-          });
-
-          if (materialListResponse.data?.total > 0) {
-            ElMessage.error("素材名称已存在");
-            instance.confirmButtonLoading = false;
-            return;
-          }
-
-          // 将当前图片URL转换为File对象进行上传
-          const response = await fetch(resultPicture.value);
-          const blob = await response.blob();
-
-          // 获取文件扩展名
-          const contentType = blob.type;
-          let extension = "";
-          if (contentType === "image/jpeg") {
-            extension = ".jpg";
-          } else if (contentType === "image/png") {
-            extension = ".png";
-          } else if (contentType === "image/gif") {
-            extension = ".gif";
-          } else if (contentType === "image/webp") {
-            extension = ".webp";
-          } else {
-            // 根据URL推断扩展名
-            const urlExt = resultPicture.value.substring(
-              resultPicture.value.lastIndexOf(".")
-            );
-            extension = urlExt.includes(".") ? urlExt : ".png";
-          }
-
-          // 创建新的File对象，使用用户输入的名称
-          const file = new File([blob], materialName + extension, {
-            type: contentType
-          });
-
-          const formData = new FormData();
-          formData.append("file", file);
-
-          // console.log("formData:", formData);
-
-          // 上传图片到服务器
-          const uploadRes: any = await uploadDraw(formData);
-
-          if (uploadRes.code === 200) {
-            // 上传成功后创建新素材记录
-            const newMaterialRes: any = await newMaterial({
-              objectName: uploadRes.data,
-              type: JSON.stringify({ mtype: "template" })
-            });
-
-            if (newMaterialRes.code === 200) {
-              ElMessage.success(`模板素材 "${materialName}" 已保存到素材库`);
-              instance.confirmButtonLoading = false;
-              done();
-            } else {
-              ElMessage.error("添加素材失败:" + newMaterialRes.msg);
-              instance.confirmButtonLoading = false;
-            }
-          } else {
-            ElMessage.error("图片上传失败:" + uploadRes.msg);
-            instance.confirmButtonLoading = false;
-          }
-        } else {
-          done();
-        }
-      } catch (error: any) {
-        console.error("保存到素材库失败:", error);
-        ElMessage.error("保存失败: " + error.message);
-      }
-    }
-  })
-    .then(({ value }) => {})
-    .catch(() => {});
+  saveToMaterialLibrary(resultPicture.value, "template");
 };
 
 /**

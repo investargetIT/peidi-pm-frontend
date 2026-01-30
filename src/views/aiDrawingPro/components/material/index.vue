@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { inject, onMounted, ref, watch } from "vue";
+import { inject, onMounted, provide, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import RiAddLine from "@iconify-icons/ri/add-line";
-import { getMaterialPage } from "@/api/aiDraw";
+import { getClickRateTrend, getMaterialPage } from "@/api/aiDraw";
 import { MATERIAL_LIBRARY_TABS } from "../../config/material";
 import PictureCard from "./pictureCard.vue";
 import DetailForm from "./detailForm.vue";
 import ContactForm from "./contactForm.vue";
+import ClickRateForm from "./clickRateForm.vue";
+import dayjs from "dayjs";
+import { type ClickRateTrendItem } from "../../type/material";
 
 const initCreativeStudio = inject<Function>("initCreativeStudio");
 
@@ -15,6 +18,7 @@ const materialList = ref({});
 const cardData = ref([]);
 const detailFormRef = ref(null);
 const contactFormRef = ref(null);
+const clickRateFormRef = ref(null);
 
 const updateCardData = () => {
   cardData.value = materialList.value[radio.value] || [];
@@ -56,7 +60,72 @@ const fetchMaterialPage = () => {
     });
 };
 
-onMounted(() => {
+const clickRateTrend = ref({});
+provide("clickRateTrend", clickRateTrend);
+const fetchClickRateTrend = () => {
+  const searchStrTemp = [
+    {
+      searchName: "date",
+      searchType: "betweenStr",
+      // 本周
+      searchValue: [
+        dayjs().startOf("week").add(1, "day").format("YYYY-MM-DD"),
+        dayjs().endOf("week").add(1, "day").format("YYYY-MM-DD")
+      ]
+        .map(date => dayjs(date).format("YYYY-MM-DD"))
+        .join(",")
+    }
+  ];
+  return getClickRateTrend({
+    pageNo: 1,
+    pageSize: 10e4,
+    searchStr: JSON.stringify(searchStrTemp)
+  })
+    .then((res: any) => {
+      if (res.code === 200) {
+        const temp = {};
+        const firstDay = dayjs()
+          .startOf("week")
+          .add(1, "day")
+          .format("YYYY-MM-DD"); // 本周一
+        // console.log("天数差:", dayjs().diff(firstDay, "day"));
+        // 数据清洗
+        res.data.records.forEach((item: ClickRateTrendItem) => {
+          if (temp[item.unitId]) {
+            temp[item.unitId].clickCounts[
+              dayjs(item.date).diff(firstDay, "day")
+            ] = item.clickCount;
+
+            temp[item.unitId].conversionRates[
+              dayjs(item.date).diff(firstDay, "day")
+            ] = item.conversionRate;
+          } else {
+            temp[item.unitId] = {
+              channel: item.channel,
+              imageOss: item.imageOss,
+              imageUrl: item.imageUrl,
+              productName: item.productName,
+              shopName: item.shopName,
+              unitId: item.unitId,
+              clickCounts: Array(7).fill(0),
+              conversionRates: Array(7).fill(0)
+            };
+          }
+        });
+
+        // console.log("获取点击率趋势:", temp);
+        clickRateTrend.value = temp;
+      } else {
+        ElMessage.error("获取点击率趋势失败:" + res.msg);
+      }
+    })
+    .catch(error => {
+      ElMessage.error("获取点击率趋势失败:" + error.message);
+    });
+};
+
+onMounted(async () => {
+  await fetchClickRateTrend();
   fetchMaterialPage();
 });
 
@@ -76,6 +145,10 @@ const handleAddMaterial = () => {
 
 const handleContact = (data: any) => {
   contactFormRef.value.initContactForm(data);
+};
+
+const handleClickRate = (data: any) => {
+  clickRateFormRef.value.initClickRateForm(data);
 };
 
 const handleCreate = (data: any) => {
@@ -125,6 +198,7 @@ defineExpose({
           :fetchMaterialPage="fetchMaterialPage"
           :handleContact="handleContact"
           :handleCreate="handleCreate"
+          :handleClickRate="handleClickRate"
         />
       </el-space>
     </div>
@@ -142,6 +216,14 @@ defineExpose({
       <ContactForm
         ref="contactFormRef"
         :materialList="materialList"
+        :fetchMaterialPage="fetchMaterialPage"
+      />
+    </div>
+
+    <div>
+      <ClickRateForm
+        ref="clickRateFormRef"
+        :clickRateTrend="clickRateTrend"
         :fetchMaterialPage="fetchMaterialPage"
       />
     </div>

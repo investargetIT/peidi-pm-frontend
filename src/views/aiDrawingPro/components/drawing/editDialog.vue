@@ -8,13 +8,14 @@ import {
   watch,
   inject
 } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import DEFAULT_IMG from "../../assests/images/default.png";
 import { snapdom } from "@zumer/snapdom";
 import { loadImage } from "../../utils/imageLoader";
 import { type ImageDataResult } from "../../utils/compressImage";
 import { type ExcelTableItem } from "../../type/drawing";
 import { blobManager } from "../../utils/blobManager";
+import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterialLibrary";
 
 // 注入顶层缓存管理函数
 const imageCacheManager = inject("imageCacheManager") as {
@@ -470,6 +471,18 @@ const handleCapture = async () => {
 
     // 获取PNG图像
     const img = await capture.toPng();
+
+    ElMessageBox.confirm("是否保存结果至素材库？", "提示", {
+      confirmButtonText: "是",
+      cancelButtonText: "否",
+      type: "warning"
+    })
+      .then(() => {
+        saveToMaterialLibrary(img.src, "resultImage", {
+          fromProduct: selectedRow.value.productName
+        });
+      })
+      .catch(() => {});
 
     // 可选：自动下载
     await capture.download({
