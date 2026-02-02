@@ -2,6 +2,7 @@
 import { inject, Ref, ref, watch } from "vue";
 import ChartCard from "@/components/PdChart/index.vue";
 import { generateID } from "../../utils/general";
+import dayjs from "dayjs";
 
 const props = defineProps({
   sourceData: {
@@ -52,7 +53,7 @@ const channelDistributionByTotalAmountCards = ref({
       splitLine: {
         show: false
       },
-      data: ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+      data: []
     },
     yAxis: {
       type: "value",
@@ -118,6 +119,12 @@ watch(
     if (newVal) {
       const clickRateInfoTemp = JSON.parse(newVal.type)?.clickRateInfo;
       if (clickRateInfoTemp) {
+        const xAxisData = [];
+        for (let i = 7; i > 0; i--) {
+          xAxisData.push(dayjs().subtract(i, "day").format("MM-DD"));
+        }
+        let yAxisData = [0, 0, 0, 0, 0, 0, 0];
+
         clickRateInfo.value = clickRateInfoTemp;
         // console.log("点击率图表:", clickRateInfo.value, clickRateTrend.value);
 
@@ -125,15 +132,27 @@ watch(
           clickRateTrend.value[clickRateInfoTemp.unitId] &&
           clickRateTrend.value[clickRateInfoTemp.unitId].clickCounts.length
         ) {
-          channelDistributionByTotalAmountCards.value.option.series[0].data =
-            clickRateTrend.value[clickRateInfoTemp.unitId].clickCounts.map(
-              item => (item * 100).toFixed(1)
-            );
-        } else {
-          channelDistributionByTotalAmountCards.value.option.series[0].data = [
-            0, 0, 0, 0, 0, 0, 0
-          ];
+          yAxisData = clickRateTrend.value[
+            clickRateInfoTemp.unitId
+          ].clickCounts.map(item => (item * 100).toFixed(1));
         }
+
+        channelDistributionByTotalAmountCards.value = {
+          ...channelDistributionByTotalAmountCards.value,
+          option: {
+            ...channelDistributionByTotalAmountCards.value.option,
+            xAxis: {
+              ...channelDistributionByTotalAmountCards.value.option.xAxis,
+              data: xAxisData
+            },
+            series: [
+              {
+                ...channelDistributionByTotalAmountCards.value.option.series[0],
+                data: yAxisData
+              }
+            ]
+          }
+        };
       }
     }
   },

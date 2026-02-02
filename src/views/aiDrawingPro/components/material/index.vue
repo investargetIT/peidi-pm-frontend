@@ -67,10 +67,10 @@ const fetchClickRateTrend = () => {
     {
       searchName: "date",
       searchType: "betweenStr",
-      // 本周
+      // 近7天（不包含当前天）
       searchValue: [
-        dayjs().startOf("week").add(1, "day").format("YYYY-MM-DD"),
-        dayjs().endOf("week").add(1, "day").format("YYYY-MM-DD")
+        dayjs().subtract(7, "day").format("YYYY-MM-DD"),
+        dayjs().subtract(1, "day").format("YYYY-MM-DD")
       ]
         .map(date => dayjs(date).format("YYYY-MM-DD"))
         .join(",")
@@ -84,21 +84,18 @@ const fetchClickRateTrend = () => {
     .then((res: any) => {
       if (res.code === 200) {
         const temp = {};
-        const firstDay = dayjs()
-          .startOf("week")
-          .add(1, "day")
-          .format("YYYY-MM-DD"); // 本周一
+        const firstDay = dayjs().subtract(7, "day").format("YYYY-MM-DD");
         // console.log("天数差:", dayjs().diff(firstDay, "day"));
         // 数据清洗
         res.data.records.forEach((item: ClickRateTrendItem) => {
-          if (temp[item.unitId]) {
-            temp[item.unitId].clickCounts[
-              dayjs(item.date).diff(firstDay, "day")
-            ] = item.clickCount;
+          const dayIndex = dayjs(item.date).diff(firstDay, "day");
 
-            temp[item.unitId].conversionRates[
-              dayjs(item.date).diff(firstDay, "day")
-            ] = item.conversionRate;
+          if (temp[item.unitId]) {
+            // 确保索引在有效范围内
+            if (dayIndex >= 0 && dayIndex < 7) {
+              temp[item.unitId].clickCounts[dayIndex] = item.clickCount;
+              temp[item.unitId].conversionRates[dayIndex] = item.conversionRate;
+            }
           } else {
             temp[item.unitId] = {
               channel: item.channel,
@@ -110,6 +107,11 @@ const fetchClickRateTrend = () => {
               clickCounts: Array(7).fill(0),
               conversionRates: Array(7).fill(0)
             };
+            // 设置当前数据点
+            if (dayIndex >= 0 && dayIndex < 7) {
+              temp[item.unitId].clickCounts[dayIndex] = item.clickCount;
+              temp[item.unitId].conversionRates[dayIndex] = item.conversionRate;
+            }
           }
         });
 
