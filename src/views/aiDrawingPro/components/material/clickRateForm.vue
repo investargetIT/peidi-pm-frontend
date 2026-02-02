@@ -139,6 +139,7 @@ defineExpose({
         <el-form-item label="主图库" class="mt-4" prop="product">
           <div
             class="bg-gray-50 p-4 rounded-lg border border-dashed border-gray-300"
+            v-if="productConfigUrls.length > 0"
           >
             <el-scrollbar height="380px">
               <el-space wrap :size="30">
@@ -177,6 +178,7 @@ defineExpose({
               </el-space>
             </el-scrollbar>
           </div>
+          <div v-else class="text-gray-500">本周暂无数据</div>
         </el-form-item>
 
         <el-form-item class="mt-6">

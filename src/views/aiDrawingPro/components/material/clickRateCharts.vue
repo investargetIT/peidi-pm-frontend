@@ -81,13 +81,15 @@ const channelDistributionByTotalAmountCards = ref({
               type: "max",
               itemStyle: {
                 color: "rgb(34, 197, 94)" // 绿色表示最高点
-              }
+              },
+              symbolSize: 48
             },
             {
               type: "min",
               itemStyle: {
                 color: "rgb(239, 68, 68)" // 红色表示最低点
-              }
+              },
+              symbolSize: 48
             }
           ],
           label: {
@@ -119,10 +121,19 @@ watch(
         clickRateInfo.value = clickRateInfoTemp;
         // console.log("点击率图表:", clickRateInfo.value, clickRateTrend.value);
 
-        channelDistributionByTotalAmountCards.value.option.series[0].data =
-          clickRateTrend.value[clickRateInfoTemp.unitId].clickCounts.map(item =>
-            (item * 100).toFixed(1)
-          );
+        if (
+          clickRateTrend.value[clickRateInfoTemp.unitId] &&
+          clickRateTrend.value[clickRateInfoTemp.unitId].clickCounts.length
+        ) {
+          channelDistributionByTotalAmountCards.value.option.series[0].data =
+            clickRateTrend.value[clickRateInfoTemp.unitId].clickCounts.map(
+              item => (item * 100).toFixed(1)
+            );
+        } else {
+          channelDistributionByTotalAmountCards.value.option.series[0].data = [
+            0, 0, 0, 0, 0, 0, 0
+          ];
+        }
       }
     }
   },
