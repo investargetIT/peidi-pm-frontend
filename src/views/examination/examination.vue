@@ -53,7 +53,7 @@ import { getExaminationList, getModifyUser, updateExamination } from '@/api/pmAp
 import { dayjs, ElMessage } from 'element-plus'
 
 const examList = ref([])
-const selectedMonth = ref(dayjs().format('YYYY-MM'))
+const selectedMonth = ref(dayjs().subtract(1, 'month').format('YYYY-MM'))
 // 修改 months 数组，使其值与 examList 中的 month 属性的月份部分匹配
 const months = ref([
   { label: '1月', value: '01' },
