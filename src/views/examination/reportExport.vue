@@ -4,6 +4,7 @@ import { getExaminationRecordResult } from "@/api/pmApi";
 import { Download } from "@element-plus/icons-vue";
 import { exportExaminationTable, formatNumber } from "./utils/export";
 import { ElMessage, ElLoading } from "element-plus";
+import dayjs from "dayjs";
 
 const loading = ref(false);
 const monthList = ref([]);
@@ -17,7 +18,16 @@ const searchForm = ref({
 
 // 处理搜索参数
 const handleSearchParams = () => {
-  const searchStr: any = [];
+  const searchStr: any = [
+    {
+      searchName: "month",
+      searchType: "betweenStr",
+      searchValue: [
+        dayjs().startOf("year").format("YYYY-MM-DD"),
+        dayjs().endOf("year").format("YYYY-MM-DD")
+      ].join(",")
+    }
+  ];
   if (searchForm.value.userName) {
     searchStr.push({
       searchName: "userName",
@@ -249,7 +259,7 @@ onMounted(() => {
           min-width="150px"
         />
         <el-table-column prop="dataType" label="数据类型" min-width="100px" />
-        <el-table-column prop="dataSum" label="当前数据合计" min-width="150px">
+        <el-table-column prop="dataSum" label="当年数据合计" min-width="150px">
           <template #default="scope">
             {{ formatNumber(scope.row.dataSum) }}
           </template>
