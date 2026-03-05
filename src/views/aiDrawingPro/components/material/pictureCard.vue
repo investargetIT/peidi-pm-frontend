@@ -26,6 +26,10 @@ const props = defineProps({
   handleClickRate: {
     type: Function,
     required: true
+  },
+  handleDescriptorInfo: {
+    type: Function,
+    required: true
   }
 });
 
@@ -91,6 +95,14 @@ const handleDelete = () => {
             v-if="getMTType === 'template'"
           >
             创意
+          </el-button>
+          <el-button
+            type="primary"
+            @click="props.handleDescriptorInfo(props.data)"
+            text
+            v-if="getMTType === 'template'"
+          >
+            描述词
           </el-button>
           <el-button
             type="warning"

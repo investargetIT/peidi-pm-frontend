@@ -155,6 +155,24 @@ const handleProductImageChange = () => {
   }
 };
 
+// 处理模板图片选择变化
+const handleTemplateImageChange = () => {
+  const template = props.materialList["template"].find(
+    item => item.objectName === editingRowData.value!.templateImage[0]
+  );
+  if (template) {
+    const descriptorInfo = JSON.parse(template.type)?.descriptorInfo || {};
+    // console.log("descriptorInfo", descriptorInfo);
+
+    editingRowData.value.descriptor = descriptorInfo?.descriptor;
+    editingRowData.value.mapping = descriptorInfo?.mapping;
+  }
+  function formatData(data: string | null | undefined) {
+    if (data) return [data];
+    return [];
+  }
+};
+
 const handleUploadExcel = () => {
   // 创建隐藏的文件输入元素
   const input = document.createElement("input");
@@ -645,6 +663,32 @@ const handleDownloadTemplate = () => {
         </template>
       </el-table-column>
 
+      <!-- 参数对照 -->
+      <el-table-column
+        :resizable="false"
+        prop="mapping"
+        label="参数对照"
+        width="150"
+      >
+        <template #default="{ row, $index }">
+          <template v-if="editingRowIndex === $index">
+            <el-input
+              v-model="editingRowData!.mapping"
+              type="textarea"
+              :rows="TABLE_ROW_HEIGHT"
+            />
+          </template>
+          <template v-else>
+            <el-scrollbar
+              height="300px"
+              style="white-space: pre-wrap; word-break: break-all"
+            >
+              {{ row.mapping }}
+            </el-scrollbar>
+          </template>
+        </template>
+      </el-table-column>
+
       <!-- 备注 -->
       <el-table-column
         :resizable="false"
@@ -661,7 +705,12 @@ const handleDownloadTemplate = () => {
             />
           </template>
           <template v-else>
-            {{ row.remark }}
+            <el-scrollbar
+              height="300px"
+              style="white-space: pre-wrap; word-break: break-all"
+            >
+              {{ row.remark }}
+            </el-scrollbar>
           </template>
         </template>
       </el-table-column>
@@ -679,6 +728,7 @@ const handleDownloadTemplate = () => {
               <el-select
                 v-model="editingRowData!.templateImage[0]"
                 placeholder="请选择"
+                @change="handleTemplateImageChange"
               >
                 <el-option
                   v-for="item in materialList['template']"
@@ -902,6 +952,32 @@ const handleDownloadTemplate = () => {
         </template>
       </el-table-column>
 
+      <!-- 描述词 -->
+      <el-table-column
+        :resizable="false"
+        prop="descriptor"
+        label="描述词"
+        width="150"
+      >
+        <template #default="{ row, $index }">
+          <template v-if="editingRowIndex === $index">
+            <el-input
+              v-model="editingRowData!.descriptor"
+              type="textarea"
+              :rows="TABLE_ROW_HEIGHT"
+            />
+          </template>
+          <template v-else>
+            <el-scrollbar
+              height="300px"
+              style="white-space: pre-wrap; word-break: break-all"
+            >
+              {{ row.descriptor }}
+            </el-scrollbar>
+          </template>
+        </template>
+      </el-table-column>
+
       <!-- 结果图片 -->
       <el-table-column
         :resizable="false"
@@ -928,7 +1004,7 @@ const handleDownloadTemplate = () => {
             <p class="text-[12px] text-red-500">生成失败！</p>
           </div>
 
-          <el-scrollbar height="210px">
+          <el-scrollbar height="300px">
             <div v-for="(image, index) in row.resultImages" :key="index">
               <div
                 class="peidi-aiDrawingPro-tableDataCard-resultImages-container flex justify-around items-center mb-[8px]"

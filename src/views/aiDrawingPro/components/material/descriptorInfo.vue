@@ -1,42 +1,116 @@
 <script setup lang="ts">
-import { transferGemini } from "@/api/aiDraw";
-import imageUrl1 from "./assets/绘图1.png";
-import imageUrl2 from "./assets/绘图2.jpg";
+import { ElMessage, FormInstance, FormRules } from "element-plus";
+import { nextTick, reactive, ref } from "vue";
+import { updateMaterial, transferGemini, downloadFile } from "@/api/aiDraw";
+import { Pointer } from "@element-plus/icons-vue";
+// import imageUrl1 from "@/views/debug/assets/绘图1.png";
+// import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 
-// 将图片 URL 转换为 base64
-const imageToBase64 = (imageUrl: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("无法获取 canvas 上下文"));
-        return;
-      }
-      ctx.drawImage(img, 0, 0);
-      const base64 = canvas.toDataURL("image/png");
-      resolve(base64);
-    };
-    img.onerror = () => {
-      reject(new Error("图片加载失败"));
-    };
-    img.src = imageUrl;
+const props = defineProps({
+  fetchMaterialPage: {
+    type: Function,
+    required: true
+  }
+});
+
+const dialogVisible = ref(false);
+const loading = ref(false);
+const geminiLoading = ref(false);
+
+const materialData = ref(null);
+
+const ruleFormRef = ref<FormInstance>();
+const ruleForm = reactive({
+  descriptor: "",
+  mapping: ""
+});
+const rules = reactive<FormRules>({});
+
+const initDetailForm = (data: any) => {
+  materialData.value = data;
+  dialogVisible.value = true;
+  geminiLoading.value = false;
+
+  nextTick(() => {
+    ruleFormRef.value?.resetFields();
+    const descriptorInfo = JSON.parse(materialData.value.type)?.descriptorInfo;
+    if (descriptorInfo) {
+      Object.keys(descriptorInfo).forEach(key => {
+        ruleForm[key] = descriptorInfo[key];
+      });
+    }
   });
 };
-// 测试中转gemini模型
-const testTransferGemini = async () => {
+
+defineExpose({ initDetailForm });
+
+const submitForm = async (formEl: FormInstance | undefined) => {
+  // console.log("描述词:", materialData.value);
+  // return;
+  if (!formEl) return;
+  await formEl.validate((valid, fields) => {
+    if (valid) {
+      loading.value = true;
+      // console.log("ruleForm:", ruleForm, materialData.value);
+      const type = JSON.parse(materialData.value.type);
+      const temp = {
+        ...materialData.value,
+        type: JSON.stringify({
+          ...type,
+          descriptorInfo: ruleForm
+        })
+      };
+      // console.log("submitForm:", temp);
+      updateMaterial(temp)
+        .then((res: any) => {
+          if (res.code === 200) {
+            ElMessage.success("描述词保存成功");
+            props.fetchMaterialPage();
+            dialogVisible.value = false;
+          } else {
+            ElMessage.error("保存描述词失败:" + res?.msg);
+          }
+        })
+        .catch(error => {
+          ElMessage.error("保存描述词失败:" + error.message);
+        })
+        .finally(() => {
+          loading.value = false;
+        });
+    } else {
+      // console.log("error submit!", fields);
+    }
+  });
+};
+
+//#region 调用AI相关
+// 获取图片数据
+async function getBase64(url: string) {
+  return new Promise((resolve, reject) => {
+    downloadFile({ objectName: url })
+      .then((res: any) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          // console.log("getBase64", reader.result);
+          resolve(reader.result as string);
+        };
+        reader.onerror = () => {
+          reject(reader.error);
+        };
+        reader.readAsDataURL(res);
+      })
+      .catch(reject);
+  });
+}
+const handleGenerateDescriptor = async () => {
   // 转换图片为 base64
-  let base64Url1 = "";
-  let base64Url2 = "";
+  let base64Url1: any = "";
+  let base64Url2: any = "";
 
   try {
     [base64Url1, base64Url2] = await Promise.all([
-      imageToBase64(imageUrl1),
-      imageToBase64(imageUrl2)
+      getBase64("ai/draw/origin/京东模板_test_26191136.png"),
+      getBase64(materialData.value.objectName)
     ]);
   } catch (error) {
     console.error("图片转 base64 失败:", error);
@@ -182,7 +256,7 @@ const prompt = \`
 
 针对通用模板，有一份专属的描述词：
 const descriptor = \`
-【必须执行的抹除规则】 1. 抹除中间左侧红色边框模块（整体抹除边框、背景、内部文字、图片，还原为绿底）。 2. 抹除中间独立产品图及下方阴影。 3. 抹除中间右侧草坪及草坪上的产品图，还原绿底。 4. 抹除右上角圆形店铺 LOGO 及其底色。 5. 整体抹除左上角品牌与活动 LOGO 区域（包括 LOGO 本身及中间的竖线），还原绿底。 【文本映射与排版规则（必须将变量替换为实际文本内容！）】 1. 顶部主标题映射：将原“特色酥骨工艺 蜜汁兔脊”替换为变量 {item.normalSellingPoints}。其中如果包含变量 {item.highlightedSellingPoints} 的内容，该部分文字需标为橙红色。注意：排版时右侧不能越过右上角原圆形 LOGO 的占位区域，过长需换行或缩小。 2. 标题下方绿色胶囊框文字映射：将原“兔脊骨120g”替换为变量 {item.productName}。注意：承载该文字的绿色背景方块必须完整保留，且必须为纯绿色，不准变色。 3. 底部红色价格栏映射：左下角文字替换为“{item.handPriceTitle} {item.handPrice}”。 4. 底部红色优惠栏映射：正下方文字替换为 {item.profitPoints}。 5. 底部黑色小字映射：替换为 {item.activityTime}。          
+【必须执行的抹除规则】 1. 抹除中间左侧红色边框模块（整体抹除边框、背景、内部文字、图片，还原为绿底）。 2. 抹除中间独立产品图及下方阴影。 3. 抹除中间右侧草坪及草坪上的产品图，还原绿底。 4. 抹除右上角圆形店铺 LOGO 及其底色。 5. 整体抹除左上角品牌与活动 LOGO 区域（包括 LOGO 本身及中间的竖线），还原绿底。 【文本映射与排版规则（必须将变量替换为实际文本内容！）】 1. 顶部主标题映射：将原“特色酥骨工艺 蜜汁兔脊”替换为变量 {item.normalSellingPoints}。其中如果包含变量 {item.highlightedSellingPoints} 的内容，该部分文字需标为橙红色。注意：排版时右侧不能越过右上角原圆形 LOGO 的占位区域，过长需换行或缩小。 2. 标题下方绿色胶囊框文字映射：将原“兔脊骨120g”替换为变量 {item.productName}。注意：承载该文字的绿色背景方块必须完整保留，且必须为纯绿色，不准变色。 3. 底部红色价格栏映射：左下角文字替换为“{item.handPriceTitle} {item.handPrice}”。 4. 底部红色优惠栏映射：正下方文字替换为 {item.profitPoints}。 5. 底部黑色小字映射：替换为 {item.activityTime}。
 \`
 `
           },
@@ -203,23 +277,107 @@ const descriptor = \`
     ]
   };
 
+  geminiLoading.value = true;
   transferGemini({
     urlParam: JSON.stringify(params)
-  }).then((res: any) => {
-    // console.log("中转gemini模型:", res);
-    if (res.code === 200) {
-      const content = res.data;
-      console.log("截取后的内容:", content);
-    }
-  });
+  })
+    .then((res: any) => {
+      // console.log("中转gemini模型:", res);
+      if (res.code === 200) {
+        const content = res.data;
+        console.log("截取后的内容:", content);
+
+        try {
+          const codeBlockMatch = content.match(/```javascript\s*([\s\S]*?)```/);
+          if (codeBlockMatch && codeBlockMatch[1]) {
+            let codeContent = codeBlockMatch[1].trim();
+
+            codeContent = codeContent.replace(/const\s+result\s*=\s*/, "");
+
+            codeContent = codeContent.replace(/`([^`]*)`/g, (match, p1) => {
+              return JSON.stringify(p1);
+            });
+
+            const result = JSON.parse(codeContent);
+
+            console.log("解析出的 result:", result);
+
+            if (result.new_descriptor) {
+              ruleForm.descriptor = result.new_descriptor.trim();
+            }
+
+            if (result.new_descriptor_mapping) {
+              ruleForm.mapping = result.new_descriptor_mapping.trim();
+            }
+
+            ElMessage.success("生成描述词成功");
+          } else {
+            throw new Error("未找到 JavaScript 代码块");
+          }
+        } catch (error) {
+          console.error("解析 AI 返回内容失败:", error);
+          ElMessage.error("解析 AI 返回内容失败：" + (error as Error).message);
+        }
+      } else {
+        ElMessage.error("生成描述词失败:" + res?.msg);
+      }
+    })
+    .catch(err => {
+      ElMessage.error("生成描述词失败:" + err.message);
+    })
+    .finally(() => {
+      geminiLoading.value = false;
+    });
 };
+//#endregion
 </script>
 
 <template>
   <div>
-    <h4>debug</h4>
-    <el-button type="primary" @click="testTransferGemini">
-      testTransferGemini
-    </el-button>
+    <el-dialog
+      v-model="dialogVisible"
+      title="描述词"
+      width="600"
+      :close-on-click-modal="false"
+      append-to-body
+      align-center
+    >
+      <el-form
+        ref="ruleFormRef"
+        style="max-width: 600px"
+        :model="ruleForm"
+        :rules="rules"
+        label-width="auto"
+      >
+        <el-form-item label="" prop="">
+          <el-button
+            :icon="Pointer"
+            type="primary"
+            @click="handleGenerateDescriptor"
+            :loading="geminiLoading"
+          >
+            生成描述词
+          </el-button>
+        </el-form-item>
+        <el-form-item label="描述词" prop="descriptor">
+          <el-input type="textarea" :rows="16" v-model="ruleForm.descriptor" />
+        </el-form-item>
+        <el-form-item label="参数对照" prop="mapping">
+          <el-input type="textarea" :rows="12" v-model="ruleForm.mapping" />
+        </el-form-item>
+
+        <el-form-item>
+          <div class="flex justify-end w-full">
+            <el-button
+              type="primary"
+              @click="submitForm(ruleFormRef)"
+              :loading="loading"
+            >
+              保存
+            </el-button>
+          </div>
+        </el-form-item>
+      </el-form>
+    </el-dialog>
   </div>
 </template>

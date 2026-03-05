@@ -114,3 +114,11 @@ export const getClickRateTrend = (params: AiDrawPageRequest) => {
     params
   });
 };
+
+// 中转gemini模型
+export const transferGemini = (data: { urlParam: string }) => {
+  return http.request("post", baseUrlApi("/ai/draw/transfer/gemini"), {
+    data,
+    timeout: 0
+  });
+};

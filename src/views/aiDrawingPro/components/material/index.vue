@@ -8,6 +8,7 @@ import PictureCard from "./pictureCard.vue";
 import DetailForm from "./detailForm.vue";
 import ContactForm from "./contactForm.vue";
 import ClickRateForm from "./clickRateForm.vue";
+import DescriptorInfo from "./descriptorInfo.vue";
 import dayjs from "dayjs";
 import { type ClickRateTrendItem } from "../../type/material";
 
@@ -19,6 +20,7 @@ const cardData = ref([]);
 const detailFormRef = ref(null);
 const contactFormRef = ref(null);
 const clickRateFormRef = ref(null);
+const descriptorInfoRef = ref(null);
 
 const updateCardData = () => {
   cardData.value = materialList.value[radio.value] || [];
@@ -162,6 +164,10 @@ const handleCreate = (data: any) => {
   initCreativeStudio(data.objectName);
 };
 
+const handleDescriptorInfo = (data: any) => {
+  descriptorInfoRef.value?.initDetailForm(data);
+};
+
 defineExpose({
   fetchMaterialPage
 });
@@ -201,6 +207,7 @@ defineExpose({
           :handleContact="handleContact"
           :handleCreate="handleCreate"
           :handleClickRate="handleClickRate"
+          :handleDescriptorInfo="handleDescriptorInfo"
         />
       </el-space>
     </div>
@@ -226,6 +233,13 @@ defineExpose({
       <ClickRateForm
         ref="clickRateFormRef"
         :clickRateTrend="clickRateTrend"
+        :fetchMaterialPage="fetchMaterialPage"
+      />
+    </div>
+
+    <div>
+      <DescriptorInfo
+        ref="descriptorInfoRef"
         :fetchMaterialPage="fetchMaterialPage"
       />
     </div>
