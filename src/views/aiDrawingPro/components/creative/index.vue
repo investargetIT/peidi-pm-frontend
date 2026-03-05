@@ -20,6 +20,9 @@ import { fileToBase64, downloadImageFromUrl } from "../../utils/general";
 import { imageCache } from "../../utils/imageCache";
 import { blobManager } from "../../utils/blobManager";
 import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterialLibrary";
+import PictureSizeDailog from "./pictureSizeDailog.vue";
+
+const pictureSizeDailogRef = ref(null);
 
 const loading = ref(false);
 const aiModel = ref("nano-banana-pro");
@@ -243,18 +246,7 @@ const formatParams = async () => {
 
 // 下载图片
 const handleDownloadClick = () => {
-  const msg = ElMessage({
-    message: "图片下载中，请稍后...",
-    duration: 0
-  });
-  downloadImageFromUrl(resultPicture.value)
-    .then(() => {
-      ElMessage.success("图片已下载");
-    })
-    .catch(() => {
-      ElMessage.error("图片下载失败");
-    })
-    .finally(() => msg.close());
+  pictureSizeDailogRef.value?.initDetail(resultPicture.value);
 };
 
 // 保存到素材库
@@ -527,6 +519,10 @@ defineExpose({
         </el-card>
       </el-col>
     </el-row>
+
+    <div>
+      <PictureSizeDailog ref="pictureSizeDailogRef" />
+    </div>
   </div>
 </template>
 

@@ -40,48 +40,130 @@ export const fileToBase64 = (file: File | { raw: File }): Promise<string> => {
   });
 };
 
+//#region 下载图片相关
 /**
- * 根据URL下载图片
- * @param url 图片的URL地址
+ * 根据URL下载图片，支持控制尺寸
+ * @param url 图片的 URL 地址
  * @param filename 下载后的文件名（可选）
+ * @param options 可选配置项
+ * @param options.width 目标宽度（可选，与 height 同时设置时才会缩放）
+ * @param options.height 目标高度（可选，与 width 同时设置时才会缩放）
  * @returns Promise<void>
  */
 export const downloadImageFromUrl = async (
   url: string,
-  filename?: string
+  filename?: string,
+  options?: {
+    width?: number;
+    height?: number;
+  }
 ): Promise<void> => {
   try {
-    // 如果没有提供文件名，则从URL中提取
+    // 如果没有提供文件名，则从 URL 中提取
     if (!filename) {
       const urlParts = url.split("/");
-      filename = urlParts[urlParts.length - 1].split("?")[0]; // 去除查询参数
+      filename = urlParts[urlParts.length - 1].split("?")[0];
       if (!/\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(filename)) {
-        // 如果URL中没有文件扩展名，则默认使用.png
         filename = `${generateID()}.png`;
       }
     }
 
-    // 发起网络请求获取图片blob数据
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`下载失败: ${response.status} ${response.statusText}`);
+    const shouldResize = options?.width && options?.height;
+
+    if (shouldResize) {
+      await downloadResizedImage(
+        url,
+        filename,
+        options.width!,
+        options.height!
+      );
+    } else {
+      await downloadOriginalImage(url, filename);
     }
-
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-
-    // 创建临时链接并触发下载
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-
-    // 清理资源
-    document.body.removeChild(link);
-    URL.revokeObjectURL(blobUrl);
   } catch (error) {
     console.error("下载图片时出错:", error);
     throw error;
   }
 };
+
+/**
+ * 下载原始图片
+ */
+const downloadOriginalImage = async (
+  url: string,
+  filename: string
+): Promise<void> => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`下载失败：${response.status} ${response.statusText}`);
+  }
+
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+
+  document.body.removeChild(link);
+  URL.revokeObjectURL(blobUrl);
+};
+
+/**
+ * 下载缩放后的图片
+ */
+const downloadResizedImage = async (
+  url: string,
+  filename: string,
+  width: number,
+  height: number
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = url;
+
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        reject(new Error("无法获取 canvas 上下文"));
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(blob => {
+        if (!blob) {
+          reject(new Error("Canvas 转换 Blob 失败"));
+          return;
+        }
+
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = blobUrl;
+
+        const nameParts = filename.split(".");
+        const extension = nameParts.length > 1 ? nameParts.pop() : "png";
+        const baseName = nameParts.join(".");
+        link.download = `${baseName}_${width}x${height}.${extension}`;
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+        resolve();
+      }, "image/png");
+    };
+
+    img.onerror = () => {
+      reject(new Error("图片加载失败"));
+    };
+  });
+};
+//#endregion
