@@ -16,14 +16,14 @@ export const generateID = () =>
   new Date().getTime().toString(36) + Math.random().toString(36).substring(2);
 
 /**
- * 将文件转换为base64字符串
- * @param file 文件对象或Element Plus上传组件的file对象
- * @returns Promise<string> 返回base64字符串的Promise
+ * 将文件转换为 base64 字符串
+ * @param file 文件对象或 Element Plus 上传组件的 file 对象
+ * @returns Promise<string> 返回 base64 字符串的 Promise
  */
 export const fileToBase64 = (file: File | { raw: File }): Promise<string> => {
   return new Promise((resolve, reject) => {
     try {
-      // 判断是否为Element Plus上传组件的file对象格式
+      // 判断是否为 Element Plus 上传组件的 file 对象格式
       const actualFile: File = (file as any).raw ? (file as any).raw : file;
 
       const reader = new FileReader();
@@ -42,7 +42,7 @@ export const fileToBase64 = (file: File | { raw: File }): Promise<string> => {
 
 //#region 下载图片相关
 /**
- * 根据URL下载图片，支持控制尺寸
+ * 根据 URL 下载图片，支持控制尺寸
  * @param url 图片的 URL 地址
  * @param filename 下载后的文件名（可选）
  * @param options 可选配置项
@@ -68,18 +68,7 @@ export const downloadImageFromUrl = async (
       }
     }
 
-    const shouldResize = options?.width && options?.height;
-
-    if (shouldResize) {
-      await downloadResizedImage(
-        url,
-        filename,
-        options.width!,
-        options.height!
-      );
-    } else {
-      await downloadOriginalImage(url, filename);
-    }
+    await downloadImage(url, filename, options?.width, options?.height);
   } catch (error) {
     console.error("下载图片时出错:", error);
     throw error;
@@ -87,48 +76,35 @@ export const downloadImageFromUrl = async (
 };
 
 /**
- * 下载原始图片
+ * 下载图片（支持尺寸控制）
+ * @param url 图片 URL
+ * @param filename 文件名
+ * @param width 目标宽度（不传则使用原图宽度）
+ * @param height 目标高度（不传则使用原图高度）
  */
-const downloadOriginalImage = async (
-  url: string,
-  filename: string
-): Promise<void> => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`下载失败：${response.status} ${response.statusText}`);
-  }
-
-  const blob = await response.blob();
-  const blobUrl = URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  link.href = blobUrl;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-
-  document.body.removeChild(link);
-  URL.revokeObjectURL(blobUrl);
-};
-
-/**
- * 下载缩放后的图片
- */
-const downloadResizedImage = async (
+const downloadImage = async (
   url: string,
   filename: string,
-  width: number,
-  height: number
+  width?: number,
+  height?: number
 ): Promise<void> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.src = url;
+
+    const timeoutId = setTimeout(() => {
+      reject(new Error("图片加载超时"));
+    }, 1000 * 30);
 
     img.onload = () => {
+      clearTimeout(timeoutId);
+
       const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
+      const targetWidth = width ?? img.naturalWidth;
+      const targetHeight = height ?? img.naturalHeight;
+
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
       const ctx = canvas.getContext("2d");
 
       if (!ctx) {
@@ -136,7 +112,7 @@ const downloadResizedImage = async (
         return;
       }
 
-      ctx.drawImage(img, 0, 0, width, height);
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
       canvas.toBlob(blob => {
         if (!blob) {
@@ -148,13 +124,18 @@ const downloadResizedImage = async (
         const link = document.createElement("a");
         link.href = blobUrl;
 
-        const nameParts = filename.split(".");
-        const extension = nameParts.length > 1 ? nameParts.pop() : "png";
-        const baseName = nameParts.join(".");
-        link.download = `${baseName}_${width}x${height}.${extension}`;
+        let downloadName = filename;
+        if (width && height) {
+          const nameParts = filename.split(".");
+          const extension = nameParts.length > 1 ? nameParts.pop() : "png";
+          const baseName = nameParts.join(".");
+          downloadName = `${baseName}_${width}x${height}.${extension}`;
+        }
 
+        link.download = downloadName;
         document.body.appendChild(link);
         link.click();
+
         document.body.removeChild(link);
         URL.revokeObjectURL(blobUrl);
         resolve();
@@ -162,8 +143,11 @@ const downloadResizedImage = async (
     };
 
     img.onerror = () => {
-      reject(new Error("图片加载失败"));
+      clearTimeout(timeoutId);
+      reject(new Error("图片加载失败，可能是网络问题、跨域限制或图片不存在"));
     };
+
+    img.src = url;
   });
 };
 //#endregion

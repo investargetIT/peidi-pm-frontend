@@ -32,15 +32,15 @@ const handleDownloadClick = () => {
   const selectedSize = SIZE_OPTIONS.find(
     item => item.value === downloadSize.value
   );
-  console.log("选择尺寸:", selectedSize);
+  // console.log("选择尺寸:", selectedSize);
 
   downloadImageFromUrl(pictureData.value, undefined, selectedSize?.size)
     .then(() => {
       ElMessage.success("图片已下载");
       visible.value = false;
     })
-    .catch(() => {
-      ElMessage.error("图片下载失败");
+    .catch(error => {
+      ElMessage.error("图片下载失败: " + JSON.stringify(error));
     })
     .finally(() => msg.close());
 };

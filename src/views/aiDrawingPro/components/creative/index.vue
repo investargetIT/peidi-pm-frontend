@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
+import type { UploadProps, UploadUserFile } from "element-plus";
+import { Plus } from "@element-plus/icons-vue";
 import {
   downloadFile,
   getMaterialPage,
@@ -31,159 +33,64 @@ const configForm = reactive({
   ratio: "auto",
   prompt: ""
 });
-const resultPicture = ref("");
-// https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=800&fit=crop
+const resultPictures = ref<string[]>([]);
+const resultInfo = ref<any>(null);
+const selectedPictureIndex = ref<number>(0);
 
-// 添加图片上传相关变量
-const uploadedImage = ref(null); // element-plus的file对象
-const imageUrl = ref("");
+// 添加图片上传相关变量（支持多图）
+const fileList = ref<any[]>([]);
+const dialogImageUrl = ref("");
+const dialogVisible = ref(false);
+const MAX_IMAGE_COUNT = 9;
 
-// 处理文件上传
-const handleFileChange = file => {
-  // console.log("file", file);
+const handleFileChange: UploadProps["onChange"] = (uploadFile, uploadFiles) => {
+  if (uploadFiles.length > MAX_IMAGE_COUNT) {
+    ElMessage.warning(
+      `最多只能上传 ${MAX_IMAGE_COUNT} 张图片，已自动移除超出的图片`
+    );
+    uploadFiles = uploadFiles.slice(0, MAX_IMAGE_COUNT);
+    fileList.value = uploadFiles;
+    return false;
+  }
 
-  const isImage = file.raw.type.startsWith("image/");
+  const isImage = uploadFile.raw?.type.startsWith("image/");
   if (!isImage) {
     ElMessage.error("只能上传图片文件!");
     return false;
   }
 
-  // 检查文件大小 (例如限制为5MB)
-  const isLt5M = file.size / 1024 / 1024 < 50;
-  if (!isLt5M) {
+  const isLt50M = (uploadFile.size || 0) / 1024 / 1024 < 50;
+  if (!isLt50M) {
     ElMessage.error("图片大小不能超过50MB!");
     return false;
   }
 
-  // 创建URL对象用于预览
-  const url = URL.createObjectURL(file.raw);
+  fileList.value = uploadFiles;
 
-  // 如果之前有上传的图片，释放旧的URL对象
-  if (imageUrl.value) {
-    URL.revokeObjectURL(imageUrl.value);
-  }
+  return false;
+};
 
-  // 更新上传的图片和URL
-  uploadedImage.value = file;
-  imageUrl.value = url;
+const handleRemove: UploadProps["onRemove"] = (uploadFile, uploadFiles) => {
+  fileList.value = uploadFiles;
+};
 
-  return false; // 阻止自动上传
+const handlePictureCardPreview: UploadProps["onPreview"] = uploadFile => {
+  dialogImageUrl.value = uploadFile.url!;
+  dialogVisible.value = true;
 };
 
 onUnmounted(() => {
-  // 释放上传图片的URL
-  if (imageUrl.value) {
-    URL.revokeObjectURL(imageUrl.value);
-  }
-  // 释放结果图片的URL（如果有的话）
-  if (resultPicture.value && resultPicture.value.startsWith("blob:")) {
-    URL.revokeObjectURL(resultPicture.value);
-  }
+  fileList.value.forEach(file => {
+    if (file.url && file.url.startsWith("blob:")) {
+      URL.revokeObjectURL(file.url);
+    }
+  });
+  resultPictures.value.forEach(pic => {
+    if (pic && pic.startsWith("blob:")) {
+      URL.revokeObjectURL(pic);
+    }
+  });
 });
-
-//#region 调用AI接口逻辑
-// 直接对接AI服务器的方法，保留原始逻辑，以后可能会用到
-// const handleGenerateClickToGrsai = async () => {
-//   if (!configForm.prompt) {
-//     ElMessage.error("提示词不能为空");
-//     return;
-//   }
-
-//   loading.value = true;
-
-//   const params = await formatParams();
-//   // console.log("params", params, uploadedImage.value, imageUrl.value);
-//   // return;
-
-//   try {
-//     // 使用Fetch API来处理SSE流式响应
-//     const response = await fetch(
-//       "https://grsai.dakka.com.cn/v1/draw/nano-banana",
-//       {
-//         method: "POST",
-//         headers: {
-//           Authorization: "Bearer key",
-//           "Content-Type": "application/json"
-//         },
-//         body: JSON.stringify(params)
-//       }
-//     );
-
-//     // 删除这行调试代码，因为 response.text() 会消耗流
-//     // console.log(
-//     //   "AI response:",
-//     //   await response.text(),
-//     //   await response.headers.get("content-type")
-//     // );
-
-//     if (!response.ok) {
-//       throw new Error(`HTTP 错误: ${response.status} ${response.statusText}`);
-//     }
-
-//     const reader = response.body?.getReader();
-//     if (!reader) {
-//       throw new Error("无法读取响应流");
-//     }
-
-//     const decoder = new TextDecoder();
-//     let buffer = "";
-
-//     while (true) {
-//       const { done, value } = await reader.read();
-
-//       if (done) break;
-
-//       buffer += decoder.decode(value, { stream: true });
-//       const lines = buffer.split("\n");
-
-//       console.log("lines:", lines);
-//       if (lines.length > 0 && lines[0].includes("code")) {
-//         ElMessage.error("错误: " + lines[0]);
-//       }
-
-//       // 保留最后一行（可能不完整）
-//       buffer = lines.pop() || "";
-
-//       for (const line of lines) {
-//         if (line.startsWith("data: ")) {
-//           const dataStr = line.slice(6); // 去掉 "data: " 前缀
-//           if (dataStr.trim()) {
-//             try {
-//               const data = JSON.parse(dataStr);
-//               console.log("接收到的数据:", data);
-
-//               // 如果生成完成，显示图片
-//               if (
-//                 data.status === "succeeded" &&
-//                 data.results &&
-//                 data.results.length > 0
-//               ) {
-//                 resultPicture.value = data.results[0].url;
-//                 ElMessage.success("生成完成");
-//               }
-
-//               // 如果生成失败，显示错误信息
-//               if (data.status === "failed") {
-//                 throw new Error(
-//                   `生成失败: ${data.error || data.failure_reason || "未知错误"}`
-//                 );
-//               }
-//             } catch (e) {
-//               console.error("解析JSON失败:", e, "原始数据:", dataStr);
-//               // 如果解析失败，尝试检查是否是错误消息
-//               throw new Error(`解析JSON失败: ${e.message}`);
-//             }
-//           }
-//         }
-//       }
-//     }
-//   } catch (error: any) {
-//     console.error("请求失败:", error);
-//     ElMessage.error(error.message || `请求失败: ${error.toString()}`);
-//   } finally {
-//     loading.value = false;
-//   }
-// };
 
 const handleGenerateClick = async () => {
   if (!configForm.prompt) {
@@ -192,28 +99,43 @@ const handleGenerateClick = async () => {
   }
 
   loading.value = true;
+  resultInfo.value = null;
 
   const paramsContent = await formatParams();
-  // console.log("params", params, uploadedImage.value, imageUrl.value);
-  // return;
 
-  transferDraw({ urlParam: JSON.stringify(paramsContent) })
-    .then((res: any) => {
-      if (res.code === 200) {
-        // console.log("生成成功:", res);
-        if (res.data?.[0]) {
-          resultPicture.value = res.data?.[0];
-          ElMessage.success("生成完成");
+  const promises = [];
+  for (let i = 0; i < 4; i++) {
+    promises.push(transferDraw({ urlParam: JSON.stringify(paramsContent) }));
+  }
+
+  Promise.all(promises)
+    .then((results: any[]) => {
+      const successCount = results.filter(
+        res => res.code === 200 && res.data?.[0]
+      ).length;
+
+      if (successCount > 0) {
+        const validImages = results
+          .filter(res => res.code === 200 && res.data?.[0])
+          .map(res => res.data[0]);
+
+        resultPictures.value = validImages;
+        selectedPictureIndex.value = 0;
+
+        if (successCount === 4) {
+          resultInfo.value = `生成完成，成功 ${successCount}/4`;
+          ElMessage.success(resultInfo.value);
         } else {
-          ElMessage.error("生成失败:" + "Gemini timeout...");
+          resultInfo.value = `生成完成，成功 ${successCount}/4，失败 ${4 - successCount}/4`;
+          ElMessage.warning(resultInfo.value);
         }
       } else {
-        ElMessage.error("生成失败:" + res.message);
+        ElMessage.error("生成失败：所有请求均未返回有效结果");
       }
     })
     .catch((error: any) => {
       console.error("请求失败:", error);
-      ElMessage.error(error.message || `生成失败: ${error.toString()}`);
+      ElMessage.error(error.message || `生成失败：${error.toString()}`);
     })
     .finally(() => {
       loading.value = false;
@@ -221,14 +143,18 @@ const handleGenerateClick = async () => {
 };
 
 const formatParams = async () => {
-  // 如果有上传的图片，将其转换为base64格式
   let base64Urls = [];
-  if (uploadedImage.value) {
+  if (fileList.value && fileList.value.length > 0) {
     try {
-      const base64 = await fileToBase64(uploadedImage.value);
-      base64Urls = [base64];
+      const promises = fileList.value.map(file => {
+        if (file.raw) {
+          return fileToBase64(file as any);
+        }
+        return Promise.resolve(file.url || "");
+      });
+      base64Urls = await Promise.all(promises);
     } catch (error) {
-      console.error("转换图片为base64失败:", error);
+      console.error("转换图片为 base64 失败:", error);
       ElMessage.error("图片转换失败:" + error.message);
     }
   }
@@ -242,84 +168,69 @@ const formatParams = async () => {
     shutProgress: false
   };
 };
-//#endregion
 
-// 下载图片
 const handleDownloadClick = () => {
-  pictureSizeDailogRef.value?.initDetail(resultPicture.value);
+  if (!resultPictures.value[selectedPictureIndex.value]) {
+    ElMessage.warning("没有可下载的图片");
+    return;
+  }
+  pictureSizeDailogRef.value?.initDetail(
+    resultPictures.value[selectedPictureIndex.value]
+  );
 };
 
-// 保存到素材库
 const handleSaveToMaterialLibraryClick = () => {
-  if (!resultPicture.value) {
+  if (!resultPictures.value[selectedPictureIndex.value]) {
     ElMessage.warning("没有可保存的图片");
     return;
   }
 
-  saveToMaterialLibrary(resultPicture.value, "template");
+  saveToMaterialLibrary(
+    resultPictures.value[selectedPictureIndex.value],
+    "template"
+  );
 };
 
-/**
- * 初始化创意工作室
- * @param url 图片URL /ai/1.png
- */
-const initCreativeStudio = async (url: string) => {
-  // console.log("initCreativeStudio:", url);
+const selectPicture = (index: number) => {
+  selectedPictureIndex.value = index;
+};
 
+const initCreativeStudio = async (url: string) => {
   try {
-    // 首先尝试从 IndexedDB 缓存获取图片
     const cachedImageBlob = await imageCache.getImageBlob(url, "originalBlob");
 
     if (cachedImageBlob) {
-      // 如果缓存中有图片，直接使用
       console.log("从缓存加载图片:", url);
 
-      // 使用封装的 blobManager 工具类将 Blob 转换为 Base64
       const base64String = await blobManager.blobToBase64(cachedImageBlob);
 
-      uploadedImage.value = {
-        raw: cachedImageBlob,
-        name: url.split("/").pop() || "cached-image",
-        base64: base64String // 也可以存储 base64 字符串
-      };
-
-      // 创建 Blob URL 用于预览
       const blobUrl = URL.createObjectURL(cachedImageBlob);
-      if (imageUrl.value) {
-        URL.revokeObjectURL(imageUrl.value); // 释放之前的 URL
-      }
-      imageUrl.value = blobUrl;
+
+      fileList.value = [
+        {
+          name: url.split("/").pop() || "cached-image",
+          url: blobUrl,
+          raw: cachedImageBlob
+        }
+      ];
     } else {
-      // 如果缓存中没有图片，则通过 API 获取
       console.log("缓存中未找到图片，正在从服务器获取:", url);
 
-      // 从服务器下载图片
       const response: any = await downloadFile({ objectName: url });
 
-      // 将下载的图片 Blob 转换为 Base64
-      const reader = new FileReader();
-      reader.onload = async function () {
-        uploadedImage.value = {
-          raw: response,
-          name: url.split("/").pop() || "downloaded-image"
-        };
+      const blobUrl = URL.createObjectURL(response);
 
-        // 创建 Blob URL 用于预览
-        const blobUrl = URL.createObjectURL(response);
-        if (imageUrl.value) {
-          URL.revokeObjectURL(imageUrl.value); // 释放之前的 URL
+      fileList.value = [
+        {
+          name: url.split("/").pop() || "downloaded-image",
+          url: blobUrl,
+          raw: response
         }
-        imageUrl.value = blobUrl;
-      };
-      reader.onerror = function () {
-        console.error("读取图片失败");
-        ElMessage.error("读取图片失败");
-      };
-      reader.readAsDataURL(response);
+      ];
     }
   } catch (error) {
     console.error("初始化创意工作室失败:", error);
-    ElMessage.error("初始化创意工作室失败: " + error.message);
+    ElMessage.error("初始化创意工作室失败：" + error.message);
   }
 };
 
@@ -341,7 +252,7 @@ defineExpose({
             <h2 class="text-xl font-semibold text-[#0a0a0a]">生成器</h2>
             <el-select
               v-model="aiModel"
-              placeholder="请选择AI模型"
+              placeholder="请选择 AI 模型"
               style="width: 180px"
             >
               <el-option
@@ -357,43 +268,28 @@ defineExpose({
           </div>
 
           <el-form :model="configForm" :label-position="'top'">
-            <el-form-item>
+            <el-form-item label="素材图片">
               <el-upload
-                drag
+                v-model:file-list="fileList"
                 action=""
-                style="width: 100%"
+                list-type="picture-card"
                 :auto-upload="false"
-                :show-file-list="false"
                 :on-change="handleFileChange"
+                :on-remove="handleRemove"
+                :on-preview="handlePictureCardPreview"
                 accept="image/*"
+                multiple
+                :limit="MAX_IMAGE_COUNT"
               >
-                <!-- 如果没有上传图片则显示上传提示 -->
-                <div v-if="!imageUrl" class="flex flex-col items-center">
-                  <el-icon class="el-icon--upload">
-                    <UploadIcon color="none" />
-                  </el-icon>
-                  <div class="el-upload__text">
-                    <p class="text-[#0a0a0a] font-medium text-[16px]">
-                      点击上传图片
-                    </p>
-                    <p class="text-sm text-[#5b646f] mt-1">或拖拽图片到此处</p>
-                    <p class="text-xs text-[#5b646f] mt-2">
-                      支持 JPG, JPEG, PNG, WEBP 格式
-                    </p>
+                <el-icon class="text-gray-400">
+                  <Plus />
+                </el-icon>
+                <template #tip>
+                  <div class="text-xs text-gray-500">
+                    最多上传 {{ MAX_IMAGE_COUNT }} 张图片，支持 JPG, JPEG, PNG,
+                    WEBP 格式
                   </div>
-                </div>
-
-                <!-- 如果已上传图片则显示图片 -->
-                <div v-else class="w-full h-full">
-                  <img
-                    :src="imageUrl"
-                    alt="Uploaded image"
-                    class="max-h-32 rounded-lg object-contain mb-3"
-                  />
-                  <p class="text-sm text-[#5b646f]">点击重新上传</p>
-                </div>
-
-                <template #tip></template>
+                </template>
               </el-upload>
             </el-form-item>
 
@@ -452,6 +348,14 @@ defineExpose({
                 />
                 生成图片
               </el-button>
+              <el-alert
+                v-if="resultInfo"
+                :title="resultInfo"
+                type="primary"
+                :closable="false"
+                show-icon
+                style="margin-top: 16px"
+              />
             </el-form-item>
           </el-form>
         </el-card>
@@ -465,7 +369,7 @@ defineExpose({
         >
           <div class="flex items-center justify-between mb-[16px]">
             <h2 class="text-xl font-semibold text-[#0a0a0a]">预览</h2>
-            <div class="flex" v-show="resultPicture">
+            <div class="flex" v-show="resultPictures.length > 0">
               <el-button
                 color="#F3F5F8"
                 style="font-size: 13px"
@@ -492,7 +396,7 @@ defineExpose({
 
           <div
             class="relative aspect-square rounded-lg overflow-hidden bg-[#eaeff5]"
-            v-if="!resultPicture"
+            v-if="resultPictures.length === 0"
           >
             <div
               class="absolute inset-0 flex flex-col items-center justify-center text-[#0a0a0a]"
@@ -506,15 +410,53 @@ defineExpose({
               <p class="text-xs mt-1">请在左侧输入提示词并点击生成</p>
             </div>
           </div>
-          <div
-            class="relative aspect-square rounded-lg overflow-hidden bg-[#eaeff5]"
-            v-else
-          >
-            <img
-              alt="Generated"
-              class="w-full h-full object-contain"
-              :src="resultPicture"
-            />
+
+          <div v-else>
+            <div class="grid grid-cols-2 gap-2 mb-3">
+              <div
+                v-for="(picture, index) in resultPictures"
+                :key="index"
+                class="relative aspect-square rounded-lg overflow-hidden bg-[#eaeff5] cursor-pointer border-2 transition-all"
+                :class="
+                  selectedPictureIndex === index
+                    ? 'border-[#000]'
+                    : 'border-transparent hover:border-gray-300'
+                "
+                @click="selectPicture(index)"
+              >
+                <img
+                  :alt="`Generated ${index + 1}`"
+                  class="w-full h-full object-cover"
+                  :src="picture"
+                />
+                <div
+                  v-if="selectedPictureIndex === index"
+                  class="absolute top-1 right-1 w-5 h-5 bg-[#000] rounded-full flex items-center justify-center"
+                >
+                  <svg
+                    class="w-3 h-3 text-white"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="relative aspect-[4/3] rounded-lg overflow-hidden bg-[#eaeff5]"
+            >
+              <img
+                alt="Selected"
+                class="w-full h-full object-contain"
+                :src="resultPictures[selectedPictureIndex]"
+              />
+            </div>
           </div>
         </el-card>
       </el-col>
@@ -523,19 +465,22 @@ defineExpose({
     <div>
       <PictureSizeDailog ref="pictureSizeDailogRef" />
     </div>
+
+    <!-- 预览对话框 -->
+    <el-dialog v-model="dialogVisible">
+      <img w-full :src="dialogImageUrl" alt="Preview Image" />
+    </el-dialog>
   </div>
 </template>
 
 <style lang="scss" scoped>
 .peidi-aiDrawingPro-creative-card-equal-height {
-  /* 在 md 尺寸及以上（>= 768px）使卡片高度一致 */
   @media (min-width: 768px) {
     & {
       height: 100%;
     }
   }
 
-  /* 在 xs 尺寸下（< 768px）允许卡片自适应高度 */
   @media (max-width: 767px) {
     & {
       height: auto;
@@ -546,5 +491,21 @@ defineExpose({
 
 :deep(.el-form-item__label) {
   color: #0a0a0a;
+}
+
+:deep(.el-upload-list--picture-card) {
+  margin-top: 8px;
+}
+
+:deep(.el-upload--picture-card) {
+  width: 100px;
+  height: 100px;
+}
+
+:deep(.el-upload-list__item) {
+  width: 100px;
+  height: 100px;
+  margin-right: 8px;
+  margin-bottom: 8px;
 }
 </style>
