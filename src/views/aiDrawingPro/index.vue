@@ -5,6 +5,7 @@ import { ElMessage } from "element-plus";
 import Material from "./components/material/index.vue";
 import Drawing from "./components/drawing/index.vue";
 import Creative from "./components/creative/index.vue";
+import DrawingPro from "./components/drawingPro/index.vue";
 import { imageCache } from "./utils/imageCache/index";
 import { processImageCompression } from "./utils/compressImage/index";
 import { blobManager } from "./utils/blobManager";
@@ -195,7 +196,7 @@ provide("imageCacheManager", {
 
 const drawingTabRef = ref(null);
 const materialTabRef = ref(null);
-const activeTab = ref("Drawing");
+const activeTab = ref("DrawingPro");
 
 watch(activeTab, (newVal, oldVal) => {
   if (newVal !== oldVal) {
@@ -235,6 +236,9 @@ onUnmounted(() => {
     </el-tab-pane>
     <el-tab-pane label="创意工作室" name="Creative">
       <Creative ref="creativeTabRef" />
+    </el-tab-pane>
+    <el-tab-pane label="模板编辑器" name="DrawingPro">
+      <DrawingPro ref="drawingProTabRef" />
     </el-tab-pane>
   </el-tabs>
 </template>
