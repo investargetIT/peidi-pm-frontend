@@ -30,6 +30,10 @@ const props = defineProps({
   handleDescriptorInfo: {
     type: Function,
     required: true
+  },
+  handleEditPhraseInfo: {
+    type: Function,
+    required: true
   }
 });
 
@@ -78,7 +82,7 @@ const handleDelete = () => {
         </el-text>
       </template>
       <template #footer>
-        <div>
+        <el-space wrap>
           <el-button type="danger" @click="handleDelete" text>删除</el-button>
           <el-button
             type="primary"
@@ -105,6 +109,22 @@ const handleDelete = () => {
             描述词
           </el-button>
           <el-button
+            type="primary"
+            @click="props.handleEditPhraseInfo(props.data)"
+            text
+            v-if="getMTType === 'template'"
+          >
+            编辑词
+          </el-button>
+          <el-button
+            type="success"
+            @click=""
+            text
+            v-if="getMTType === 'template'"
+          >
+            模板编辑
+          </el-button>
+          <el-button
             type="warning"
             @click="props.handleClickRate(props.data)"
             text
@@ -112,7 +132,7 @@ const handleDelete = () => {
           >
             点击率
           </el-button>
-        </div>
+        </el-space>
       </template>
 
       <div class="flex flex-col justify-center items-center">

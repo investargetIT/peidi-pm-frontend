@@ -9,6 +9,7 @@ import DetailForm from "./detailForm.vue";
 import ContactForm from "./contactForm.vue";
 import ClickRateForm from "./clickRateForm.vue";
 import DescriptorInfo from "./descriptorInfo.vue";
+import EditPhraseInfo from "./editPhraseInfo.vue";
 import dayjs from "dayjs";
 import { type ClickRateTrendItem } from "../../type/material";
 
@@ -21,6 +22,7 @@ const detailFormRef = ref(null);
 const contactFormRef = ref(null);
 const clickRateFormRef = ref(null);
 const descriptorInfoRef = ref(null);
+const editPhraseInfoRef = ref(null);
 
 const updateCardData = () => {
   cardData.value = materialList.value[radio.value] || [];
@@ -168,6 +170,10 @@ const handleDescriptorInfo = (data: any) => {
   descriptorInfoRef.value?.initDetailForm(data);
 };
 
+const handleEditPhraseInfo = (data: any) => {
+  editPhraseInfoRef.value?.initDetailForm(data);
+};
+
 defineExpose({
   fetchMaterialPage
 });
@@ -208,6 +214,7 @@ defineExpose({
           :handleCreate="handleCreate"
           :handleClickRate="handleClickRate"
           :handleDescriptorInfo="handleDescriptorInfo"
+          :handleEditPhraseInfo="handleEditPhraseInfo"
         />
       </el-space>
     </div>
@@ -240,6 +247,13 @@ defineExpose({
     <div>
       <DescriptorInfo
         ref="descriptorInfoRef"
+        :fetchMaterialPage="fetchMaterialPage"
+      />
+    </div>
+
+    <div>
+      <EditPhraseInfo
+        ref="editPhraseInfoRef"
         :fetchMaterialPage="fetchMaterialPage"
       />
     </div>
