@@ -34,6 +34,10 @@ const props = defineProps({
   handleEditPhraseInfo: {
     type: Function,
     required: true
+  },
+  handleModuleEdit: {
+    type: Function,
+    required: true
   }
 });
 
@@ -100,14 +104,14 @@ const handleDelete = () => {
           >
             创意
           </el-button>
-          <el-button
+          <!-- <el-button
             type="primary"
             @click="props.handleDescriptorInfo(props.data)"
             text
             v-if="getMTType === 'template'"
           >
             描述词
-          </el-button>
+          </el-button> -->
           <el-button
             type="primary"
             @click="props.handleEditPhraseInfo(props.data)"
@@ -118,7 +122,7 @@ const handleDelete = () => {
           </el-button>
           <el-button
             type="success"
-            @click=""
+            @click="props.handleModuleEdit(props.data)"
             text
             v-if="getMTType === 'template'"
           >

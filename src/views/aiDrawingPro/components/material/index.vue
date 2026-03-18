@@ -14,6 +14,7 @@ import dayjs from "dayjs";
 import { type ClickRateTrendItem } from "../../type/material";
 
 const initCreativeStudio = inject<Function>("initCreativeStudio");
+const initDrawingPro = inject<Function>("initDrawingPro");
 
 const radio = ref(null);
 const materialList = ref({});
@@ -174,6 +175,10 @@ const handleEditPhraseInfo = (data: any) => {
   editPhraseInfoRef.value?.initDetailForm(data);
 };
 
+const handleModuleEdit = (data: any) => {
+  initDrawingPro(data);
+};
+
 defineExpose({
   fetchMaterialPage
 });
@@ -215,6 +220,7 @@ defineExpose({
           :handleClickRate="handleClickRate"
           :handleDescriptorInfo="handleDescriptorInfo"
           :handleEditPhraseInfo="handleEditPhraseInfo"
+          :handleModuleEdit="handleModuleEdit"
         />
       </el-space>
     </div>

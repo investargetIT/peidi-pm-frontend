@@ -18,13 +18,19 @@ import {
   Save2Icon,
   StarIcon
 } from "../../assests/svg/index";
-import { fileToBase64, downloadImageFromUrl } from "../../utils/general";
+import {
+  fileToBase64,
+  downloadImageFromUrl,
+  generateID
+} from "../../utils/general";
 import { imageCache } from "../../utils/imageCache";
 import { blobManager } from "../../utils/blobManager";
 import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterialLibrary";
 import PictureSizeDailog from "./pictureSizeDailog.vue";
+import ResultCard from "./resultCard.vue";
 
 const pictureSizeDailogRef = ref(null);
+const resultCardRef = ref(null);
 
 const loading = ref(false);
 const aiModel = ref("nano-banana-pro");
@@ -33,7 +39,9 @@ const configForm = reactive({
   ratio: "auto",
   prompt: ""
 });
-const resultPictures = ref<string[]>([]);
+const resultPictures = ref<string[]>([
+  // "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=800&fit=crop"
+]);
 const resultInfo = ref<any>(null);
 const selectedPictureIndex = ref<number>(0);
 
@@ -93,6 +101,12 @@ onUnmounted(() => {
 });
 
 const handleGenerateClick = async () => {
+  // 检查是否已生成 100 条记录
+  if (resultCardRef.value?.isMonthlyLimitReached()) {
+    ElMessage.warning("本月已生成 100 条记录，无法继续生成");
+    return;
+  }
+
   if (!configForm.prompt) {
     ElMessage.error("提示词不能为空");
     return;
@@ -129,6 +143,11 @@ const handleGenerateClick = async () => {
           resultInfo.value = `生成完成，成功 ${successCount}/4，失败 ${4 - successCount}/4`;
           ElMessage.warning(resultInfo.value);
         }
+
+        // 生成成功几个 就调用几次 addDrawRecord
+        resultPictures.value.forEach((pic, index) => {
+          resultCardRef.value?.addDrawRecord(pic, generateID());
+        });
       } else {
         ElMessage.error("生成失败：所有请求均未返回有效结果");
       }
@@ -242,7 +261,7 @@ defineExpose({
 <template>
   <div>
     <el-row :gutter="20">
-      <el-col :xs="24" :sm="24" :md="12" :lg="9">
+      <el-col :xs="24" :sm="24" :md="12" :lg="8">
         <el-card
           shadow="never"
           style="border-radius: 10px"
@@ -458,6 +477,16 @@ defineExpose({
               />
             </div>
           </div>
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" :sm="24" :md="12" :lg="7">
+        <el-card
+          shadow="never"
+          style="border-radius: 10px"
+          class="peidi-aiDrawingPro-creative-card-equal-height"
+        >
+          <ResultCard ref="resultCardRef" />
         </el-card>
       </el-col>
     </el-row>

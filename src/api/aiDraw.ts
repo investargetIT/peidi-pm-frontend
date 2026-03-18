@@ -122,3 +122,18 @@ export const transferGemini = (data: { urlParam: string }) => {
     timeout: 0
   });
 };
+
+// 分页图片上传历史结果
+export const getDrawRecordPage = (params: AiDrawPageRequest) => {
+  return http.request("get", baseUrlApi("/ai/draw/record/page"), {
+    params,
+    timeout: 0
+  });
+};
+
+// 图片上传历史
+export const getDrawRecordNew = (data: { path: string; type: string }) => {
+  return http.request("post", baseUrlApi("/ai/draw/record/new"), {
+    data
+  });
+};

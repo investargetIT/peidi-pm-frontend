@@ -196,7 +196,7 @@ provide("imageCacheManager", {
 
 const drawingTabRef = ref(null);
 const materialTabRef = ref(null);
-const activeTab = ref("DrawingPro");
+const activeTab = ref("Material");
 
 watch(activeTab, (newVal, oldVal) => {
   if (newVal !== oldVal) {
@@ -216,6 +216,13 @@ const initCreativeStudio = (url: string) => {
 };
 provide("initCreativeStudio", initCreativeStudio);
 
+const drawingProTabRef = ref(null);
+const initDrawingPro = (data: any) => {
+  activeTab.value = "DrawingPro";
+  drawingProTabRef.value?.initDrawingPro(data);
+};
+provide("initDrawingPro", initDrawingPro);
+
 // 在组件卸载时清理所有 Blob URL
 onUnmounted(() => {
   blobManager.releaseAll();
@@ -228,9 +235,9 @@ onUnmounted(() => {
     v-model="activeTab"
     class="peidi-el-tabs-modern-tabs"
   >
-    <el-tab-pane label="绘图" name="Drawing" lazy>
+    <!-- <el-tab-pane label="绘图" name="Drawing" lazy>
       <Drawing ref="drawingTabRef" />
-    </el-tab-pane>
+    </el-tab-pane> -->
     <el-tab-pane label="素材库" name="Material" lazy>
       <Material ref="materialTabRef" />
     </el-tab-pane>

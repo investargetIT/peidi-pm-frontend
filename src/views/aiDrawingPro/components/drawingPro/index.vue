@@ -4,7 +4,17 @@ import { IMG_CONFIG } from "./utils/config";
 import imageUrl1 from "@/views/debug/assets/绘图1.png";
 import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 import { ElMessage } from "element-plus";
-import { transferDraw } from "@/api/aiDraw";
+import { downloadFile, transferDraw } from "@/api/aiDraw";
+import { imageCache } from "../../utils/imageCache";
+import { blobManager } from "../../utils/blobManager";
+import ResultImg from "./resultImg.vue";
+
+const resultImgRef = ref(null);
+
+const loading = ref(false);
+
+const fileList = ref<any[]>([]);
+const imageConfig = ref<any>([]);
 
 /**
  * 画布尺寸配置（单位：px）
@@ -40,7 +50,7 @@ const cardRefs = ref<Record<string, any>>({});
  * 根据 IMG_CONFIG 配置为每个元素设置默认值
  */
 const initFormData = () => {
-  IMG_CONFIG.forEach(item => {
+  imageConfig.value.forEach(item => {
     if (item.content) {
       item.content.forEach(field => {
         formData.value[`${item.id}_${field.label}`] = field.text;
@@ -52,9 +62,9 @@ const initFormData = () => {
   });
 };
 
-onMounted(() => {
-  initFormData();
-});
+// onMounted(() => {
+//   initFormData();
+// });
 
 /**
  * 处理元素选中/取消选中
@@ -119,7 +129,9 @@ const generateImage = () => {
 const handleGenerateImage = () => {
   console.log("生成图片:", prompt.value, formData.value);
 
-  const result = IMG_CONFIG.map(item => {
+  // return;
+
+  const result = imageConfig.value.map(item => {
     const baseItem = {
       id: item.id,
       name: item.name,
@@ -159,7 +171,7 @@ const handleGenerateImage = () => {
 
 const formatPrompt = (prompt: string, config: any[]) => {
   const temp = `
-第一张图是模板图，已经对模板图做了标记，参数是${JSON.stringify(IMG_CONFIG)}，
+第一张图是模板图，已经对模板图做了标记，参数是${JSON.stringify(imageConfig.value)}，
 用户按照参数进行修改，用户的修改是${JSON.stringify(config)}，用户的提示词是${prompt}
 请返回修改后的图片，图片需要包含用户修改的内容，图片元素请删除留白。
 `;
@@ -197,11 +209,17 @@ const testTransferDraw = async (prompt: string) => {
   let base64Url2 = "";
 
   try {
-    [base64Url1, base64Url2] = await Promise.all([imageToBase64(imageUrl1), imageToBase64(imageUrl2)]);
+    [base64Url1, base64Url2] = await Promise.all([
+      imageToBase64(imageUrl1),
+      imageToBase64(imageUrl2)
+    ]);
   } catch (error) {
     console.error("图片转 base64 失败:", error);
     return;
   }
+
+  // 转换blob为base64
+  const base64Url1_ = await blobManager.blobToBase64(fileList.value[0].raw);
 
   const params = {
     model: "nano-banana-pro",
@@ -209,17 +227,101 @@ const testTransferDraw = async (prompt: string) => {
     aspectRatio: "auto",
     imageSize: "4K",
     shutProgress: false,
-    urls: [base64Url2]
+    urls: [base64Url1_]
   };
 
+  console.log("请求参数：", params, base64Url1_);
+  // return;
+  loading.value = true;
   transferDraw({
     urlParam: JSON.stringify(params)
-  }).then((res: any) => {
-    console.log("中转gemini模型:", res);
-    if (res.code === 200) {
-    }
-  });
+  })
+    .then(async (res: any) => {
+      console.log("中转gemini模型:", res);
+      if (res.code === 200) {
+        if (!res.data?.[0]) {
+          ElMessage.error("生成失败: 图片URL为空");
+          return;
+        }
+
+        const resultUrl = res.data?.[0]; // 绝对路径
+
+        try {
+          const base64String = await imageToBase64(resultUrl);
+          resultImgRef.value?.initResultImg(
+            imageConfig.value,
+            formData.value,
+            base64String // 使用 base64 而不是绝对路径
+          );
+        } catch (error) {
+          console.error("图片转 base64 失败:", error);
+          ElMessage.error("图片处理失败:" + error.message);
+        }
+      }
+    })
+    .finally(() => {
+      loading.value = false;
+    });
 };
+
+const initDrawingPro = async (data: any) => {
+  console.log("初始化绘图Pro:", data);
+  // 根据data.objectName 的相对路径 得到 图片的url，有缓存先拿缓存
+  try {
+    const url = data?.objectName;
+    // 1. 首先尝试从 IndexedDB 缓存获取图片
+    const cachedImageBlob = await imageCache.getImageBlob(url, "originalBlob");
+
+    if (cachedImageBlob) {
+      // 2. 如果缓存中有图片，直接使用
+      // console.log("从缓存加载图片:", url);
+      // ... 处理缓存图片
+      const base64String = await blobManager.blobToBase64(cachedImageBlob);
+      const blobUrl = URL.createObjectURL(cachedImageBlob);
+
+      fileList.value = [
+        {
+          name: url.split("/").pop() || "cached-image",
+          url: blobUrl,
+          raw: cachedImageBlob
+        }
+      ];
+    } else {
+      // 3. 如果缓存中没有图片，则通过 API 获取
+      // console.log("缓存中未找到图片，正在从服务器获取:", url);
+
+      // 4. 使用 downloadFile API，传入 objectName 参数
+      const response: any = await downloadFile({ objectName: url });
+      // ... 处理下载的图片
+      const blobUrl = URL.createObjectURL(response);
+
+      fileList.value = [
+        {
+          name: url.split("/").pop() || "downloaded-image",
+          url: blobUrl,
+          raw: response
+        }
+      ];
+    }
+  } catch (error) {
+    console.error("初始化失败:", error);
+    ElMessage.error("初始化失败：" + error.message);
+  }
+  // 解析data.type 得到editPhraseInfo
+  try {
+    const editPhraseInfo = JSON.parse(data.type)?.editPhraseInfo || {};
+    // console.log("解析的editPhraseInfo:", editPhraseInfo);
+    imageConfig.value = JSON.parse(editPhraseInfo.editPhraseInfo) || [];
+  } catch (error) {
+    console.error("解析data.type失败:", error);
+    ElMessage.error("解析data.type失败：" + error.message);
+  }
+  initFormData();
+};
+
+defineExpose({
+  initDrawingPro
+});
 </script>
 
 <template>
@@ -233,14 +335,16 @@ const testTransferDraw = async (prompt: string) => {
           </div>
           <div class="relative">
             <img
-              :src="imageUrl2"
+              v-if="fileList[0]?.url"
+              :src="fileList[0]?.url || ''"
               alt="图片"
               :style="{ width: `${CANVAS_SIZE}px`, height: `${CANVAS_SIZE}px` }"
               class="rounded-lg shadow-md"
             />
+            <div v-else>请从素材库中选择模板图片</div>
 
             <div
-              v-for="item in IMG_CONFIG"
+              v-for="item in imageConfig"
               :key="item.id"
               :style="{
                 left: `${item.rect.x * CANVAS_SIZE}px`,
@@ -270,7 +374,7 @@ const testTransferDraw = async (prompt: string) => {
           <el-scrollbar height="500px">
             <div class="space-y-4">
               <div
-                v-for="item in IMG_CONFIG"
+                v-for="item in imageConfig"
                 :key="item.id"
                 :ref="el => (cardRefs[item.id] = el)"
                 :class="[
@@ -388,6 +492,7 @@ const testTransferDraw = async (prompt: string) => {
 
                 <div
                   class="flex items-center justify-between mb-4 p-3 bg-white/60 rounded-lg"
+                  v-if="false"
                 >
                   <span class="text-sm text-gray-600"
                     >演示模式（使用示例图片测试）</span
@@ -400,6 +505,8 @@ const testTransferDraw = async (prompt: string) => {
                   size="large"
                   class="w-full generate-button"
                   @click="generateImage"
+                  :loading="loading"
+                  :disabled="!fileList[0]?.url"
                 >
                   <i class="el-icon-star"></i> 立即生成
                 </el-button>
@@ -413,6 +520,11 @@ const testTransferDraw = async (prompt: string) => {
         </div>
       </el-col>
     </el-row>
+
+    <el-divider />
+    <div>
+      <ResultImg ref="resultImgRef" />
+    </div>
   </div>
 </template>
 
