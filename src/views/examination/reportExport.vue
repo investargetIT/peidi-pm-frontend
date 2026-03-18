@@ -3,6 +3,11 @@ import { computed, onMounted, ref } from "vue";
 import { getExaminationRecordResult } from "@/api/pmApi";
 import { Download } from "@element-plus/icons-vue";
 import { exportExaminationTable, formatNumber } from "./utils/export";
+import {
+  fetchOBMPerformanceData,
+  processAndExportOBMData,
+  readOBMPerformanceFile
+} from "./utils/exportForFinance";
 import { ElMessage, ElLoading } from "element-plus";
 import dayjs from "dayjs";
 
@@ -176,6 +181,23 @@ const last3MonthList = computed(() => {
 onMounted(() => {
   fetchResultList();
 });
+
+const exportForFinanceLoading = ref(false);
+const handleExportForFinance = async () => {
+  exportForFinanceLoading.value = true;
+  processAndExportOBMData()
+    .then(result => {
+      console.log("处理成功:", result);
+      ElMessage.success("导出成功");
+    })
+    .catch(error => {
+      console.error("处理失败:", error);
+      ElMessage.error("导出失败: " + error.message);
+    })
+    .finally(() => {
+      exportForFinanceLoading.value = false;
+    });
+};
 </script>
 
 <template>
@@ -224,6 +246,15 @@ onMounted(() => {
       <div class="flex justify-between items-center mb-[12px]">
         <div class="text-[16px]">绩效数据</div>
         <div>
+          <el-button
+            type="primary"
+            @click="handleExportForFinance"
+            :icon="Download"
+            color="#217346"
+            :loading="exportForFinanceLoading"
+          >
+            人事导出
+          </el-button>
           <el-button type="primary" @click="handleExport" :icon="Download">
             导出
           </el-button>

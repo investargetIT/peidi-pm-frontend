@@ -8,15 +8,22 @@ import type { TabsPaneContext } from "element-plus";
 import { storageLocal } from "@pureadmin/utils";
 
 const DEV_ID = [
+  "1846392647319093250", // Summer
   "1926449443739600965", // 沈皓钰
   "1850741012504838145", // 张思宇
   "1887377779519434753" // 王家琦
+];
+
+const MANAGER_ID = [
+  "1926449443739598857", // 陈董
+  "1869688287188811777" // Lucy 廖丽萍
 ];
 
 const PERMISSION_ID_LIST = {
   // 报表导出
   reportExport: [
     ...DEV_ID,
+    ...MANAGER_ID,
     "1897890298264596481", // 林双叶
     "1870023775338692610", // 大树
     "1869635118983348225", // 肖嘉玲
@@ -25,6 +32,7 @@ const PERMISSION_ID_LIST = {
   // 文件上传
   fileUpload: [
     ...DEV_ID,
+    ...MANAGER_ID,
     "1848656573381541890", // 方云
     "1874711258007646210" // 范振吉
   ]
