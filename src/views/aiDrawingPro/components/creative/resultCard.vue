@@ -7,12 +7,13 @@ import OnlineImg from "../../common/onlineImg.vue";
 import OnlineImgCompress from "../../common/onlineImgCompress.vue";
 import { processImageCompression } from "../../utils/compressImage/index";
 import { blobManager } from "../../utils/blobManager/index";
+import { generateID } from "../../utils/general";
 
 const currentPage = ref(1);
 const pageSize = ref(9);
 const total = ref(0);
 
-const useNumberTime = "2026-02";
+const useNumberTime = dayjs().format("YYYY-MM");
 const useNumber = ref(0);
 
 const drawRecordList = ref<any[]>([]);
@@ -111,6 +112,8 @@ onMounted(() => {
 
 // 传入绝对路径地址 例"https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=800&fit=crop"
 const addDrawRecord = async (url: string, imgName: string) => {
+  // 随机生成 ID
+  const randomId = generateID();
   try {
     // 1. 直接使用 fetch 下载图片（支持外部 URL）
     const response = await fetch(url);
@@ -147,7 +150,7 @@ const addDrawRecord = async (url: string, imgName: string) => {
           // 5. 创建 FormData 上传原图
           const originalFile = new File(
             [originalBlob],
-            `${imgName}_original.png`,
+            `${imgName}_${randomId}_original.png`,
             {
               type: "image/png"
             }
@@ -166,7 +169,7 @@ const addDrawRecord = async (url: string, imgName: string) => {
           // 7. 创建 FormData 上传缩略图
           const thumbnailFile = new File(
             [thumbnailBlob],
-            `${imgName}_thumbnail.png`,
+            `${imgName}_${randomId}_thumbnail.png`,
             {
               type: "image/png"
             }
@@ -187,21 +190,18 @@ const addDrawRecord = async (url: string, imgName: string) => {
             path: originalPath,
             imgName,
             imgType: "Original",
-            useNumber: useNumber.value
+            useNumber: useNumberTime
           });
 
           await fetchAddDrawRecord({
             path: thumbnailPath,
             imgName,
             imgType: "Thumbnail",
-            useNumber: useNumber.value
+            useNumber: useNumberTime
           });
 
           ElMessage.success("记录添加成功");
           resolve(true);
-
-          // 刷新列表
-          fetchDrawRecordPage();
         } catch (error) {
           console.error("添加记录失败:", error);
           ElMessage.error("添加记录失败:" + error.message);
@@ -229,9 +229,16 @@ const isMonthlyLimitReached = () => {
   return useNumber.value >= 100;
 };
 
+// 刷新列表
+const updateData = () => {
+  fetchDrawRecordPageForUseNumber();
+  fetchDrawRecordPage();
+};
+
 defineExpose({
   addDrawRecord,
-  isMonthlyLimitReached
+  isMonthlyLimitReached,
+  updateData
 });
 </script>
 
@@ -246,18 +253,18 @@ defineExpose({
 
     <div class="w-full">
       <el-space :size="16" wrap>
-        <OnlineImg
-          v-for="item in drawRecordList"
-          :key="item?.id"
-          :url="item?.path"
-          size="120px"
-        />
-        <!-- <OnlineImgCompress
+        <!-- <OnlineImg
           v-for="item in drawRecordList"
           :key="item?.id"
           :url="item?.path"
           size="120px"
         /> -->
+        <OnlineImgCompress
+          v-for="item in drawRecordList"
+          :key="item?.id"
+          :url="item?.path"
+          size="120px"
+        />
       </el-space>
     </div>
 

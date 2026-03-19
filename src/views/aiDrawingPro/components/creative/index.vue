@@ -145,10 +145,22 @@ const handleGenerateClick = async () => {
         }
 
         // 生成成功几个 就调用几次 addDrawRecord
-        resultPictures.value.forEach((pic, index) => {
-          resultCardRef.value?.addDrawRecord(pic, generateID());
+        const addRecordPromises = resultPictures.value.map((pic, index) => {
+          return (
+            resultCardRef.value?.addDrawRecord(pic, generateID()) ||
+            Promise.resolve()
+          );
         });
+
+        Promise.all(addRecordPromises)
+          .then(() => {
+            resultCardRef.value?.updateData();
+          })
+          .catch(error => {
+            console.error("更新图片记录失败:", error);
+          });
       } else {
+        resultInfo.value = "生成失败：所有请求均未返回有效结果";
         ElMessage.error("生成失败：所有请求均未返回有效结果");
       }
     })
