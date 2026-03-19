@@ -304,7 +304,7 @@ defineExpose({
                   <Plus />
                 </el-icon>
                 <template #tip>
-                  <div class="text-xs text-gray-500">
+                  <div class="text-xs text-gray-500 mt-[8px]">
                     最多上传 {{ MAX_IMAGE_COUNT }} 张图片，支持 JPG, JPEG, PNG,
                     WEBP 格式
                   </div>

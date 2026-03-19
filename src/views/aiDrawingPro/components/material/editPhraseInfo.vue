@@ -27,6 +27,15 @@ const props = defineProps({
   }
 });
 
+//#region 图片预览
+const previewImageUrl = ref("");
+const previewVisible = ref(false);
+const handlePictureCardPreview: UploadProps["onPreview"] = uploadFile => {
+  previewImageUrl.value = uploadFile.url!;
+  previewVisible.value = true;
+};
+//#endregion
+
 const dialogVisible = ref(false);
 const loading = ref(false);
 const geminiLoading = ref(false);
@@ -369,6 +378,7 @@ const handleGenerateDescriptorInfo = async () => {
             :on-exceed="handleExceed"
             :on-change="handleChange"
             class="peidi-aiDrawingPro-material-editPhraseInfo-upload"
+            :on-preview="handlePictureCardPreview"
           >
             <template #trigger>
               <el-icon><Plus /></el-icon>
@@ -403,16 +413,20 @@ const handleGenerateDescriptorInfo = async () => {
         </el-form-item>
       </el-form>
     </el-dialog>
+
+    <el-dialog v-model="previewVisible" title="图片预览">
+      <img w-full :src="previewImageUrl" alt="图片预览" />
+    </el-dialog>
   </div>
 </template>
 
 <style lang="scss" scoped>
 .peidi-aiDrawingPro-material-editPhraseInfo-upload {
-  :deep(.el-upload-list__item-preview) {
-    display: none !important;
-  }
-  :deep(.el-upload-list__item-delete) {
-    margin-left: 0;
-  }
+  // :deep(.el-upload-list__item-preview) {
+  //   display: none !important;
+  // }
+  // :deep(.el-upload-list__item-delete) {
+  //   margin-left: 0;
+  // }
 }
 </style>

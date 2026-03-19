@@ -314,7 +314,7 @@ const initDrawingPro = async (data: any) => {
     imageConfig.value = JSON.parse(editPhraseInfo.editPhraseInfo) || [];
   } catch (error) {
     console.error("解析data.type失败:", error);
-    ElMessage.error("解析data.type失败：" + error.message);
+    ElMessage.error("编辑词解析失败：" + error.message);
   }
   initFormData();
 };
