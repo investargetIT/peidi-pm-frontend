@@ -36,6 +36,11 @@ const PERMISSION_ID_LIST = {
     ...MANAGER_ID,
     "1848656573381541890", // 方云
     "1874711258007646210" // 范振吉
+  ],
+  designer: [
+    ...DEV_ID,
+    ...MANAGER_ID,
+    "1926449443739601538" // 王晓莹
   ]
 };
 
@@ -87,7 +92,12 @@ const checkPermission = (name: string) => {
         <ReportExport v-if="activeName === 'reportExport'" />
       </el-tab-pane>
 
-      <el-tab-pane label="设计师考核" name="designer" lazy>
+      <el-tab-pane
+        label="设计考核"
+        name="designer"
+        lazy
+        v-if="checkPermission('designer')"
+      >
         <Designer v-if="activeName === 'designer'" />
       </el-tab-pane>
     </el-tabs>

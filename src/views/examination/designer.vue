@@ -21,21 +21,32 @@ const disabledDate = time => {
 const fetchData = () => {
   getDesignerExaminationRecordResult({
     // 月结束时间
-    end: dayjs(selectedMonth.value).endOf("month").format("YYYY-MM-DD"),
+    end: dayjs(selectedMonth.value)
+      .endOf("month")
+      .format("YYYY-MM-DD 23:59:59"),
     // 月开始时间
-    start: dayjs(selectedMonth.value).startOf("month").format("YYYY-MM-DD")
+    start: dayjs(selectedMonth.value)
+      .startOf("month")
+      .format("YYYY-MM-DD 00:00:00")
   })
     .then((res: any) => {
       if (res.code === 200) {
         // console.log(res);
         // 筛选掉 null 值
-        tableList.value = res.data.filter(item => item !== null) || [];
+        tableList.value =
+          res.data
+            .filter(item => item !== null)
+            .map(item => ({
+              ...item,
+              completeRate: "100%"
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name)) || [];
       } else {
-        ElMessage.error("获取设计师考核记录结果失败：" + res?.msg);
+        ElMessage.error("获取设计考核记录结果失败：" + res?.msg);
       }
     })
     .catch(err => {
-      ElMessage.error("获取设计师考核记录结果失败：" + err?.message);
+      ElMessage.error("获取设计考核记录结果失败：" + err?.message);
     });
 };
 //#endregion
@@ -49,11 +60,17 @@ const handleExport = async () => {
 
   try {
     const columns = [
-      { prop: "name", label: "设计师姓名", width: 20 },
-      { prop: "cnt", label: "考核结果", width: 15 }
+      { prop: "name", label: "姓名", width: 20 },
+      { prop: "cnt", label: "任务数", width: 15 },
+      { prop: "completeRate", label: "完成度", width: 15 }
     ];
 
-    await exportToExcel(tableList.value, columns, "设计师考核记录", "考核记录");
+    await exportToExcel(
+      tableList.value,
+      columns,
+      "设计考核记录 " + selectedMonth.value,
+      "考核记录"
+    );
 
     ElMessage.success("导出成功");
   } catch (error) {
@@ -90,8 +107,9 @@ watch(
       </el-button>
     </div>
     <el-table :data="tableList" border style="width: 100%">
-      <el-table-column label="设计师姓名" prop="name" />
-      <el-table-column label="考核结果" prop="cnt" />
+      <el-table-column label="姓名" prop="name" />
+      <el-table-column label="任务数" prop="cnt" />
+      <el-table-column label="完成度" prop="completeRate" />
     </el-table>
   </div>
 </template>
