@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import Examination from "./examination.vue";
 import ReportExport from "./reportExport.vue";
 import FileUpload from "./fileUpload.vue";
+import Designer from "./designer.vue";
 import NavBar from "./navBar.vue";
 import type { TabsPaneContext } from "element-plus";
 import { storageLocal } from "@pureadmin/utils";
@@ -84,6 +85,10 @@ const checkPermission = (name: string) => {
         v-if="checkPermission('reportExport')"
       >
         <ReportExport v-if="activeName === 'reportExport'" />
+      </el-tab-pane>
+
+      <el-tab-pane label="设计师考核" name="designer" lazy>
+        <Designer v-if="activeName === 'designer'" />
       </el-tab-pane>
     </el-tabs>
   </div>

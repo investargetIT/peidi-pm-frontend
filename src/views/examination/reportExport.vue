@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { getExaminationRecordResult } from "@/api/pmApi";
-import { Download } from "@element-plus/icons-vue";
+import { Download, Upload } from "@element-plus/icons-vue";
 import { exportExaminationTable, formatNumber } from "./utils/export";
 import {
   fetchOBMPerformanceData,
@@ -249,13 +249,13 @@ const handleExportForFinance = async () => {
           <el-button
             type="primary"
             @click="handleExportForFinance"
-            :icon="Download"
+            :icon="Upload"
             color="#217346"
             :loading="exportForFinanceLoading"
           >
             人事导出
           </el-button>
-          <el-button type="primary" @click="handleExport" :icon="Download">
+          <el-button type="primary" @click="handleExport" :icon="Upload">
             导出
           </el-button>
         </div>
