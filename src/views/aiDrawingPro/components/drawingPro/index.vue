@@ -12,6 +12,7 @@ import ResultImg from "./resultImg.vue";
 const resultImgRef = ref(null);
 
 const loading = ref(false);
+const errorMsg = ref("");
 
 const fileList = ref<any[]>([]);
 const imageConfig = ref<any>([]);
@@ -32,6 +33,13 @@ const selectedId = ref<string | null>(null);
  * value: 元素值（图片 base64 或文本内容）
  */
 const formData = ref<Record<string, any>>({});
+
+/**
+ * AI引用状态存储
+ * key: 元素 ID
+ * value: AI引用状态（true 或 false）
+ */
+const aiReferenceStatus = ref<Record<string, boolean>>({});
 
 /**
  * 临时图片数据存储（预览用，未确认）
@@ -58,6 +66,7 @@ const initFormData = () => {
     } else if (item.type === "image") {
       formData.value[item.id] = null;
       tempImageData.value[item.id] = "";
+      aiReferenceStatus.value[item.id] = false;
     }
   });
 };
@@ -116,20 +125,26 @@ const prompt = ref<string>("");
 const demoMode = ref<boolean>(false);
 
 const generateImage = () => {
-  if (!prompt.value.trim()) {
-    ElMessage.warning("请输入提示词");
-    return;
-  }
+  // if (!prompt.value.trim()) {
+  //   ElMessage.warning("请输入提示词");
+  //   return;
+  // }
 
-  const { prompt_, config_ } = handleGenerateImage();
+  const { prompt_, config_, urls_ } = handleGenerateImage();
 
-  testTransferDraw(formatPrompt(prompt_, config_));
+  testTransferDraw(formatPrompt(prompt_, config_), urls_);
 };
 
 const handleGenerateImage = () => {
-  console.log("生成图片:", prompt.value, formData.value);
+  console.log(
+    "生成图片:",
+    prompt.value,
+    formData.value,
+    aiReferenceStatus.value
+  );
 
   // return;
+  const urls_: string[] = [];
 
   const result = imageConfig.value.map(item => {
     const baseItem = {
@@ -151,10 +166,18 @@ const handleGenerateImage = () => {
     }
 
     if (item.type === "image") {
-      return {
-        ...baseItem,
-        image: null
-      };
+      if (aiReferenceStatus.value[item.id] && formData.value[item.id]) {
+        urls_.push(formData.value[item.id]);
+        return {
+          ...baseItem,
+          image: `第${urls_.length + 1}张图`
+        };
+      } else {
+        return {
+          ...baseItem,
+          image: null
+        };
+      }
     }
 
     return baseItem;
@@ -162,18 +185,22 @@ const handleGenerateImage = () => {
 
   console.log("生成图片:", prompt.value);
   console.log("拼接后的配置数据:", result);
+  console.log("图片素材:", urls_);
 
   return {
     prompt_: prompt.value,
-    config_: result
+    config_: result,
+    urls_: urls_
   };
 };
 
 const formatPrompt = (prompt: string, config: any[]) => {
   const temp = `
-第一张图是模板图，已经对模板图做了标记，参数是${JSON.stringify(imageConfig.value)}，
-用户按照参数进行修改，用户的修改是${JSON.stringify(config)}，用户的提示词是${prompt}
-请返回修改后的图片，图片需要包含用户修改的内容，图片元素请删除留白。
+第一张图是模板图，已经对模板图做了标记，参数是${JSON.stringify(imageConfig.value)}
+用户按照参数进行修改，用户的修改是${JSON.stringify(config)}
+其中如果image字段为null，则代表用户需要删除该图片元素，删除后要和底图和谐
+如果image字段不为null，则会在image字段中说明需要使用给你的图片素材里的第几张图，使用告知的图片替换原来的图片元素
+请返回修改后的图片，图片要实现用户修改的内容
 `;
   return temp;
 };
@@ -203,7 +230,7 @@ const imageToBase64 = (imageUrl: string): Promise<string> => {
   });
 };
 // 测试中转模型
-const testTransferDraw = async (prompt: string) => {
+const testTransferDraw = async (prompt: string, urlList: string[]) => {
   // 转换图片为 base64
   let base64Url1 = "";
   let base64Url2 = "";
@@ -227,12 +254,13 @@ const testTransferDraw = async (prompt: string) => {
     aspectRatio: "auto",
     imageSize: "4K",
     shutProgress: false,
-    urls: [base64Url1_]
+    urls: [base64Url1_, ...urlList]
   };
 
-  console.log("请求参数：", params, base64Url1_);
+  console.log("请求参数：", params);
   // return;
   loading.value = true;
+  errorMsg.value = "";
   transferDraw({
     urlParam: JSON.stringify(params)
   })
@@ -248,15 +276,25 @@ const testTransferDraw = async (prompt: string) => {
 
         try {
           const base64String = await imageToBase64(resultUrl);
+
+          const processedFormData = { ...formData.value };
+          Object.keys(aiReferenceStatus.value).forEach(key => {
+            if (aiReferenceStatus.value[key]) {
+              processedFormData[key] = null;
+            }
+          });
+
           resultImgRef.value?.initResultImg(
             imageConfig.value,
-            formData.value,
+            processedFormData,
             base64String // 使用 base64 而不是绝对路径
           );
         } catch (error) {
           console.error("图片转 base64 失败:", error);
           ElMessage.error("图片处理失败:" + error.message);
         }
+      } else {
+        errorMsg.value = res?.msg || "生成失败";
       }
     })
     .finally(() => {
@@ -443,6 +481,10 @@ defineExpose({
                       </div>
                     </div>
                   </el-upload>
+                  <div class="text-sm text-gray-500 mt-3">
+                    <span class="mr-2">AI引用</span>
+                    <el-switch v-model="aiReferenceStatus[item.id]" />
+                  </div>
                 </div>
 
                 <div v-else-if="item.content" class="space-y-2 ml-2">
@@ -471,7 +513,7 @@ defineExpose({
 
               <!-- AI 生成面板 -->
               <div class="mt-6 ai-generate-panel rounded-xl p-5">
-                <div class="mb-3">
+                <div class="mb-3" v-if="false">
                   <div class="panel-title mb-2 flex items-center">
                     <span class="mr-2">✨</span>
                     描述你想要的 Banner 内容
@@ -488,6 +530,7 @@ defineExpose({
                   :rows="3"
                   placeholder="请输入提示词，越详细越好..."
                   class="w-full mb-4"
+                  v-if="false"
                 />
 
                 <div
@@ -508,10 +551,10 @@ defineExpose({
                   :loading="loading"
                   :disabled="!fileList[0]?.url"
                 >
-                  <i class="el-icon-star"></i> 立即生成
+                  <i class="el-icon-star"></i> ✨立即生成
                 </el-button>
 
-                <div class="panel-footer mt-3 text-center">
+                <div class="panel-footer mt-3 text-center" v-if="false">
                   💡 输入提示词，生成的图片将保留在此处
                 </div>
               </div>
@@ -525,6 +568,7 @@ defineExpose({
     <div>
       <ResultImg ref="resultImgRef" />
     </div>
+    <div class="text-red-500 text-sm" v-if="errorMsg">{{ errorMsg }}</div>
   </div>
 </template>
 
