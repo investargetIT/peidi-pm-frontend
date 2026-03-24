@@ -8,6 +8,13 @@ import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterial
 import { loadImage } from "../../utils/imageLoader";
 import { type ImageDataResult } from "../../utils/compressImage";
 
+const props = defineProps({
+  errorMsg: {
+    type: String,
+    required: true
+  }
+});
+
 const imageCacheManager = inject("imageCacheManager") as {
   processImageWithCache: (
     url: string,
@@ -21,7 +28,7 @@ const imageCacheManager = inject("imageCacheManager") as {
 const CANVAS_SIZE = 700;
 const exportSize = ref("800");
 
-const showStatus = ref(false);
+const showStatus = ref(true);
 const resultConfig = ref<any>(null);
 const resultData = ref<any>(null);
 const resultImage = ref<any>(null);
@@ -486,132 +493,146 @@ defineExpose({
 
 <template>
   <div v-if="showStatus">
-    <el-card style="border-radius: 10px">
-      <div class="text-base font-bold mb-4 text-gray-800">结果图片</div>
-      <div class="flex gap-12">
-        <div
-          class="relative result-image-container"
-          :style="{
-            width: `${CANVAS_SIZE}px`,
-            height: `${CANVAS_SIZE}px`,
-            overflow: 'hidden'
-          }"
-          ref="exportContainer"
-          @click="deselectAll"
-        >
-          <img
-            :src="resultImage"
-            alt="图片"
-            :style="{ width: `${CANVAS_SIZE}px`, height: `${CANVAS_SIZE}px` }"
-            class="shadow-md"
-          />
-
-          <template v-for="item in resultConfig">
-            <div
-              :key="item.id"
-              v-if="
-                item?.type === 'image' && (resultData?.[item?.id] || item?.src)
-              "
-              :style="{
-                left: `${item.rect.x * CANVAS_SIZE}px`,
-                top: `${item.rect.y * CANVAS_SIZE}px`,
-                width: `${item.rect.width * CANVAS_SIZE}px`,
-                height: `${item.rect.height * CANVAS_SIZE}px`,
-                cursor: item.dragging ? 'grabbing' : 'pointer'
-              }"
-              class="absolute image-element"
-              :class="{ selected: item.selected }"
-              @mousedown="e => startDrag(e, item)"
-              @click="e => selectElement(e, item)"
-            >
-              <img
-                :src="resultData[item.id] || item.src"
-                :alt="'图片元素' + item.id"
-                class="element-image"
-              />
-
-              <div class="element-controls" v-if="item.selected">
-                <el-button
-                  size="small"
-                  type="danger"
-                  @click="e => deleteImageElement(e, item.id)"
-                  class="delete-btn"
-                >
-                  删除
-                </el-button>
-              </div>
-
-              <div
-                class="resize-handle se"
-                v-if="item.selected"
-                @mousedown="e => resizeImage(e, item, 'se')"
-              ></div>
-              <div
-                class="resize-handle sw"
-                v-if="item.selected"
-                @mousedown="e => resizeImage(e, item, 'sw')"
-              ></div>
-              <div
-                class="resize-handle ne"
-                v-if="item.selected"
-                @mousedown="e => resizeImage(e, item, 'ne')"
-              ></div>
-              <div
-                class="resize-handle nw"
-                v-if="item.selected"
-                @mousedown="e => resizeImage(e, item, 'nw')"
-              ></div>
-            </div>
-          </template>
+    <div class="text-base font-bold mb-4 text-gray-800">结果图片</div>
+    <div class="text-red-500 text-sm" v-if="props.errorMsg">
+      {{ props.errorMsg }}
+    </div>
+    <div class="flex gap-12">
+      <div
+        class="relative result-image-container"
+        :style="{
+          width: `${CANVAS_SIZE}px`,
+          height: `${CANVAS_SIZE}px`,
+          overflow: 'hidden'
+        }"
+        ref="exportContainer"
+        @click="deselectAll"
+      >
+        <img
+          v-if="resultImage"
+          :src="resultImage"
+          alt="图片"
+          :style="{ width: `${CANVAS_SIZE}px`, height: `${CANVAS_SIZE}px` }"
+          class="shadow-md"
+        />
+        <div v-else>
+          <div class="text-gray-500 text-sm">暂无图片</div>
         </div>
 
-        <div>
-          <div class="flex flex-col">
-            <div>
-              <el-button type="primary" @click="importImage"
-                >导入素材</el-button
-              >
-            </div>
-            <span class="text-xs text-gray-500 mt-2">
-              导入的素材将作为可拖动的元素添加到画布中
-            </span>
-          </div>
+        <template v-for="item in resultConfig">
+          <div
+            :key="item.id"
+            v-if="
+              item?.type === 'image' && (resultData?.[item?.id] || item?.src)
+            "
+            :style="{
+              left: `${item.rect.x * CANVAS_SIZE}px`,
+              top: `${item.rect.y * CANVAS_SIZE}px`,
+              width: `${item.rect.width * CANVAS_SIZE}px`,
+              height: `${item.rect.height * CANVAS_SIZE}px`,
+              cursor: item.dragging ? 'grabbing' : 'pointer'
+            }"
+            class="absolute image-element"
+            :class="{ selected: item.selected }"
+            @mousedown="e => startDrag(e, item)"
+            @click="e => selectElement(e, item)"
+          >
+            <img
+              :src="resultData[item.id] || item.src"
+              :alt="'图片元素' + item.id"
+              class="element-image"
+            />
 
-          <div class="mt-12 flex flex-col">
-            <el-select
-              v-model="exportSize"
-              placeholder="请选择导出尺寸"
-              style="width: 160px; margin-right: 10px"
-            >
-              <el-option label="800*800" value="800"></el-option>
-              <el-option label="1400*1400" value="1400"></el-option>
-              <el-option label="2048*2048" value="2048"></el-option>
-              <el-option label="4096*4096" value="4096"></el-option>
-            </el-select>
-            <div class="mt-2">
-              <el-button type="primary" @click="exportAsPNG">
-                导出 PNG
-              </el-button>
-            </div>
-          </div>
-
-          <div class="mt-12">
-            <div>
+            <div class="element-controls" v-if="item.selected">
               <el-button
-                type="primary"
-                @click="handleSaveToMaterialLibraryClick"
+                size="small"
+                type="danger"
+                @click="e => deleteImageElement(e, item.id)"
+                class="delete-btn"
               >
-                保存到素材库
+                删除
               </el-button>
             </div>
 
-            <span class="text-xs text-gray-500 mt-2">
-              素材将保存到【素材库-结果图片】中
-            </span>
+            <div
+              class="resize-handle se"
+              v-if="item.selected"
+              @mousedown="e => resizeImage(e, item, 'se')"
+            ></div>
+            <div
+              class="resize-handle sw"
+              v-if="item.selected"
+              @mousedown="e => resizeImage(e, item, 'sw')"
+            ></div>
+            <div
+              class="resize-handle ne"
+              v-if="item.selected"
+              @mousedown="e => resizeImage(e, item, 'ne')"
+            ></div>
+            <div
+              class="resize-handle nw"
+              v-if="item.selected"
+              @mousedown="e => resizeImage(e, item, 'nw')"
+            ></div>
           </div>
+        </template>
+      </div>
+
+      <div>
+        <div class="flex flex-col">
+          <div>
+            <el-button
+              type="primary"
+              @click="importImage"
+              :disabled="!resultImage"
+            >
+              导入素材
+            </el-button>
+          </div>
+          <span class="text-xs text-gray-500 mt-2">
+            导入的素材将作为可拖动的元素添加到画布中
+          </span>
+        </div>
+
+        <div class="mt-12 flex flex-col">
+          <el-select
+            v-model="exportSize"
+            placeholder="请选择导出尺寸"
+            style="width: 160px; margin-right: 10px"
+          >
+            <el-option label="800*800" value="800"></el-option>
+            <el-option label="1400*1400" value="1400"></el-option>
+            <el-option label="2048*2048" value="2048"></el-option>
+            <el-option label="4096*4096" value="4096"></el-option>
+          </el-select>
+          <div class="mt-2">
+            <el-button
+              type="primary"
+              :disabled="!resultImage"
+              @click="exportAsPNG"
+            >
+              导出 PNG
+            </el-button>
+          </div>
+        </div>
+
+        <div class="mt-12">
+          <div>
+            <el-button
+              type="primary"
+              @click="handleSaveToMaterialLibraryClick"
+              :disabled="!resultImage"
+            >
+              保存到素材库
+            </el-button>
+          </div>
+
+          <span class="text-xs text-gray-500 mt-2">
+            素材将保存到【素材库-结果图片】中
+          </span>
         </div>
       </div>
-    </el-card>
+    </div>
   </div>
 </template>
 

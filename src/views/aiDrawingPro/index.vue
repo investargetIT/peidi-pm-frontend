@@ -206,6 +206,9 @@ watch(activeTab, (newVal, oldVal) => {
     if (newVal === "Material") {
       materialTabRef.value?.fetchMaterialPage();
     }
+    if (newVal === "DrawingPro") {
+      drawingProTabRef.value?.clearTableCard();
+    }
   }
 });
 
