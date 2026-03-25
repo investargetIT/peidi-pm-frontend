@@ -44,6 +44,13 @@ const formData = ref<Record<string, any>>({});
 const aiReferenceStatus = ref<Record<string, boolean>>({});
 
 /**
+ * 是否保留状态存储
+ * key: 元素 ID
+ * value: 是否填充状态
+ */
+const isKeepStatus = ref<Record<string, boolean>>({});
+
+/**
  * 临时图片数据存储（预览用，未确认）
  * key: 元素 ID
  * value: 图片 base64 字符串
@@ -69,6 +76,7 @@ const initFormData = () => {
       formData.value[item.id] = null;
       tempImageData.value[item.id] = "";
       aiReferenceStatus.value[item.id] = false;
+      isKeepStatus.value[item.id] = false;
     }
   });
 };
@@ -122,6 +130,17 @@ const handleCancelUpload = (itemId: string) => {
   tempImageData.value[itemId] = "";
 };
 
+/**
+ * 删除已上传的图片
+ * @param itemId - 元素 ID
+ */
+const handleDeleteImage = (itemId: string) => {
+  formData.value[itemId] = null;
+  aiReferenceStatus.value[itemId] = false;
+  isKeepStatus.value[itemId] = false;
+  // ElMessage.success("图片已删除");
+};
+
 // ==================== AI 生成功能 ====================
 const prompt = ref<string>("");
 const demoMode = ref<boolean>(false);
@@ -142,7 +161,8 @@ const handleGenerateImage = () => {
     "生成图片:",
     prompt.value,
     formData.value,
-    aiReferenceStatus.value
+    aiReferenceStatus.value,
+    isKeepStatus.value
   );
 
   // return;
@@ -168,11 +188,18 @@ const handleGenerateImage = () => {
     }
 
     if (item.type === "image") {
-      if (aiReferenceStatus.value[item.id] && formData.value[item.id]) {
+      if (formData.value[item.id] && aiReferenceStatus.value[item.id]) {
         urls_.push(formData.value[item.id]);
         return {
           ...baseItem,
           image: `第${urls_.length + 1}张图`
+        };
+      }
+      if (!formData.value[item.id] && isKeepStatus.value[item.id]) {
+        return {
+          ...baseItem,
+          image: null,
+          keep: true
         };
       } else {
         return {
@@ -200,7 +227,8 @@ const formatPrompt = (prompt: string, config: any[]) => {
   const temp = `
 第一张图是模板图，已经对模板图做了标记，参数是${JSON.stringify(imageConfig.value)}
 用户按照参数进行修改，用户的修改是${JSON.stringify(config)}
-其中如果image字段为null，则代表用户需要删除该图片元素，删除后要和底图和谐
+其中如果image字段为null但keep字段为true，则代表用户需要保留该图片元素
+如果image字段为null但keep字段不存在或为false，则代表用户需要删除该图片元素，删除后要和底图和谐
 如果image字段不为null，则会在image字段中说明需要使用给你的图片素材里的第几张图，使用告知的图片替换原来的图片元素
 请返回修改后的图片，图片要实现用户修改的内容
 `;
@@ -486,6 +514,16 @@ defineExpose({
                             :src="formData[item.id]"
                             class="max-h-[120px] max-w-full mx-auto rounded"
                           />
+                          <div class="absolute top-1 right-1">
+                            <el-button
+                              type="danger"
+                              size="small"
+                              circle
+                              @click.stop="handleDeleteImage(item.id)"
+                            >
+                              <el-icon><Delete /></el-icon>
+                            </el-button>
+                          </div>
                           <div class="text-sm text-gray-600 mt-2">
                             点击重新上传
                           </div>
@@ -496,9 +534,42 @@ defineExpose({
                         </div>
                       </div>
                     </el-upload>
-                    <div class="text-sm text-gray-500 mt-3">
-                      <span class="mr-2">AI引用</span>
+                    <div
+                      v-if="formData[item.id]"
+                      class="text-sm text-gray-500 mt-3 flex items-center"
+                    >
+                      <span>AI引用</span>
+                      <el-tooltip
+                        effect="dark"
+                        content="开启后由AI负责渲染图片"
+                        placement="top-start"
+                        :show-after="250"
+                      >
+                        <el-icon class="mr-2 cursor-pointer"
+                          ><QuestionFilled
+                        /></el-icon>
+                      </el-tooltip>
+
                       <el-switch v-model="aiReferenceStatus[item.id]" />
+                    </div>
+
+                    <div
+                      v-else
+                      class="text-sm text-gray-500 mt-3 flex items-center"
+                    >
+                      <span>是否保留</span>
+                      <el-tooltip
+                        effect="dark"
+                        content="开启后会自动保留图片，不被AI擦除"
+                        placement="top-start"
+                        :show-after="250"
+                      >
+                        <el-icon class="mr-2 cursor-pointer"
+                          ><QuestionFilled
+                        /></el-icon>
+                      </el-tooltip>
+
+                      <el-switch v-model="isKeepStatus[item.id]" />
                     </div>
                   </div>
 

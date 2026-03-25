@@ -172,6 +172,7 @@ const handleDescriptorInfo = (data: any) => {
 };
 
 const handleEditPhraseInfo = (data: any) => {
+  console.log("handleClickRate:", data);
   editPhraseInfoRef.value?.initDetailForm(data);
 };
 

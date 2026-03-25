@@ -30,6 +30,7 @@ export const exportConfigToExcel = async (
       key: string;
       width: number;
       isAIRef?: boolean;
+      isKeepRef?: boolean;
     }> = [];
 
     let colIndex = 0;
@@ -55,6 +56,12 @@ export const exportConfigToExcel = async (
           key: `col_${colIndex++}`,
           width: 15,
           isAIRef: true
+        });
+        headers.push({
+          header: `${item.name}-是否保留`,
+          key: `col_${colIndex++}`,
+          width: 15,
+          isKeepRef: true
         });
       } else if (item.type === "group" && item.content) {
         // 组合类型：每个子字段占一列
@@ -88,7 +95,7 @@ export const exportConfigToExcel = async (
         right: { style: "thin" }
       };
 
-      // AI 引用列用不同颜色标记
+      // AI 引用列和是否保留列用不同颜色标记
       const colConfig = headers[colNum - 1];
       if (colConfig?.isAIRef) {
         cell.fill = {
@@ -96,13 +103,19 @@ export const exportConfigToExcel = async (
           pattern: "solid",
           fgColor: { argb: "FF70AD47" }
         };
+      } else if (colConfig?.isKeepRef) {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFFFB961" }
+        };
       }
     });
 
     // 添加一行示例数据（可选，方便用户理解格式）
     const dataRow: any = {};
     headers.forEach((header, index) => {
-      if (header.isAIRef) {
+      if (header.isAIRef || header.isKeepRef) {
         dataRow[`col_${index}`] = "否";
       } else {
         dataRow[`col_${index}`] = "";
@@ -199,6 +212,9 @@ export const importConfigFromExcel = async (
             if (header && header.includes("-AI 引用")) {
               const baseName = header.replace("-AI 引用", "");
               rowData[`${baseName}_aiRef`] = value === "是" ? true : false;
+            } else if (header && header.includes("-是否保留")) {
+              const baseName = header.replace("-是否保留", "");
+              rowData[`${baseName}_keepRef`] = value === "是" ? true : false;
             } else if (header) {
               // 解析列名，提取字段信息
               // 格式：标签名 (配置名) 或 配置名

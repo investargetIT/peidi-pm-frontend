@@ -43,7 +43,7 @@ const tableColumns = computed(() => {
     prop: string;
     label: string;
     width?: number;
-    type?: "text" | "image" | "aiRef";
+    type?: "text" | "image" | "aiRef" | "keepRef";
   }> = [];
 
   let index = 0;
@@ -66,9 +66,15 @@ const tableColumns = computed(() => {
       });
       columns.push({
         prop: `${item.id}_aiRef`,
-        label: `AI 引用`,
+        label: `AI引用`,
         width: 100,
         type: "aiRef"
+      });
+      columns.push({
+        prop: `${item.id}_keepRef`,
+        label: `是否保留`,
+        width: 100,
+        type: "keepRef"
       });
     } else if (item.type === "group" && item.content) {
       item.content.forEach(field => {
@@ -185,6 +191,11 @@ const renderCell = (row: Record<string, any>, column: any) => {
     return value ? "是" : "否";
   }
 
+  // 是否保留列显示开关状态
+  if (prop.endsWith("_keepRef")) {
+    return value ? "是" : "否";
+  }
+
   // 其他列直接显示值
   return value || "-";
 };
@@ -248,11 +259,19 @@ const buildPrompt = (rowData: Record<string, any>) => {
     if (item.type === "image") {
       const imageData = rowData[`${item.id}_image`];
       const aiRef = rowData[`${item.id}_aiRef`];
+      const keepRef = rowData[`${item.id}_keepRef`];
 
       if (aiRef && imageData) {
         return {
           ...baseItem,
           image: "第 1 张图"
+        };
+      }
+      if (!imageData && keepRef) {
+        return {
+          ...baseItem,
+          image: null,
+          keep: true
         };
       } else {
         return {
@@ -268,7 +287,8 @@ const buildPrompt = (rowData: Record<string, any>) => {
   const prompt = `
 第一张图是模板图，已经对模板图做了标记，参数是${JSON.stringify(props.imageConfig)}
 用户按照参数进行修改，用户的修改是${JSON.stringify(config)}
-其中如果 image 字段为 null，则代表用户需要删除该图片元素，删除后要和底图和谐
+其中如果 image 字段为 null 但 keep 字段为 true，则代表用户需要保留该图片元素
+如果 image 字段为 null 但 keep 字段不存在或为 false，则代表用户需要删除该图片元素，删除后要和底图和谐
 如果 image 字段不为 null，则会在 image 字段中说明需要使用给你的图片素材里的第几张图，使用告知的图片替换原来的图片元素
 请返回修改后的图片，图片要实现用户修改的内容
 `;

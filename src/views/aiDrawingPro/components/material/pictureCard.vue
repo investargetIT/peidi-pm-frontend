@@ -45,6 +45,11 @@ const getMTType = computed(() => {
   return JSON.parse(props.data.type)?.mtype || "";
 });
 
+const getEditPhraseInfo = computed(() => {
+  return JSON.parse(props.data.type)?.editPhraseInfo?.editPhraseInfo === "";
+  // return true;
+});
+
 const handleDelete = () => {
   ElMessageBox.confirm(
     `确定删除素材【${getNameFromObjectName(props.data.objectName)}】吗？`,
@@ -120,14 +125,22 @@ const handleDelete = () => {
           >
             编辑词
           </el-button>
-          <el-button
-            type="success"
-            @click="props.handleModuleEdit(props.data)"
-            text
-            v-if="getMTType === 'template'"
+          <el-tooltip
+            content="请先填写编辑词"
+            placement="top"
+            :disabled="!getEditPhraseInfo"
+            :show-after="200"
           >
-            模板编辑
-          </el-button>
+            <el-button
+              type="primary"
+              @click="props.handleModuleEdit(props.data)"
+              text
+              v-if="getMTType === 'template'"
+              :disabled="getEditPhraseInfo"
+            >
+              模板编辑
+            </el-button>
+          </el-tooltip>
           <el-button
             type="warning"
             @click="props.handleClickRate(props.data)"

@@ -26,5 +26,9 @@ export const MATERIAL_LIBRARY_TABS = [
   {
     label: "结果图片",
     name: "resultImage"
+  },
+  {
+    label: "组件素材",
+    name: "componentMaterial"
   }
 ];
