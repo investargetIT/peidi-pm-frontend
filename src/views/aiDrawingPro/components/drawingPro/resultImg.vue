@@ -106,17 +106,8 @@ const handleMouseMove = (event: MouseEvent) => {
   const x = event.clientX - containerRect.value.left - dragOffset.value.x;
   const y = event.clientY - containerRect.value.top - dragOffset.value.y;
 
-  const normalizedX = Math.max(
-    0,
-    Math.min(x / CANVAS_SIZE, 1 - dragElement.value.rect.width)
-  );
-  const normalizedY = Math.max(
-    0,
-    Math.min(y / CANVAS_SIZE, 1 - dragElement.value.rect.height)
-  );
-
-  dragElement.value.rect.x = normalizedX;
-  dragElement.value.rect.y = normalizedY;
+  dragElement.value.rect.x = x / CANVAS_SIZE;
+  dragElement.value.rect.y = y / CANVAS_SIZE;
 };
 
 const handleMouseUp = () => {
@@ -143,64 +134,24 @@ const resizeImage = (event: MouseEvent, element: any, direction: string) => {
 
     switch (direction) {
       case "se":
-        element.rect.width = Math.max(
-          0.1,
-          Math.min(startWidth + deltaX / CANVAS_SIZE, 1 - element.rect.x)
-        );
-        element.rect.height = Math.max(
-          0.1,
-          Math.min(startHeight + deltaY / CANVAS_SIZE, 1 - element.rect.y)
-        );
+        element.rect.width = Math.max(0.1, startWidth + deltaX / CANVAS_SIZE);
+        element.rect.height = Math.max(0.1, startHeight + deltaY / CANVAS_SIZE);
         break;
       case "sw":
-        const newWidthSW = Math.max(
-          0.1,
-          Math.min(
-            startWidth - deltaX / CANVAS_SIZE,
-            element.rect.x + element.rect.width
-          )
-        );
-        element.rect.x = Math.max(0, startXPos + deltaX / CANVAS_SIZE);
-        element.rect.width = newWidthSW;
-        element.rect.height = Math.max(
-          0.1,
-          Math.min(startHeight + deltaY / CANVAS_SIZE, 1 - element.rect.y)
-        );
+        element.rect.width = Math.max(0.1, startWidth - deltaX / CANVAS_SIZE);
+        element.rect.x = startXPos + deltaX / CANVAS_SIZE;
+        element.rect.height = Math.max(0.1, startHeight + deltaY / CANVAS_SIZE);
         break;
       case "ne":
-        element.rect.width = Math.max(
-          0.1,
-          Math.min(startWidth + deltaX / CANVAS_SIZE, 1 - element.rect.x)
-        );
-        const newYNE = Math.max(0, startYPos + deltaY / CANVAS_SIZE);
-        element.rect.y = newYNE;
-        element.rect.height = Math.max(
-          0.1,
-          Math.min(
-            startHeight - deltaY / CANVAS_SIZE,
-            element.rect.y + element.rect.height
-          )
-        );
+        element.rect.width = Math.max(0.1, startWidth + deltaX / CANVAS_SIZE);
+        element.rect.y = startYPos + deltaY / CANVAS_SIZE;
+        element.rect.height = Math.max(0.1, startHeight - deltaY / CANVAS_SIZE);
         break;
       case "nw":
-        const newWidthNW = Math.max(
-          0.1,
-          Math.min(
-            startWidth - deltaX / CANVAS_SIZE,
-            element.rect.x + element.rect.width
-          )
-        );
-        element.rect.x = Math.max(0, startXPos + deltaX / CANVAS_SIZE);
-        element.rect.width = newWidthNW;
-        const newYNW = Math.max(0, startYPos + deltaY / CANVAS_SIZE);
-        element.rect.y = newYNW;
-        element.rect.height = Math.max(
-          0.1,
-          Math.min(
-            startHeight - deltaY / CANVAS_SIZE,
-            element.rect.y + element.rect.height
-          )
-        );
+        element.rect.width = Math.max(0.1, startWidth - deltaX / CANVAS_SIZE);
+        element.rect.x = startXPos + deltaX / CANVAS_SIZE;
+        element.rect.y = startYPos + deltaY / CANVAS_SIZE;
+        element.rect.height = Math.max(0.1, startHeight - deltaY / CANVAS_SIZE);
         break;
     }
   };
@@ -473,10 +424,14 @@ const exportAsPNG = async () => {
   }
 };
 
-const handleResize = () => {};
+const handleResize = () => {
+  updateContainerRect();
+};
 
 onMounted(() => {
-  window.addEventListener("resize", handleResize);
+  nextTick(() => {
+    window.addEventListener("resize", handleResize);
+  });
 });
 
 onUnmounted(() => {
@@ -506,6 +461,8 @@ defineExpose({
           overflow: 'hidden'
         }"
         ref="exportContainer"
+        @mouseup="handleMouseUp"
+        @mouseleave="handleMouseUp"
         @click="deselectAll"
       >
         <img
@@ -628,7 +585,7 @@ defineExpose({
           </div>
 
           <span class="text-xs text-gray-500 mt-2">
-            素材将保存到【素材库-结果图片】中
+            素材将保存到【素材库 - 结果图片】中
           </span>
         </div>
       </div>
@@ -637,6 +594,11 @@ defineExpose({
 </template>
 
 <style lang="scss" scoped>
+.result-image-container {
+  position: relative;
+  overflow: hidden;
+}
+
 .image-element {
   border: 2px solid transparent;
   border-radius: 4px;

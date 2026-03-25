@@ -251,7 +251,7 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
   const base64Url1_ = await blobManager.blobToBase64(fileList.value[0].raw);
 
   const params = {
-    model: "nano-banana-pro",
+    model: "nano-banana-fast",
     prompt: prompt,
     aspectRatio: "auto",
     imageSize: "4K",
@@ -581,16 +581,17 @@ defineExpose({
 
       <el-divider />
 
-      <div class="mt-4">
+      <div class="mt-4" v-if="fileList[0]?.url">
         <ResultImg ref="resultImgRef" :errorMsg="errorMsg" />
       </div>
     </el-card>
 
-    <div class="mt-4">
+    <div class="mt-4" v-if="fileList[0]?.url">
       <TableCard
         :imageConfig="imageConfig"
         :imageName="imageName"
         ref="tableCardRef"
+        :fileList="fileList"
       />
     </div>
   </div>
