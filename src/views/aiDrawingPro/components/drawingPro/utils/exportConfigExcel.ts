@@ -31,6 +31,7 @@ export const exportConfigToExcel = async (
       width: number;
       isAIRef?: boolean;
       isKeepRef?: boolean;
+      isImage?: boolean;
     }> = [];
 
     let colIndex = 0;
@@ -39,7 +40,7 @@ export const exportConfigToExcel = async (
         // 文本类型：每个子字段占一列
         item.content.forEach(field => {
           headers.push({
-            header: `${field.label}(${item.name})`,
+            header: `${field.label}`,
             key: `col_${colIndex++}`,
             width: 20
           });
@@ -49,7 +50,8 @@ export const exportConfigToExcel = async (
         headers.push({
           header: `${item.name}`,
           key: `col_${colIndex++}`,
-          width: 25
+          width: 25,
+          isImage: true
         });
         headers.push({
           header: `${item.name}-AI 引用`,
@@ -97,7 +99,13 @@ export const exportConfigToExcel = async (
 
       // AI 引用列和是否保留列用不同颜色标记
       const colConfig = headers[colNum - 1];
-      if (colConfig?.isAIRef) {
+      if (colConfig?.isImage) {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF4BACC6" }
+        };
+      } else if (colConfig?.isAIRef) {
         cell.fill = {
           type: "pattern",
           pattern: "solid",

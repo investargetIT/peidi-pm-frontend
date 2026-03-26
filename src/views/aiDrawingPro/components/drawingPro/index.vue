@@ -4,7 +4,7 @@ import { IMG_CONFIG } from "./utils/config";
 import imageUrl1 from "@/views/debug/assets/绘图1.png";
 import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 import { ElMessage } from "element-plus";
-import { downloadFile, transferDraw } from "@/api/aiDraw";
+import { downloadFile, getMaterialPage, transferDraw } from "@/api/aiDraw";
 import { imageCache } from "../../utils/imageCache";
 import { blobManager } from "../../utils/blobManager";
 import ResultImg from "./resultImg.vue";
@@ -18,6 +18,8 @@ const errorMsg = ref("");
 const fileList = ref<any[]>([]);
 const imageConfig = ref<any>([]);
 const imageName = ref("");
+
+const materialList = ref<any>({});
 
 /**
  * 画布尺寸配置（单位：px）
@@ -81,9 +83,39 @@ const initFormData = () => {
   });
 };
 
-// onMounted(() => {
-//   initFormData();
-// });
+const fetchMaterialPage = () => {
+  return getMaterialPage({
+    pageNo: 1,
+    pageSize: 9999
+  })
+    .then((res: any) => {
+      if (res.code === 200) {
+        const materialListTemp = {};
+        res.data.records.forEach((item: any) => {
+          const mtype = JSON.parse(item.type)?.mtype;
+          if (mtype) {
+            if (!materialListTemp[mtype]) {
+              materialListTemp[mtype] = [item];
+            } else {
+              materialListTemp[mtype].push(item);
+            }
+          }
+        });
+
+        materialList.value = materialListTemp;
+      } else {
+        ElMessage.error("获取素材库失败:" + res.msg);
+      }
+    })
+    .catch(error => {
+      ElMessage.error("获取素材库失败:" + error.message);
+    });
+};
+
+onMounted(() => {
+  fetchMaterialPage();
+  // initFormData();
+});
 
 /**
  * 处理元素选中/取消选中
@@ -663,6 +695,7 @@ defineExpose({
         :imageName="imageName"
         ref="tableCardRef"
         :fileList="fileList"
+        :materialList="materialList"
       />
     </div>
   </div>

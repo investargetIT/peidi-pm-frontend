@@ -50,6 +50,18 @@ const getEditPhraseInfo = computed(() => {
   // return true;
 });
 
+const copyName = () => {
+  const name = getNameFromObjectName(props.data.objectName);
+  navigator.clipboard
+    .writeText(name)
+    .then(() => {
+      ElMessage.success("名称已复制");
+    })
+    .catch(() => {
+      ElMessage.error("复制失败");
+    });
+};
+
 const handleDelete = () => {
   ElMessageBox.confirm(
     `确定删除素材【${getNameFromObjectName(props.data.objectName)}】吗？`,
@@ -84,11 +96,22 @@ const handleDelete = () => {
   <div>
     <el-card shadow="hover" style="width: 240px">
       <template #header>
-        <el-text class="w-full" truncated size="large">
-          <span class="text-[#000] font-bold text-[14px]">{{
-            getNameFromObjectName(props.data.objectName)
-          }}</span>
-        </el-text>
+        <el-tooltip
+          :content="getNameFromObjectName(props.data.objectName)"
+          placement="top"
+          :show-after="300"
+        >
+          <el-text
+            class="w-full cursor-pointer hover:text-[var(--el-color-primary)]"
+            truncated
+            size="large"
+            @click="copyName"
+          >
+            <span class="text-[#000] font-bold text-[14px]">{{
+              getNameFromObjectName(props.data.objectName)
+            }}</span>
+          </el-text>
+        </el-tooltip>
       </template>
       <template #footer>
         <el-space wrap>

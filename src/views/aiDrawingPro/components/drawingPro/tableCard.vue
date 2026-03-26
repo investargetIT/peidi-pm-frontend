@@ -10,6 +10,7 @@ import imageUrl1 from "@/views/debug/assets/绘图1.png";
 import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 import { blobManager } from "../../utils/blobManager";
 import ResultDialog from "./resultDialog.vue";
+import OnlineImg from "../../common/onlineImg.vue";
 
 const props = defineProps({
   imageConfig: {
@@ -23,6 +24,10 @@ const props = defineProps({
   fileList: {
     type: Array<any>,
     required: true
+  },
+  materialList: {
+    type: Object as PropType<{ [key: string]: any[] }>,
+    default: () => ({})
   }
 });
 
@@ -66,7 +71,7 @@ const tableColumns = computed(() => {
       });
       columns.push({
         prop: `${item.id}_aiRef`,
-        label: `AI引用`,
+        label: `AI 引用`,
         width: 100,
         type: "aiRef"
       });
@@ -92,8 +97,96 @@ const tableColumns = computed(() => {
 });
 
 const exportConfig = () => {
-  console.log("imageConfig:", props.imageConfig, props.imageName);
+  // console.log("imageConfig:", props.imageConfig, props.imageName);
   exportConfigToExcel(props.imageConfig, props.imageName);
+};
+
+/**
+ * 在素材库中寻找是否有符合要求的图片
+ */
+const findMaterialImage = (
+  materialList: { [key: string]: any[] },
+  imageType: string,
+  imageUrl: string
+) => {
+  // console.log(
+  //   "在素材库中寻找是否有符合要求的图片:",
+  //   materialList,
+  //   imageType,
+  //   imageUrl
+  // );
+  const material = materialList[imageType]?.find((item: any) =>
+    item.objectName?.includes("/" + imageUrl + ".")
+  );
+  return material?.objectName || null;
+};
+
+/**
+ * Excel 数据解析函数
+ */
+const parseExcelData = (jsonData: any[]) => {
+  const result: Array<Record<string, any> & { _id: number }> = [];
+
+  for (const row of jsonData) {
+    try {
+      const parsedRow: Record<string, any> = {};
+
+      props.imageConfig.forEach(item => {
+        if (item.type === "text" && item.content) {
+          item.content.forEach(field => {
+            // console.log("field:", field);
+            const key = `${item.id}_${field.label}`;
+            parsedRow[key] = row[field.label] || "";
+          });
+        } else if (item.type === "image") {
+          const imageKey = `${item.id}_image`;
+          const aiRefKey = `${item.id}_aiRef`;
+          const keepRefKey = `${item.id}_keepRef`;
+
+          const imageName = row[item.name];
+          // console.log("数据解析函数", imageName, props.materialList);
+
+          if (imageName && props.materialList["componentMaterial"]) {
+            const materialObjectName = findMaterialImage(
+              props.materialList,
+              "componentMaterial",
+              imageName
+            );
+
+            // console.log("materialObjectName:", materialObjectName);
+
+            if (materialObjectName) {
+              parsedRow[imageKey] = materialObjectName;
+            } else {
+              parsedRow[imageKey] = null;
+            }
+          } else {
+            parsedRow[imageKey] = null;
+          }
+
+          parsedRow[aiRefKey] =
+            row[`${item.name}_AI 引用`] === "是" ||
+            row[`${item.name}_AI 引用`] === true ||
+            false;
+          parsedRow[keepRefKey] =
+            row[`${item.name}_是否保留`] === "是" ||
+            row[`${item.name}_是否保留`] === true ||
+            false;
+        } else if (item.type === "group" && item.content) {
+          item.content.forEach(field => {
+            const key = `${item.id}_${field.label}`;
+            parsedRow[key] = row[field.label] || "";
+          });
+        }
+      });
+
+      result.push(parsedRow as Record<string, any> & { _id: number });
+    } catch (error) {
+      console.error("解析 Excel 行数据错误:", error);
+    }
+  }
+
+  return result;
 };
 
 // 导入配置
@@ -101,45 +194,87 @@ const importConfig = () => {
   const input = document.createElement("input");
   input.type = "file";
   input.accept = ".xlsx,.xls";
+  input.style.display = "none";
+
   input.onchange = async (e: Event) => {
     const target = e.target as HTMLInputElement;
     const file = target.files?.[0];
 
-    if (!file) return;
+    if (!file) {
+      document.body.removeChild(input);
+      return;
+    }
 
     try {
-      // 导入 Excel 数据
-      const importedData = await importConfigFromExcel(file, props.imageConfig);
+      const reader = new FileReader();
+      reader.onload = async (event: ProgressEvent<FileReader>) => {
+        try {
+          const data = new Uint8Array(event.target?.result as ArrayBuffer);
+          const XLSX = await import("xlsx");
+          const workbook = XLSX.read(data, { type: "array" });
+          // console.log("workbook:", workbook);
 
-      ElMessageBox.confirm(
-        `成功导入 ${importedData.length} 条配置数据，是否添加到列表？`,
-        "导入确认",
-        {
-          confirmButtonText: "确定",
-          cancelButtonText: "取消",
-          type: "warning"
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+          if (jsonData.length === 0) {
+            ElMessage.warning("Excel 文件中没有数据");
+            document.body.removeChild(input);
+            return;
+          }
+
+          const importedData = parseExcelData(jsonData);
+
+          ElMessageBox.confirm(
+            `成功导入 ${importedData.length} 条配置数据，是否添加到列表？`,
+            "导入确认",
+            {
+              confirmButtonText: "确定",
+              cancelButtonText: "取消",
+              type: "warning"
+            }
+          )
+            .then(() => {
+              const dataWithId = importedData.map((data, index) => ({
+                ...data,
+                _id: Date.now() + index
+              }));
+
+              importedDataList.value = [
+                ...importedDataList.value,
+                ...dataWithId
+              ];
+              // console.log("导入数据:", importedDataList.value);
+
+              ElMessage.success(`导入成功，共 ${importedData.length} 条数据`);
+            })
+            .catch(() => {});
+        } catch (error) {
+          console.error("Excel 解析错误:", error);
+          ElMessage.error("Excel 文件解析失败：" + (error as Error).message);
+        } finally {
+          document.body.removeChild(input);
         }
-      )
-        .then(() => {
-          // 为每行数据添加唯一 ID
-          const dataWithId = importedData.map((data, index) => ({
-            ...data,
-            _id: Date.now() + index
-          }));
+      };
 
-          // 添加到列表中
-          importedDataList.value = [...importedDataList.value, ...dataWithId];
+      reader.onerror = () => {
+        ElMessage.error("文件读取失败");
+        document.body.removeChild(input);
+      };
 
-          ElMessage.success(`导入成功，共 ${importedData.length} 条数据`);
-        })
-        .catch(() => {
-          // 用户取消
-        });
+      reader.readAsArrayBuffer(file);
     } catch (error) {
       ElMessage.error("导入失败：" + (error as Error).message);
+      document.body.removeChild(input);
     }
   };
 
+  input.oncancel = () => {
+    document.body.removeChild(input);
+  };
+
+  document.body.appendChild(input);
   input.click();
 };
 
@@ -308,7 +443,24 @@ const collectImageUrls = (rowData: Record<string, any>): string[] => {
       const aiRef = rowData[`${item.id}_aiRef`];
 
       if (aiRef && imageData) {
-        urls.push(imageData);
+        if (props.materialList[item.id]) {
+          const material = props.materialList[item.id].find(
+            (mat: any) => mat.objectName === imageData || mat.url === imageData
+          );
+          if (material && material.url) {
+            urls.push(material.url);
+          } else if (
+            typeof imageData === "string" &&
+            imageData.startsWith("http")
+          ) {
+            urls.push(imageData);
+          }
+        } else if (
+          typeof imageData === "string" &&
+          imageData.startsWith("http")
+        ) {
+          urls.push(imageData);
+        }
       }
     }
   });
@@ -459,7 +611,7 @@ const resultDialogRef = ref<typeof ResultDialog>();
  * 预览并编辑图片
  */
 const handlePreviewImage = (imageUrl: string, rowData?: any) => {
-  console.log("预览图片:", imageUrl, rowData);
+  // console.log("预览图片:", imageUrl, rowData);
   resultDialogRef.value?.open(imageUrl, rowData);
 };
 
@@ -584,7 +736,16 @@ defineExpose({
             align="center"
           >
             <template #default="{ row }">
-              <div v-html="renderCell(row, { property: col.prop })"></div>
+              <div v-if="col.type === 'image' && row[col.prop]">
+                <div>
+                  <span class="text-xs">{{ row[col.prop] }}</span>
+                  <OnlineImg :url="row[col.prop]" size="70px" />
+                </div>
+              </div>
+              <div
+                v-else
+                v-html="renderCell(row, { property: col.prop })"
+              ></div>
             </template>
           </el-table-column>
 
