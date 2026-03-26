@@ -15,6 +15,8 @@ const resultImgRef = ref(null);
 
 const loading = ref(false);
 const errorMsg = ref("");
+const timerInterval = ref<number>(0);
+let timerId: number | null = null;
 
 const fileList = ref<any[]>([]);
 const imageConfig = ref<any>([]);
@@ -80,6 +82,15 @@ const tempMaterialSelect = ref<Record<string, string>>({});
 const cardRefs = ref<Record<string, any>>({});
 
 /**
+ * 格式化时间为 mm:ss 格式
+ */
+const formatTime = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+};
+
+/**
  * 初始化表单数据
  * 根据 IMG_CONFIG 配置为每个元素设置默认值
  */
@@ -130,7 +141,7 @@ const fetchMaterialPage = () => {
 };
 
 onMounted(() => {
-  fetchMaterialPage();
+  // fetchMaterialPage();
   // initFormData();
 });
 
@@ -367,6 +378,17 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
   // return;
   loading.value = true;
   errorMsg.value = "";
+
+  if (timerId) {
+    clearInterval(timerId);
+    timerId = null;
+  }
+
+  timerInterval.value = 0;
+  timerId = window.setInterval(() => {
+    timerInterval.value += 1;
+  }, 1000);
+
   transferDraw({
     urlParam: JSON.stringify(params)
   })
@@ -405,6 +427,10 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
     })
     .finally(() => {
       loading.value = false;
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
     });
 };
 
@@ -466,8 +492,9 @@ const initDrawingPro = async (data: any) => {
 
 // 清空批量操作表单数据
 const tableCardRef = ref(null);
-const clearTableCard = () => {
+const clearTableCard = async () => {
   tableCardRef.value?.closeClearAll();
+  await fetchMaterialPage();
 };
 
 defineExpose({
@@ -478,8 +505,23 @@ defineExpose({
 
 <template>
   <div>
-    <el-card shadow="never" style="border-radius: 10px">
-      <div class="text-base font-bold text-gray-800">{{ imageName }}</div>
+    <el-card
+      shadow="never"
+      style="border-radius: 10px; background-color: #f5f7fa"
+    >
+      <template #header>
+        <div class="card-header">
+          <span>
+            <span>演示模式</span>
+            <span class="text-sm text-gray-500">
+              (实时编辑预览单张模板图，可调整模板图价格、活动时间等元素，确认效果后可批量生成)
+            </span>
+          </span>
+        </div>
+      </template>
+      <div class="text-base font-bold text-gray-800">
+        {{ imageName }}
+      </div>
       <el-row>
         <!-- 左侧：图片展示区域 -->
         <el-col :span="16">
@@ -797,6 +839,12 @@ defineExpose({
                     :disabled="!fileList[0]?.url"
                   >
                     <i class="el-icon-star"></i> ✨立即生成
+                    <span
+                      v-if="loading && timerInterval > 0"
+                      class="ml-2 text-sm"
+                    >
+                      ({{ formatTime(timerInterval) }})
+                    </span>
                   </el-button>
 
                   <div class="panel-footer mt-3 text-center" v-if="false">

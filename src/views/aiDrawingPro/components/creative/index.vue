@@ -273,7 +273,7 @@ defineExpose({
 <template>
   <div>
     <el-row :gutter="20">
-      <el-col :xs="24" :sm="24" :md="12" :lg="8">
+      <el-col :xs="24" :sm="24" :md="12" :lg="8" class="mb-5 xl:mb-0 ">
         <el-card
           shadow="never"
           style="border-radius: 10px"
@@ -392,7 +392,7 @@ defineExpose({
         </el-card>
       </el-col>
 
-      <el-col :xs="24" :sm="24" :md="12" :lg="9">
+      <el-col :xs="24" :sm="24" :md="12" :lg="9" class="mb-5 xl:mb-0">
         <el-card
           shadow="never"
           style="border-radius: 10px"
@@ -492,7 +492,7 @@ defineExpose({
         </el-card>
       </el-col>
 
-      <el-col :xs="24" :sm="24" :md="12" :lg="7">
+      <el-col :xs="24" :sm="24" :md="12" :lg="7" class="mb-5 xl:mb-0">
         <el-card
           shadow="never"
           style="border-radius: 10px"
@@ -525,7 +525,6 @@ defineExpose({
   @media (max-width: 767px) {
     & {
       height: auto;
-      margin-bottom: 20px;
     }
   }
 }

@@ -11,6 +11,7 @@ import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 import { blobManager } from "../../utils/blobManager";
 import ResultDialog from "./resultDialog.vue";
 import OnlineImg from "../../common/onlineImg.vue";
+import { Download, Refresh, Upload } from "@element-plus/icons-vue";
 
 const props = defineProps({
   imageConfig: {
@@ -622,14 +623,39 @@ defineExpose({
 
 <template>
   <div>
-    <el-card shadow="never" style="border-radius: 10px">
+    <el-card
+      shadow="never"
+      style="border-radius: 10px; background-color: #f5f7fa"
+    >
+      <template #header>
+        <div class="card-header">
+          <span>
+            <span>批量生成模式</span>
+          </span>
+        </div>
+      </template>
       <div class="flex items-center justify-between mb-4">
-        <div class="text-base font-bold text-gray-800">批量操作</div>
+        <div class="text-base font-bold text-gray-800">
+          配置表
+          <span class="text-sm text-gray-500 font-normal">
+            (点击右侧导出配置表，支持多次导入配置表)
+          </span>
+        </div>
         <div class="flex items-center">
-          <el-button color="#217346" size="small" @click="exportConfig">
+          <el-button
+            color="#217346"
+            size="small"
+            @click="exportConfig"
+            :icon="Download"
+          >
             导出配置表
           </el-button>
-          <el-button type="primary" size="small" @click="importConfig">
+          <el-button
+            type="primary"
+            size="small"
+            @click="importConfig"
+            :icon="Upload"
+          >
             导入配置表
           </el-button>
           <el-button
@@ -637,6 +663,7 @@ defineExpose({
             size="small"
             @click="clearAll"
             :disabled="importedDataList.length === 0"
+            :icon="Refresh"
           >
             清空全部
           </el-button>
@@ -675,7 +702,7 @@ defineExpose({
                   v-if="
                     batchGenerating && currentGeneratingId === props.row._id
                   "
-                  class="flex items-center justify-center py-8"
+                  class="flex items-center justify-start py-8"
                 >
                   <el-progress
                     type="circle"
@@ -706,12 +733,12 @@ defineExpose({
 
                 <div
                   v-else-if="generatedResults[props.row._id]?.length === 0"
-                  class="text-center py-8 text-gray-400"
+                  class="text-left py-8 text-gray-400"
                 >
                   生成失败
                 </div>
 
-                <div v-else class="text-center py-8 text-gray-400">
+                <div v-else class="text-left py-8 text-gray-400">
                   暂无结果，请点击「✨ 开始绘制」
                 </div>
               </div>
@@ -738,7 +765,7 @@ defineExpose({
             <template #default="{ row }">
               <div v-if="col.type === 'image' && row[col.prop]">
                 <div>
-                  <span class="text-xs">{{ row[col.prop] }}</span>
+                  <p class="text-xs w-full">{{ row[col.prop] }}</p>
                   <OnlineImg :url="row[col.prop]" size="70px" />
                 </div>
               </div>

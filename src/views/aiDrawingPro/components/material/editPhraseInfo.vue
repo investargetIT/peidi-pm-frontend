@@ -357,17 +357,6 @@ const handleGenerateDescriptorInfo = async () => {
         :rules="rules"
         label-width="auto"
       >
-        <el-form-item label="" prop="">
-          <el-button
-            :icon="Pointer"
-            type="primary"
-            @click="handleGenerateDescriptorInfo"
-            :loading="geminiLoading"
-          >
-            生成编辑词
-          </el-button>
-        </el-form-item>
-
         <el-form-item label="模板标记图" prop="image">
           <el-upload
             ref="uploadRef"
@@ -393,10 +382,27 @@ const handleGenerateDescriptorInfo = async () => {
         </el-form-item>
 
         <el-form-item label="编辑词" prop="editPhraseInfo">
+          <div class="w-full">
+            <el-button
+              :icon="Pointer"
+              type="primary"
+              @click="handleGenerateDescriptorInfo"
+              :loading="geminiLoading"
+            >
+              点击AI自动生成编辑词
+            </el-button>
+          </div>
+
+          <p class="text-xs text-gray-500 mt-2">
+            编辑词不需要手动输入，点击AI自动生成即可，若不满意可重复生成
+          </p>
+
           <el-input
+            class="mt-3"
             type="textarea"
             :rows="16"
             v-model="ruleForm.editPhraseInfo"
+            placeholder="编辑词不需要手动输入，点击AI自动生成即可"
           />
         </el-form-item>
 

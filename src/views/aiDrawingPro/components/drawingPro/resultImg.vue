@@ -448,9 +448,9 @@ defineExpose({
 
 <template>
   <div v-if="showStatus">
-    <div class="text-base font-bold mb-4 text-gray-800">结果图片</div>
+    <div class="text-base font-bold mb-4 text-gray-800">演示生成结果图</div>
     <div class="text-red-500 text-sm" v-if="props.errorMsg">
-      {{ props.errorMsg }}
+      生成失败：{{ props.errorMsg }}
     </div>
     <div class="flex gap-12">
       <div

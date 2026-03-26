@@ -55,6 +55,8 @@ const importMaterialElements = async () => {
 
   const materials = selectedRowData.value?.materialConfig || [];
 
+  console.log("importMaterialElements", materials, selectedRowData.value);
+
   if (!materials || materials.length === 0) {
     ElMessage.info("没有找到素材配置");
     return;

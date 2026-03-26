@@ -238,9 +238,9 @@ onUnmounted(() => {
     v-model="activeTab"
     class="peidi-el-tabs-modern-tabs"
   >
-    <el-tab-pane label="绘图" name="Drawing" lazy>
+    <!-- <el-tab-pane label="绘图" name="Drawing" lazy>
       <Drawing ref="drawingTabRef" />
-    </el-tab-pane>
+    </el-tab-pane> -->
     <el-tab-pane label="素材库" name="Material" lazy>
       <Material ref="materialTabRef" />
     </el-tab-pane>

@@ -149,7 +149,7 @@ const handleDelete = () => {
             编辑词
           </el-button>
           <el-tooltip
-            content="请先填写编辑词"
+            content="请先生成编辑词"
             placement="top"
             :disabled="!getEditPhraseInfo"
             :show-after="200"
