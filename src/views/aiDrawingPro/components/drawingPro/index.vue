@@ -9,6 +9,7 @@ import { imageCache } from "../../utils/imageCache";
 import { blobManager } from "../../utils/blobManager";
 import ResultImg from "./resultImg.vue";
 import TableCard from "./tableCard.vue";
+import { getNameFromObjectName } from "../../utils/general";
 
 const resultImgRef = ref(null);
 
@@ -60,6 +61,20 @@ const isKeepStatus = ref<Record<string, boolean>>({});
 const tempImageData = ref<Record<string, string>>({});
 
 /**
+ * 图片选择模式：'upload' | 'material'
+ * key: 元素 ID
+ * value: 当前选择的模式
+ */
+const imageSelectMode = ref<Record<string, "upload" | "material">>({});
+
+/**
+ * 素材选择器的临时值（仅用于绑定 el-select）
+ * key: 元素 ID
+ * value: 选中的 objectName
+ */
+const tempMaterialSelect = ref<Record<string, string>>({});
+
+/**
  * 右侧卡片元素的引用集合，用于滚动定位
  */
 const cardRefs = ref<Record<string, any>>({});
@@ -79,6 +94,8 @@ const initFormData = () => {
       tempImageData.value[item.id] = "";
       aiReferenceStatus.value[item.id] = false;
       isKeepStatus.value[item.id] = false;
+      imageSelectMode.value[item.id] = "upload";
+      tempMaterialSelect.value[item.id] = "";
     }
   });
 };
@@ -163,11 +180,38 @@ const handleCancelUpload = (itemId: string) => {
 };
 
 /**
+ * 从素材库选择图片
+ * @param itemId - 元素 ID
+ * @param objectName - 素材的对象名称
+ */
+const handleSelectFromMaterial = async (itemId: string, objectName: string) => {
+  if (!objectName) return;
+
+  try {
+    // 调用 API 下载文件，获取 blob
+    const response: any = await downloadFile({ objectName });
+
+    // 将 blob 转换为 base64
+    const base64String = await blobManager.blobToBase64(response);
+
+    // 存储 base64 到 formData
+    formData.value[itemId] = base64String;
+    tempImageData.value[itemId] = "";
+
+    ElMessage.success("已选择素材");
+  } catch (error) {
+    console.error("素材加载失败:", error);
+    ElMessage.error("素材加载失败：" + error.message);
+  }
+};
+
+/**
  * 删除已上传的图片
  * @param itemId - 元素 ID
  */
 const handleDeleteImage = (itemId: string) => {
   formData.value[itemId] = null;
+  tempMaterialSelect.value[itemId] = "";
   aiReferenceStatus.value[itemId] = false;
   isKeepStatus.value[itemId] = false;
   // ElMessage.success("图片已删除");
@@ -508,43 +552,132 @@ defineExpose({
                   </div>
 
                   <div v-if="item.type === 'image'" class="ml-2">
-                    <el-upload
-                      :file-list="[]"
-                      :auto-upload="false"
-                      :show-file-list="false"
-                      :on-change="
-                        (file: any) => handleImageSelect(item.id, file.raw)
-                      "
-                      accept="image/*"
-                      class="w-full"
-                    >
-                      <div
-                        class="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-500 transition-colors cursor-pointer hover:bg-gray-50"
+                    <!-- 模式切换 -->
+                    <div class="flex gap-2 mb-2">
+                      <el-button
+                        size="small"
+                        :type="
+                          imageSelectMode[item.id] === 'upload' ? 'primary' : ''
+                        "
+                        :plain="imageSelectMode[item.id] !== 'upload'"
+                        @click="imageSelectMode[item.id] = 'upload'"
+                        class="flex-1"
                       >
-                        <div v-if="tempImageData[item.id]" class="relative">
-                          <img
-                            :src="tempImageData[item.id]"
-                            class="max-h-[120px] max-w-full mx-auto rounded"
-                          />
-                          <div class="flex justify-center gap-2 mt-2">
-                            <el-button
-                              type="primary"
-                              size="small"
-                              @click.stop="handleConfirmUpload(item.id)"
-                              >确认</el-button
-                            >
-                            <el-button
-                              type="danger"
-                              size="small"
-                              @click.stop="handleCancelUpload(item.id)"
-                              >取消</el-button
-                            >
+                        📤 本地上传
+                      </el-button>
+                      <el-button
+                        size="small"
+                        :type="
+                          imageSelectMode[item.id] === 'material'
+                            ? 'primary'
+                            : ''
+                        "
+                        :plain="imageSelectMode[item.id] !== 'material'"
+                        @click="imageSelectMode[item.id] = 'material'"
+                        class="flex-1"
+                      >
+                        🗂️ 素材库选择
+                      </el-button>
+                    </div>
+
+                    <!-- 本地上传模式 -->
+                    <div v-if="imageSelectMode[item.id] === 'upload'">
+                      <el-upload
+                        :file-list="[]"
+                        :auto-upload="false"
+                        :show-file-list="false"
+                        :on-change="
+                          (file: any) => handleImageSelect(item.id, file.raw)
+                        "
+                        accept="image/*"
+                        class="w-full"
+                      >
+                        <div
+                          class="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-500 transition-colors cursor-pointer hover:bg-gray-50"
+                        >
+                          <div v-if="tempImageData[item.id]" class="relative">
+                            <img
+                              :src="tempImageData[item.id]"
+                              class="max-h-[120px] max-w-full mx-auto rounded"
+                            />
+                            <div class="flex justify-center gap-2 mt-2">
+                              <el-button
+                                type="primary"
+                                size="small"
+                                @click.stop="handleConfirmUpload(item.id)"
+                                >确认</el-button
+                              >
+                              <el-button
+                                type="danger"
+                                size="small"
+                                @click.stop="handleCancelUpload(item.id)"
+                                >取消</el-button
+                              >
+                            </div>
+                          </div>
+                          <div v-else-if="formData[item.id]" class="relative">
+                            <img
+                              :src="formData[item.id]"
+                              class="max-h-[120px] max-w-full mx-auto rounded"
+                            />
+                            <div class="absolute top-1 right-1">
+                              <el-button
+                                type="danger"
+                                size="small"
+                                circle
+                                @click.stop="handleDeleteImage(item.id)"
+                              >
+                                <el-icon><Delete /></el-icon>
+                              </el-button>
+                            </div>
+                            <div class="text-sm text-gray-600 mt-2">
+                              点击重新上传
+                            </div>
+                          </div>
+                          <div v-else class="py-3">
+                            <div class="text-gray-400 mb-1 text-xl">📁</div>
+                            <div class="text-xs text-gray-500">
+                              点击上传图片
+                            </div>
                           </div>
                         </div>
-                        <div v-else-if="formData[item.id]" class="relative">
+                      </el-upload>
+                    </div>
+
+                    <!-- 素材库选择模式 -->
+                    <div v-else-if="imageSelectMode[item.id] === 'material'">
+                      <el-select
+                        v-model="tempMaterialSelect[item.id]"
+                        placeholder="请选择素材"
+                        filterable
+                        @change="
+                          value => handleSelectFromMaterial(item.id, value)
+                        "
+                        class="w-full"
+                      >
+                        <el-option
+                          v-for="matItem in materialList['componentMaterial'] ||
+                          []"
+                          :key="matItem.id"
+                          :label="getNameFromObjectName(matItem.objectName)"
+                          :value="matItem.objectName"
+                        >
+                          <div class="flex items-center gap-2">
+                            <span>{{
+                              getNameFromObjectName(matItem.objectName)
+                            }}</span>
+                          </div>
+                        </el-option>
+                      </el-select>
+
+                      <div
+                        v-if="formData[item.id] && !tempImageData[item.id]"
+                        class="mt-2"
+                      >
+                        <div class="relative inline-block">
                           <img
                             :src="formData[item.id]"
-                            class="max-h-[120px] max-w-full mx-auto rounded"
+                            class="max-h-[120px] max-w-full rounded border-2 border-blue-200"
                           />
                           <div class="absolute top-1 right-1">
                             <el-button
@@ -556,24 +689,18 @@ defineExpose({
                               <el-icon><Delete /></el-icon>
                             </el-button>
                           </div>
-                          <div class="text-sm text-gray-600 mt-2">
-                            点击重新上传
-                          </div>
-                        </div>
-                        <div v-else class="py-3">
-                          <div class="text-gray-400 mb-1 text-xl">📁</div>
-                          <div class="text-xs text-gray-500">点击上传图片</div>
                         </div>
                       </div>
-                    </el-upload>
+                    </div>
+
                     <div
                       v-if="formData[item.id]"
                       class="text-sm text-gray-500 mt-3 flex items-center"
                     >
-                      <span>AI引用</span>
+                      <span>AI 引用</span>
                       <el-tooltip
                         effect="dark"
-                        content="开启后由AI负责渲染图片"
+                        content="开启后由 AI 负责渲染图片"
                         placement="top-start"
                         :show-after="250"
                       >
@@ -592,7 +719,7 @@ defineExpose({
                       <span>是否保留</span>
                       <el-tooltip
                         effect="dark"
-                        content="开启后会自动保留图片，不被AI擦除"
+                        content="开启后会自动保留图片，不被 AI 擦除"
                         placement="top-start"
                         :show-after="250"
                       >
