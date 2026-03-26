@@ -232,7 +232,16 @@ const handleDeleteImage = (itemId: string) => {
 const prompt = ref<string>("");
 const demoMode = ref<boolean>(false);
 
-const generateImage = () => {
+const generateImage = async () => {
+  // const testB4 = await imageToBase64(imageUrl2);
+  // resultImgRef.value?.initResultImg(
+  //   imageConfig.value,
+  //   { ...formData.value },
+  //   testB4,
+  //   aiReferenceStatus.value
+  // );
+  // return;
+
   // if (!prompt.value.trim()) {
   //   ElMessage.warning("请输入提示词");
   //   return;
@@ -366,7 +375,7 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
   const base64Url1_ = await blobManager.blobToBase64(fileList.value[0].raw);
 
   const params = {
-    model: "nano-banana-fast",
+    model: "nano-banana-pro",
     prompt: prompt,
     aspectRatio: "auto",
     imageSize: "4K",
@@ -415,7 +424,8 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
           resultImgRef.value?.initResultImg(
             imageConfig.value,
             processedFormData,
-            base64String // 使用 base64 而不是绝对路径
+            base64String, // 使用 base64 而不是绝对路径
+            aiReferenceStatus.value
           );
         } catch (error) {
           console.error("图片转 base64 失败:", error);

@@ -7,6 +7,7 @@ import { snapdom } from "@zumer/snapdom";
 import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterialLibrary";
 import { loadImage } from "../../utils/imageLoader";
 import { type ImageDataResult } from "../../utils/compressImage";
+import type { PropType } from "vue";
 
 const props = defineProps({
   errorMsg: {
@@ -32,6 +33,7 @@ const showStatus = ref(true);
 const resultConfig = ref<any>(null);
 const resultData = ref<any>(null);
 const resultImage = ref<any>(null);
+const importedImages = ref<any[]>([]);
 
 const selectedElementId = ref<string | null>(null);
 const isDragging = ref(false);
@@ -42,12 +44,21 @@ const exportContainer = ref<HTMLElement | null>(null);
 
 const materialLoadRequests = ref<Array<{ cancel: () => void }>>([]);
 
-const initResultImg = async (config: any, data: any, base64Url: string) => {
-  console.log("结果图片：", config, data);
+const initResultImg = async (
+  config: any,
+  data: any,
+  base64Url: string,
+  aiRefStatus?: Record<string, boolean>
+) => {
+  console.log("结果图片：", config, data, base64Url, aiRefStatus);
   resultConfig.value = JSON.parse(JSON.stringify(config));
   resultData.value = JSON.parse(JSON.stringify(data));
   resultImage.value = base64Url;
+  importedImages.value = [];
   showStatus.value = true;
+
+  await nextTick();
+  importMaterialElements(aiRefStatus);
 };
 
 const selectElement = (event: MouseEvent, element: any) => {
@@ -174,125 +185,50 @@ const deleteImageElement = (event: MouseEvent, elementId: string) => {
   selectedElementId.value = null;
 };
 
-const importMaterialElements = async () => {
-  if (resultConfig.value) {
-    resultConfig.value = resultConfig.value.filter(
-      (el: any) => el.type !== "image"
-    );
-  } else {
-    resultConfig.value = [];
+const importMaterialElements = async (
+  aiRefStatus?: Record<string, boolean>
+) => {
+  const status = aiRefStatus;
+
+  if (!resultConfig.value || !resultData.value) {
+    return;
   }
 
-  materialLoadRequests.value.forEach(request => request.cancel());
-  materialLoadRequests.value = [];
+  importedImages.value = [];
 
-  const materials = [
-    {
-      field: "productImage",
-      name: "产品图片",
-      rect: { x: 0.33, y: 0.316, width: 0.594, height: 0.509 }
-    },
-    {
-      field: "fullGiftImages",
-      name: "全场满赠图片",
-      rect: { x: 0.009, y: 0.384, width: 0.347, height: 0.311 }
-    },
-    {
-      field: "campaignLogoImage",
-      name: "活动 LOGO",
-      rect: { x: 0.091, y: -0.03, width: 0.33, height: 0.229 }
-    },
-    {
-      field: "shopLogoImage",
-      name: "店铺 LOGO",
-      rect: { x: 0.662, y: -0.056, width: 0.286, height: 0.286 }
+  const imageConfigs = resultConfig.value.filter(
+    (el: any) => el.type === "image"
+  );
+
+  // console.log("imageConfigs", imageConfigs);
+
+  for (const config of imageConfigs) {
+    const imageData = resultData.value[config.id];
+    const isAiReferenced = status[config.id];
+
+    // console.log("imageData", isAiReferenced);
+
+    if (imageData && !isAiReferenced) {
+      const newImageElement = {
+        id: config.id,
+        type: "image",
+        rect: { ...config.rect },
+        src: imageData,
+        selected: false,
+        name: config.name
+      };
+
+      importedImages.value.push(newImageElement);
     }
-  ];
+  }
 
-  const loadPromises = materials.map(async material => {
-    const images = resultData.value?.[material.field];
-    if (images && Array.isArray(images) && images.length > 0) {
-      const imageUrl = images[0];
-      if (imageUrl) {
-        try {
-          const loadRequest = loadImage(imageUrl, imageCacheManager, {
-            loadingMessage: `正在加载${material.name}...`,
-            errorMessage: `${material.name}加载失败`
-          });
+  const successfulLoads = importedImages.value.length;
+  const totalMaterials = imageConfigs.length;
 
-          materialLoadRequests.value.push(loadRequest);
-
-          const base64Data: any = await loadRequest.promise;
-
-          if (materialLoadRequests.value.length === 0) {
-            return {
-              success: false,
-              material: material.name,
-              error: "操作已取消"
-            };
-          }
-
-          return new Promise(resolve => {
-            const img = new Image();
-            img.onload = () => {
-              const newImageElement = {
-                id: "img_" + Date.now() + Math.random(),
-                type: "image",
-                rect: { ...material.rect },
-                src: base64Data,
-                selected: false,
-                name: material.name
-              };
-              resultConfig.value.push(newImageElement);
-              resolve({ success: true, material: material.name });
-            };
-            img.onerror = () => {
-              resolve({
-                success: false,
-                material: material.name,
-                error: "图片加载失败"
-              });
-            };
-            img.src = base64Data;
-          });
-        } catch (error) {
-          if (error.message !== "请求已取消") {
-            console.warn(`加载 ${material.name} 失败:`, error);
-          }
-          return {
-            success: false,
-            material: material.name,
-            error: error.message
-          };
-        }
-      }
-    }
-    return { success: false, material: material.name, error: "素材为空" };
-  });
-
-  try {
-    const results = await Promise.all(loadPromises);
-
-    const successfulLoads = results.filter(
-      (result: any) => result.success
-    ).length;
-    const failedLoads = results.filter((result: any) => !result.success).length;
-    const totalMaterials = materials.length;
-
-    if (successfulLoads === 0) {
-      ElMessage.warning("没有找到可导入的素材");
-    } else if (successfulLoads === totalMaterials) {
-      ElMessage.success(`成功导入 ${successfulLoads} 个素材`);
-    } else {
-      ElMessage.info(
-        `成功导入 ${successfulLoads} 个素材，${failedLoads} 个素材加载失败或为空`
-      );
-    }
-  } catch (error) {
-    if (error.message !== "请求已取消") {
-      console.error("导入素材时发生错误:", error);
-      ElMessage.error("导入素材时发生错误");
-    }
+  if (successfulLoads > 0) {
+    ElMessage.success(`成功导入 ${successfulLoads} 个素材`);
+  } else if (totalMaterials > 0) {
+    ElMessage.info("没有找到可导入的素材");
   }
 };
 
@@ -476,7 +412,7 @@ defineExpose({
           <div class="text-gray-500 text-sm">暂无图片</div>
         </div>
 
-        <template v-for="item in resultConfig">
+        <!-- <template v-for="item in resultConfig">
           <div
             :key="item.id"
             v-if="
@@ -499,6 +435,56 @@ defineExpose({
               :alt="'图片元素' + item.id"
               class="element-image"
             />
+
+            <div class="element-controls" v-if="item.selected">
+              <el-button
+                size="small"
+                type="danger"
+                @click="e => deleteImageElement(e, item.id)"
+                class="delete-btn"
+              >
+                删除
+              </el-button>
+            </div>
+
+            <div
+              class="resize-handle se"
+              v-if="item.selected"
+              @mousedown="e => resizeImage(e, item, 'se')"
+            ></div>
+            <div
+              class="resize-handle sw"
+              v-if="item.selected"
+              @mousedown="e => resizeImage(e, item, 'sw')"
+            ></div>
+            <div
+              class="resize-handle ne"
+              v-if="item.selected"
+              @mousedown="e => resizeImage(e, item, 'ne')"
+            ></div>
+            <div
+              class="resize-handle nw"
+              v-if="item.selected"
+              @mousedown="e => resizeImage(e, item, 'nw')"
+            ></div>
+          </div>
+        </template> -->
+
+        <template v-for="item in importedImages" :key="item.id">
+          <div
+            :style="{
+              left: `${item.rect.x * CANVAS_SIZE}px`,
+              top: `${item.rect.y * CANVAS_SIZE}px`,
+              width: `${item.rect.width * CANVAS_SIZE}px`,
+              height: `${item.rect.height * CANVAS_SIZE}px`,
+              cursor: item.dragging ? 'grabbing' : 'pointer'
+            }"
+            class="absolute image-element"
+            :class="{ selected: item.selected }"
+            @mousedown="e => startDrag(e, item)"
+            @click="e => selectElement(e, item)"
+          >
+            <img :src="item.src" :alt="item.name" class="element-image" />
 
             <div class="element-controls" v-if="item.selected">
               <el-button

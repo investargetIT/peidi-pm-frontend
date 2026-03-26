@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   exportConfigToExcel,
@@ -166,12 +166,12 @@ const parseExcelData = (jsonData: any[]) => {
           }
 
           parsedRow[aiRefKey] =
-            row[`${item.name}_AI 引用`] === "是" ||
-            row[`${item.name}_AI 引用`] === true ||
+            row[`${item.name}-AI 引用`] === "是" ||
+            row[`${item.name}-AI 引用`] === true ||
             false;
           parsedRow[keepRefKey] =
-            row[`${item.name}_是否保留`] === "是" ||
-            row[`${item.name}_是否保留`] === true ||
+            row[`${item.name}-是否保留`] === "是" ||
+            row[`${item.name}-是否保留`] === true ||
             false;
         } else if (item.type === "group" && item.content) {
           item.content.forEach(field => {
@@ -236,7 +236,7 @@ const importConfig = () => {
               type: "warning"
             }
           )
-            .then(() => {
+            .then(async () => {
               const dataWithId = importedData.map((data, index) => ({
                 ...data,
                 _id: Date.now() + index
@@ -246,7 +246,9 @@ const importConfig = () => {
                 ...importedDataList.value,
                 ...dataWithId
               ];
-              // console.log("导入数据:", importedDataList.value);
+              // const testB4 = await imageToBase64(imageUrl1);
+              // generatedResults.value[importedDataList.value[0]._id] = [testB4];
+              console.log("导入数据:", importedDataList.value);
 
               ElMessage.success(`导入成功，共 ${importedData.length} 条数据`);
             })
@@ -499,7 +501,7 @@ const generateSingleImage = async (
     const base64Url1_ = await blobManager.blobToBase64(props.fileList[0].raw);
 
     const params = {
-      model: "nano-banana-fast",
+      model: "nano-banana-pro",
       prompt: buildPrompt(row),
       aspectRatio: "auto",
       imageSize: "4K",
@@ -613,7 +615,7 @@ const resultDialogRef = ref<typeof ResultDialog>();
  */
 const handlePreviewImage = (imageUrl: string, rowData?: any) => {
   // console.log("预览图片:", imageUrl, rowData);
-  resultDialogRef.value?.open(imageUrl, rowData);
+  resultDialogRef.value?.open(imageUrl, rowData, props.imageConfig);
 };
 
 defineExpose({

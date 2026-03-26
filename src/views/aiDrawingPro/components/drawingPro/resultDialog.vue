@@ -48,81 +48,120 @@ const imageElements = reactive<ResultImageItem[]>([]);
 
 let animationFrameId = null;
 
+const isBase64Image = (str: string): boolean => {
+  if (!str || typeof str !== "string") return false;
+  return str.startsWith("data:image/") || /^[A-Za-z0-9+/=]+$/.test(str);
+};
+
 const importMaterialElements = async () => {
   imageElements.length = 0;
   materialLoadRequests.value.forEach(request => request.cancel());
   materialLoadRequests.value = [];
 
-  const materials = selectedRowData.value?.materialConfig || [];
+  const rowData = selectedRowData.value;
+  const imageConfig = selectedImageConfig.value;
 
-  console.log("importMaterialElements", materials, selectedRowData.value);
+  // console.log("importMaterialElements", { rowData, imageConfig });
 
-  if (!materials || materials.length === 0) {
-    ElMessage.info("没有找到素材配置");
+  if (!rowData || !imageConfig || imageConfig.length === 0) {
+    ElMessage.info("没有找到配置信息");
     return;
   }
 
-  const loadPromises = materials.map(async material => {
-    const images = selectedRowData.value?.[material.field];
-    if (images && Array.isArray(images) && images.length > 0) {
-      const imageUrl = images[0];
-      if (imageUrl) {
-        try {
-          const loadRequest = imageCacheManager.processImageWithCache(imageUrl);
-          materialLoadRequests.value.push({ cancel: () => {} });
+  const loadPromises: Promise<any>[] = [];
 
-          const base64Data: any = await loadRequest;
+  const imageConfigs = imageConfig.filter((item: any) => item.type === "image");
 
-          if (materialLoadRequests.value.length === 0) {
+  for (const config of imageConfigs) {
+    const imageKey = `${config.id}_image`;
+    const aiRefKey = `${config.id}_aiRef`;
+
+    const imageData = rowData[imageKey];
+    const isAiReferenced = rowData[aiRefKey] === true;
+
+    // console.log(`处理图片配置：${config.name}`, {
+    //   imageKey,
+    //   imageData,
+    //   isAiReferenced,
+    //   aiRefValue: rowData[aiRefKey]
+    // });
+
+    if (imageData && !isAiReferenced) {
+      const promise = (async () => {
+        let base64Data: string | null = null;
+
+        if (isBase64Image(imageData)) {
+          base64Data = imageData;
+        } else {
+          try {
+            const loadRequest =
+              imageCacheManager.processImageWithCache(imageData);
+            materialLoadRequests.value.push({ cancel: () => {} });
+
+            const blob = await loadRequest;
+            // console.log(`加载 ${config.name} 成功:`, blob);
+            base64Data = await blobManager.blobToBase64(blob?.originalBlob);
+          } catch (error) {
+            if (error.message !== "请求已取消") {
+              console.warn(`加载 ${config.name} 失败:`, error);
+            }
             return {
               success: false,
-              material: material.name,
-              error: "操作已取消"
+              field: imageKey,
+              name: config.name,
+              error: error.message
             };
           }
+        }
 
+        if (base64Data) {
           return new Promise(resolve => {
             const img = new Image();
             img.onload = () => {
               const newImageElement: ResultImageItem = {
                 id: Date.now() + Math.random(),
-                x: material.position.x,
-                y: material.position.y,
-                width: material.size.width,
-                height: material.size.height,
-                src: base64Data,
+                x: config.rect?.x * 700 || 50 + imageElements.length * 20,
+                y: config.rect?.y * 700 || 50 + imageElements.length * 20,
+                width: config.rect?.width * 700 || Math.min(img.width, 200),
+                height: config.rect?.height * 700 || Math.min(img.height, 200),
+                src: base64Data!,
                 dragging: false,
                 originalWidth: img.width,
                 originalHeight: img.height,
                 selected: false,
-                name: material.name
+                name: config.name
               };
               imageElements.push(newImageElement);
-              resolve({ success: true, material: material.name });
+              resolve({ success: true, field: imageKey, name: config.name });
             };
             img.onerror = () => {
               resolve({
                 success: false,
-                material: material.name,
+                field: imageKey,
+                name: config.name,
                 error: "图片加载失败"
               });
             };
-            img.src = base64Data;
+            img.src = base64Data!;
           });
-        } catch (error) {
-          if (error.message !== "请求已取消") {
-            console.warn(`加载 ${material.name} 失败:`, error);
-          }
-          return {
-            success: false,
-            material: material.name,
-            error: error.message
-          };
         }
-      }
+
+        return {
+          success: false,
+          field: imageKey,
+          name: config.name,
+          error: "无法获取图片"
+        };
+      })();
+
+      loadPromises.push(promise);
     }
-    return { success: false, material: material.name, error: "素材为空" };
-  });
+  }
+
+  if (loadPromises.length === 0) {
+    ElMessage.info("没有找到可导入的素材");
+    return;
+  }
 
   try {
     const results = await Promise.all(loadPromises);
@@ -130,16 +169,11 @@ const importMaterialElements = async () => {
       (result: any) => result.success
     ).length;
     const failedLoads = results.filter((result: any) => !result.success).length;
-    const totalMaterials = materials.length;
 
-    if (successfulLoads === 0) {
-      ElMessage.warning("没有找到可导入的素材");
-    } else if (successfulLoads === totalMaterials) {
+    if (successfulLoads > 0) {
       ElMessage.success(`成功导入 ${successfulLoads} 个素材`);
-    } else {
-      ElMessage.info(
-        `成功导入 ${successfulLoads} 个素材，${failedLoads} 个素材加载失败或为空`
-      );
+    } else if (failedLoads > 0) {
+      ElMessage.warning(`所有素材加载失败`);
     }
   } catch (error) {
     if (error.message !== "操作已取消") {
@@ -148,7 +182,6 @@ const importMaterialElements = async () => {
     }
   }
 };
-
 const importImage = () => {
   const input = document.createElement("input");
   input.type = "file";
@@ -446,8 +479,9 @@ const handleSaveToMaterialLibrary = async () => {
 
 const selectedResultUrl = ref<string>("");
 const selectedRowData = ref<any>({});
+const selectedImageConfig = ref<any[]>([]);
 
-const handleOpen = (imageUrl: string, rowData?: any) => {
+const handleOpen = (imageUrl: string, rowData?: any, imageConfig?: any[]) => {
   dialogVisible.value = true;
   imageElements.length = 0;
   templateImgBase64.value = DEFAULT_IMG;
@@ -455,6 +489,7 @@ const handleOpen = (imageUrl: string, rowData?: any) => {
   nextTick(() => {
     selectedResultUrl.value = imageUrl;
     selectedRowData.value = rowData || {};
+    selectedImageConfig.value = imageConfig || [];
 
     templateImgBase64.value = imageUrl;
 
@@ -501,8 +536,8 @@ onUnmounted(() => {
 });
 
 defineExpose({
-  open: (imageUrl: string, rowData?: any) => {
-    handleOpen(imageUrl, rowData);
+  open: (imageUrl: string, rowData?: any, imageConfig?: any[]) => {
+    handleOpen(imageUrl, rowData, imageConfig);
   }
 });
 </script>
