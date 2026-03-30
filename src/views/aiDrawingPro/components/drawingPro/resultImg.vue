@@ -63,15 +63,25 @@ const initResultImg = async (
 
 const selectElement = (event: MouseEvent, element: any) => {
   event.stopPropagation();
+
+  // 先取消所有元素的选中状态
   resultConfig.value?.forEach((el: any) => {
     el.selected = false;
   });
+  importedImages.value.forEach((el: any) => {
+    el.selected = false;
+  });
+
+  // 再选中当前元素
   element.selected = true;
   selectedElementId.value = element.id;
 };
 
 const deselectAll = () => {
   resultConfig.value?.forEach((el: any) => {
+    el.selected = false;
+  });
+  importedImages.value.forEach((el: any) => {
     el.selected = false;
   });
   selectedElementId.value = null;
@@ -89,6 +99,16 @@ const startDrag = (event: MouseEvent, element: any) => {
   isDragging.value = true;
   dragElement.value = element;
 
+  // 先取消所有元素的选中状态，再选中当前拖动的元素
+  resultConfig.value?.forEach((el: any) => {
+    el.selected = false;
+  });
+  importedImages.value.forEach((el: any) => {
+    el.selected = false;
+  });
+  element.selected = true;
+  selectedElementId.value = element.id;
+
   updateContainerRect();
 
   if (containerRect.value) {
@@ -102,8 +122,6 @@ const startDrag = (event: MouseEvent, element: any) => {
       y: event.clientY - elementRect.top
     };
   }
-
-  selectElement(event, element);
 
   document.addEventListener("mousemove", handleMouseMove);
   document.addEventListener("mouseup", handleMouseUp);
@@ -259,10 +277,9 @@ const importImage = () => {
               selected: false,
               name: file.name
             };
-            if (!resultConfig.value) {
-              resultConfig.value = [];
-            }
-            resultConfig.value.push(newImageElement);
+
+            // 添加到 importedImages 数组而不是 resultConfig
+            importedImages.value.push(newImageElement);
             ElMessage.success("图片导入成功");
           };
           img.src = event.target.result;
@@ -294,6 +311,8 @@ const handleSaveToMaterialLibraryClick = async () => {
     deselectAll();
 
     await nextTick();
+    // 等待一秒
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     const capture = await snapdom(exportContainer.value, {
       scale: Number(exportSize.value) / CANVAS_SIZE,
@@ -339,6 +358,8 @@ const exportAsPNG = async () => {
   try {
     deselectAll();
     await nextTick();
+    // 等待一秒
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     const capture = await snapdom(exportContainer.value, {
       scale: Number(exportSize.value) / CANVAS_SIZE,

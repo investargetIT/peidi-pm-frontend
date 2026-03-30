@@ -12,6 +12,7 @@ import { blobManager } from "../../utils/blobManager";
 import ResultDialog from "./resultDialog.vue";
 import OnlineImg from "../../common/onlineImg.vue";
 import { Download, Refresh, Upload } from "@element-plus/icons-vue";
+import { FORMAT_PROMPT } from "./utils/prompt";
 
 const props = defineProps({
   imageConfig: {
@@ -414,7 +415,8 @@ const buildPrompt = (rowData: Record<string, any>) => {
       } else {
         return {
           ...baseItem,
-          image: null
+          image: null,
+          keep: false
         };
       }
     }
@@ -422,14 +424,10 @@ const buildPrompt = (rowData: Record<string, any>) => {
     return baseItem;
   });
 
-  const prompt = `
-第一张图是模板图，已经对模板图做了标记，参数是${JSON.stringify(props.imageConfig)}
-用户按照参数进行修改，用户的修改是${JSON.stringify(config)}
-其中如果 image 字段为 null 但 keep 字段为 true，则代表用户需要保留该图片元素
-如果 image 字段为 null 但 keep 字段不存在或为 false，则代表用户需要删除该图片元素，删除后要和底图和谐
-如果 image 字段不为 null，则会在 image 字段中说明需要使用给你的图片素材里的第几张图，使用告知的图片替换原来的图片元素
-请返回修改后的图片，图片要实现用户修改的内容
-`;
+  const prompt = FORMAT_PROMPT(
+    JSON.stringify(props.imageConfig),
+    JSON.stringify(config)
+  );
 
   return prompt;
 };

@@ -10,6 +10,8 @@ import { blobManager } from "../../utils/blobManager";
 import ResultImg from "./resultImg.vue";
 import TableCard from "./tableCard.vue";
 import { getNameFromObjectName } from "../../utils/general";
+import MaterialSelectorWithThumb from "./materialSelectorWithThumb.vue";
+import { FORMAT_PROMPT } from "./utils/prompt";
 
 const resultImgRef = ref(null);
 
@@ -300,7 +302,8 @@ const handleGenerateImage = () => {
       } else {
         return {
           ...baseItem,
-          image: null
+          image: null,
+          keep: false
         };
       }
     }
@@ -320,14 +323,10 @@ const handleGenerateImage = () => {
 };
 
 const formatPrompt = (prompt: string, config: any[]) => {
-  const temp = `
-第一张图是模板图，已经对模板图做了标记，参数是${JSON.stringify(imageConfig.value)}
-用户按照参数进行修改，用户的修改是${JSON.stringify(config)}
-其中如果image字段为null但keep字段为true，则代表用户需要保留该图片元素
-如果image字段为null但keep字段不存在或为false，则代表用户需要删除该图片元素，删除后要和底图和谐
-如果image字段不为null，则会在image字段中说明需要使用给你的图片素材里的第几张图，使用告知的图片替换原来的图片元素
-请返回修改后的图片，图片要实现用户修改的内容
-`;
+  const temp = FORMAT_PROMPT(
+    JSON.stringify(imageConfig.value),
+    JSON.stringify(config)
+  );
   return temp;
 };
 
@@ -384,6 +383,7 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
   };
 
   console.log("请求参数：", params);
+  // await loadTestResultImage();
   // return;
   loading.value = true;
   errorMsg.value = "";
@@ -442,6 +442,35 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
         timerId = null;
       }
     });
+};
+
+// 测试加载结果图片
+const loadTestResultImage = async () => {
+  const testImageUrl =
+    "https://fuss10.elemecdn.com/e/5d/4a731a90594a4af544c0c25941171jpeg.jpeg";
+
+  try {
+    const base64String = await imageToBase64(testImageUrl);
+
+    const processedFormData = { ...formData.value };
+    Object.keys(aiReferenceStatus.value).forEach(key => {
+      if (aiReferenceStatus.value[key]) {
+        processedFormData[key] = null;
+      }
+    });
+
+    resultImgRef.value?.initResultImg(
+      imageConfig.value,
+      processedFormData,
+      base64String,
+      aiReferenceStatus.value
+    );
+
+    ElMessage.success("测试图片已加载");
+  } catch (error) {
+    console.error("测试图片加载失败:", error);
+    ElMessage.error("测试图片加载失败:" + error.message);
+  }
 };
 
 const initDrawingPro = async (data: any) => {
@@ -698,29 +727,15 @@ defineExpose({
 
                     <!-- 素材库选择模式 -->
                     <div v-else-if="imageSelectMode[item.id] === 'material'">
-                      <el-select
+                      <MaterialSelectorWithThumb
                         v-model="tempMaterialSelect[item.id]"
+                        :material-list="materialList['componentMaterial'] || []"
                         placeholder="请选择素材"
-                        filterable
+                        :cache-key="`material_thumb:${item.id}`"
                         @change="
                           value => handleSelectFromMaterial(item.id, value)
                         "
-                        class="w-full"
-                      >
-                        <el-option
-                          v-for="matItem in materialList['componentMaterial'] ||
-                          []"
-                          :key="matItem.id"
-                          :label="getNameFromObjectName(matItem.objectName)"
-                          :value="matItem.objectName"
-                        >
-                          <div class="flex items-center gap-2">
-                            <span>{{
-                              getNameFromObjectName(matItem.objectName)
-                            }}</span>
-                          </div>
-                        </el-option>
-                      </el-select>
+                      />
 
                       <div
                         v-if="formData[item.id] && !tempImageData[item.id]"

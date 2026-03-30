@@ -378,7 +378,9 @@ const exportAsPNG = () => {
   exportPNGLoading.value = true;
   deselectAll();
 
-  nextTick(() => {
+  nextTick(async () => {
+    // 等待一秒
+    await new Promise(resolve => setTimeout(resolve, 1000));
     handleCapture();
   });
 };
@@ -448,6 +450,8 @@ const handleSaveToMaterialLibrary = async () => {
     deselectAll();
 
     await nextTick();
+    // 等待一秒
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     const capture = await snapdom(exportContainer.value, {
       scale: Number(exportSize.value) / 668,
