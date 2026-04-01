@@ -6,6 +6,7 @@ interface ImageConfigItem {
   id: string;
   name: string;
   type: "image" | "text" | "group";
+  remark?: string;
   content?: Array<{
     label: string;
     text: string;
@@ -32,6 +33,7 @@ export const exportConfigToExcel = async (
       isAIRef?: boolean;
       isKeepRef?: boolean;
       isImage?: boolean;
+      isRemark?: boolean;
     }> = [];
 
     let colIndex = 0;
@@ -77,6 +79,14 @@ export const exportConfigToExcel = async (
       }
     });
 
+    // 添加备注列
+    headers.push({
+      header: `第一优先级提示词`,
+      key: `col_${colIndex++}`,
+      width: 30,
+      isRemark: true
+    });
+
     // 设置列
     worksheet.columns = headers;
 
@@ -116,6 +126,12 @@ export const exportConfigToExcel = async (
           type: "pattern",
           pattern: "solid",
           fgColor: { argb: "FFFFB961" }
+        };
+      } else if (colConfig?.isRemark) {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFFFD966" }
         };
       }
     });
@@ -167,7 +183,7 @@ export const exportConfigToExcel = async (
 };
 
 /**
- * 从Excel 文件导入配置数据
+ * 从 Excel 文件导入配置数据
  * @param file - Excel 文件
  * @param imageConfig - 图片配置数组（用于解析列对应关系）
  * @returns 导入的配置数据数组，每行是一个配置对象
@@ -223,6 +239,9 @@ export const importConfigFromExcel = async (
             } else if (header && header.includes("-是否保留")) {
               const baseName = header.replace("-是否保留", "");
               rowData[`${baseName}_keepRef`] = value === "是" ? true : false;
+            } else if (header === "第一优先级提示词") {
+              // 解析备注列
+              rowData["remark"] = value;
             } else if (header) {
               // 解析列名，提取字段信息
               // 格式：标签名 (配置名) 或 配置名

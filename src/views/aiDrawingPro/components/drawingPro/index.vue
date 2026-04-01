@@ -327,7 +327,7 @@ const formatPrompt = (prompt: string, config: any[]) => {
     JSON.stringify(imageConfig.value),
     JSON.stringify(config)
   );
-  return temp;
+  return temp + "\n" + prompt;
 };
 
 // 将图片 URL 转换为 base64
@@ -374,7 +374,7 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
   const base64Url1_ = await blobManager.blobToBase64(fileList.value[0].raw);
 
   const params = {
-    model: "nano-banana-pro",
+    model: "nano-banana-2",
     prompt: prompt,
     aspectRatio: "auto",
     imageSize: "4K",
@@ -563,12 +563,24 @@ defineExpose({
       </div>
       <el-row>
         <!-- 左侧：图片展示区域 -->
-        <el-col :span="16">
-          <div class="w-full h-full flex flex-col items-center justify-center">
+        <el-col :xs="24" :sm="24" :md="16">
+          <div
+            class="w-full h-full flex flex-col items-center justify-center"
+            :style="{ flexShrink: 0, minWidth: `${CANVAS_SIZE}px` }"
+          >
             <div class="text-center text-gray-500 text-sm mb-4">
               点击画布中的元素区域即可在右侧编辑
             </div>
-            <div class="relative">
+            <div
+              class="relative"
+              :style="{
+                width: `${CANVAS_SIZE}px`,
+                height: `${CANVAS_SIZE}px`,
+                flexShrink: 0,
+                minWidth: `${CANVAS_SIZE}px`,
+                minHeight: `${CANVAS_SIZE}px`
+              }"
+            >
               <img
                 v-if="fileList[0]?.url"
                 :src="fileList[0]?.url || ''"
@@ -606,7 +618,7 @@ defineExpose({
         </el-col>
 
         <!-- 右侧：元素编辑区域 -->
-        <el-col :span="8">
+        <el-col :xs="24" :sm="24" :md="8">
           <div class="p-4">
             <div class="text-base font-bold mb-4 text-gray-800">元素编辑</div>
             <el-scrollbar height="500px">
@@ -840,9 +852,9 @@ defineExpose({
                     v-model="prompt"
                     type="textarea"
                     :rows="3"
-                    placeholder="请输入提示词，越详细越好..."
+                    placeholder="效果不好时才输入更详细的描述，否则请保持为空..."
                     class="w-full mb-4"
-                    v-if="false"
+                    v-if="true"
                   />
 
                   <div

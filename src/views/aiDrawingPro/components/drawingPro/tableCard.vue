@@ -50,7 +50,7 @@ const tableColumns = computed(() => {
     prop: string;
     label: string;
     width?: number;
-    type?: "text" | "image" | "aiRef" | "keepRef";
+    type?: "text" | "image" | "aiRef" | "keepRef" | "remark";
   }> = [];
 
   let index = 0;
@@ -93,6 +93,14 @@ const tableColumns = computed(() => {
         });
       });
     }
+  });
+
+  // 添加备注列
+  columns.push({
+    prop: "remark",
+    label: "第一优先级提示词",
+    width: 200,
+    type: "remark"
   });
 
   return columns;
@@ -181,6 +189,12 @@ const parseExcelData = (jsonData: any[]) => {
           });
         }
       });
+
+      // 解析备注字段
+      if (row["备注 Remark"] || row["Remark"] || row["备注"]) {
+        parsedRow["remark"] =
+          row["备注 Remark"] || row["Remark"] || row["备注"];
+      }
 
       result.push(parsedRow as Record<string, any> & { _id: number });
     } catch (error) {
@@ -376,7 +390,7 @@ const imageToBase64 = (imageUrl: string): Promise<string> => {
  * 构建 AI 生成的 prompt
  */
 const buildPrompt = (rowData: Record<string, any>) => {
-  const config = props.imageConfig.map(item => {
+  const config = props.imageConfig.map((item, index) => {
     const baseItem = {
       id: item.id,
       name: item.name,
@@ -396,6 +410,7 @@ const buildPrompt = (rowData: Record<string, any>) => {
     }
 
     if (item.type === "image") {
+      // return { ...baseItem };
       const imageData = rowData[`${item.id}_image`];
       const aiRef = rowData[`${item.id}_aiRef`];
       const keepRef = rowData[`${item.id}_keepRef`];
@@ -403,7 +418,7 @@ const buildPrompt = (rowData: Record<string, any>) => {
       if (aiRef && imageData) {
         return {
           ...baseItem,
-          image: "第 1 张图"
+          image: `第 ${index + 2} 张图`
         };
       }
       if (!imageData && keepRef) {
@@ -429,7 +444,10 @@ const buildPrompt = (rowData: Record<string, any>) => {
     JSON.stringify(config)
   );
 
-  return prompt;
+  // 如果有备注字段，添加到 prompt 中
+  if (rowData.remark) {
+    return `${prompt}\n${rowData.remark}`;
+  }
 };
 
 /**
@@ -438,6 +456,7 @@ const buildPrompt = (rowData: Record<string, any>) => {
 const collectImageUrls = (rowData: Record<string, any>): string[] => {
   const urls: string[] = [];
 
+  console.log("collectImageUrls", props.imageConfig);
   props.imageConfig.forEach(item => {
     if (item.type === "image") {
       const imageData = rowData[`${item.id}_image`];
@@ -484,6 +503,8 @@ const generateSingleImage = async (
 
     // 收集素材图片
     const materialUrls = collectImageUrls(row);
+    console.log("素材图片:", materialUrls, row);
+    // return;
 
     // 转换素材图片为 base64
     const base64MaterialUrls: string[] = [];
@@ -499,13 +520,16 @@ const generateSingleImage = async (
     const base64Url1_ = await blobManager.blobToBase64(props.fileList[0].raw);
 
     const params = {
-      model: "nano-banana-pro",
+      model: "nano-banana-2",
       prompt: buildPrompt(row),
       aspectRatio: "auto",
       imageSize: "4K",
       shutProgress: false,
       urls: [base64Url1_, ...base64MaterialUrls]
+      // urls: [base64Url1_]
     };
+    console.log("params:", params);
+    // return;
 
     const response: any = await transferDraw({
       urlParam: JSON.stringify(params)
@@ -634,7 +658,7 @@ defineExpose({
           </span>
         </div>
       </template>
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-4 flex-wrap">
         <div class="text-base font-bold text-gray-800">
           配置表
           <span class="text-sm text-gray-500 font-normal">

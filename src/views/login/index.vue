@@ -20,7 +20,13 @@ import Motion from "./utils/motion";
 import { loginRules } from "./utils/rule";
 import { bg, avatar, illustration } from "./utils/static";
 import { DDUSERINFO } from "./utils/constants";
-import { getUserInfo, register, registerMobile, getUserSite, getUserCheck } from "../../api/user";
+import {
+  getUserInfo,
+  register,
+  registerMobile,
+  getUserSite,
+  getUserCheck
+} from "../../api/user";
 
 import dayIcon from "@/assets/svg/day.svg?component";
 import darkIcon from "@/assets/svg/dark.svg?component";
@@ -68,29 +74,39 @@ const onLogin = async () => {
   useUserStoreHook()
     .loginByUsername({
       username: ruleForm.username,
-      password: DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD_ENCRYPTED,
+      password: DINGTALK_LOGIN_FREE_DEFAULT_PASSWORD_ENCRYPTED
     })
     .then((res: any) => {
       if (res.success) {
-
         return getUserCheck(res?.data)
-          .then((res: any) => localStorage.setItem("user-check-info", JSON.stringify({ ...res?.data })))
+          .then((res: any) =>
+            localStorage.setItem(
+              "user-check-info",
+              JSON.stringify({ ...res?.data })
+            )
+          )
           .catch((error: any) => {
-            console.error('获取用户信息失败:', error)
-            message("获取用户信息失败:" + error.message, { type: "error" })
+            console.error("获取用户信息失败:", error);
+            message("获取用户信息失败:" + error.message, { type: "error" });
           })
-          .then(() => { return initRouterAndRedirect() });
+          .then(() => {
+            return initRouterAndRedirect();
+          });
 
         // 获取后端路由
         function initRouterAndRedirect() {
-          const redirectPath = localStorage.getItem('redirectPath') || '/';
-          if (redirectPath.includes('/examination')) {
+          const redirectPath = localStorage.getItem("redirectPath") || "/";
+          if (redirectPath.includes("/examination")) {
             return initRouter().then(() => {
-              router.push('/examination');
+              router.push("/examination");
             });
-          } else if (route.query.tabName == 'worker') {
+          } else if (redirectPath.includes("/aiDrawingApp")) {
             return initRouter().then(() => {
-              router.push({ path: '/my/index', query: { tabName: 'worker' } });
+              router.push("/aiDrawingApp");
+            });
+          } else if (route.query.tabName == "worker") {
+            return initRouter().then(() => {
+              router.push({ path: "/my/index", query: { tabName: "worker" } });
             });
           } else {
             return initRouter().then(() => {
@@ -100,7 +116,6 @@ const onLogin = async () => {
             });
           }
         }
-
       } else {
         message("登录失败:" + res?.msg, { type: "error" });
       }
@@ -205,7 +220,7 @@ const ddLogin = () => {
               });
             }
           }
-        })
+        });
     },
     onFail: function (err) {
       // setErrMsg('获取钉钉免登授权码失败：' + JSON.stringify(err))

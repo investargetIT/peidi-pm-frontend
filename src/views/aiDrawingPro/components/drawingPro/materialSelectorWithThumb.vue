@@ -1,37 +1,3 @@
-<template>
-  <div class="material-selector">
-    <el-select
-      v-model="selectedValue"
-      :placeholder="placeholder"
-      filterable
-      @change="handleSelectChange"
-      class="w-full"
-    >
-      <el-option
-        v-for="matItem in materialList"
-        :key="matItem.id"
-        :label="getNameFromObjectName(matItem.objectName)"
-        :value="matItem.objectName"
-      >
-        <div class="material-option">
-          <span class="material-name">{{
-            getNameFromObjectName(matItem.objectName)
-          }}</span>
-          <img
-            v-if="thumbnailUrls[matItem.objectName]"
-            :src="thumbnailUrls[matItem.objectName]"
-            class="material-thumbnail"
-            loading="lazy"
-          />
-          <div v-else class="material-thumbnail-placeholder">
-            <el-icon><Picture /></el-icon>
-          </div>
-        </div>
-      </el-option>
-    </el-select>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { Picture } from "@element-plus/icons-vue";
@@ -202,7 +168,41 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped>
+<template>
+  <div class="material-selector">
+    <el-select
+      v-model="selectedValue"
+      :placeholder="placeholder"
+      filterable
+      @change="handleSelectChange"
+      class="w-full"
+    >
+      <el-option
+        v-for="matItem in materialList"
+        :key="matItem.id"
+        :label="getNameFromObjectName(matItem.objectName)"
+        :value="matItem.objectName"
+      >
+        <div class="material-option">
+          <span class="material-name">{{
+            getNameFromObjectName(matItem.objectName)
+          }}</span>
+          <img
+            v-if="thumbnailUrls[matItem.objectName]"
+            :src="thumbnailUrls[matItem.objectName]"
+            class="material-thumbnail"
+            loading="lazy"
+          />
+          <div v-else class="material-thumbnail-placeholder">
+            <el-icon><Picture /></el-icon>
+          </div>
+        </div>
+      </el-option>
+    </el-select>
+  </div>
+</template>
+
+<style lang="scss" scoped>
 .material-selector {
   width: 100%;
 }

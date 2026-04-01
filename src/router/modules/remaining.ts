@@ -37,5 +37,16 @@ export default [
       // showParent: false,
       showLink: false
     }
+  },
+  {
+    path: "/aiDrawingApp",
+    name: "aiDrawingApp",
+    component: () => import("@/views/aiDrawingPro/index.vue"),
+    meta: {
+      title: "AI绘图",
+      icon: "ri:input-method-line",
+      // showParent: false,
+      showLink: false
+    }
   }
 ] satisfies Array<RouteConfigsTable>;

@@ -26,7 +26,7 @@ const imageCacheManager = inject("imageCacheManager") as {
   getOriginalImage: (url: string) => Promise<string | null>;
 };
 
-const CANVAS_SIZE = 700;
+const CANVAS_SIZE = 500;
 const exportSize = ref("800");
 
 const showStatus = ref(true);
@@ -196,9 +196,11 @@ const resizeImage = (event: MouseEvent, element: any, direction: string) => {
 
 const deleteImageElement = (event: MouseEvent, elementId: string) => {
   event.stopPropagation();
-  const index = resultConfig.value?.findIndex((el: any) => el.id === elementId);
+  const index = importedImages.value.findIndex(
+    (el: any) => el.id === elementId
+  );
   if (index !== -1) {
-    resultConfig.value.splice(index, 1);
+    importedImages.value.splice(index, 1);
   }
   selectedElementId.value = null;
 };
@@ -409,13 +411,16 @@ defineExpose({
     <div class="text-red-500 text-sm" v-if="props.errorMsg">
       生成失败：{{ props.errorMsg }}
     </div>
-    <div class="flex gap-12">
+    <div class="flex gap-12 flex-wrap">
       <div
         class="relative result-image-container"
         :style="{
           width: `${CANVAS_SIZE}px`,
           height: `${CANVAS_SIZE}px`,
-          overflow: 'hidden'
+          overflow: 'hidden',
+          flexShrink: 0,
+          minWidth: `${CANVAS_SIZE}px`,
+          minHeight: `${CANVAS_SIZE}px`
         }"
         ref="exportContainer"
         @mouseup="handleMouseUp"

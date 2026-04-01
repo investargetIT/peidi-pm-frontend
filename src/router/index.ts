@@ -303,7 +303,7 @@ router.beforeEach((to: ToRouteType, _from, next) => {
       handleAliveRoute(to);
     }
   }
-  if (to.path === "/examination") {
+  if (to.path === "/examination" || to.path === "/aiDrawingApp") {
     localStorage.setItem("redirectPath", to.fullPath);
   } else if (to.path !== "/login") {
     localStorage.removeItem("redirectPath");

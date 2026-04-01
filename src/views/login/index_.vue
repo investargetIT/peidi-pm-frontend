@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted } from "vue";
 import { initRouter, getTopMenu } from "@/router/utils";
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter } from "vue-router";
 import { message } from "@/utils/message";
-import { useUserStoreHook } from '../../store/modules/user';
-import { storageLocal } from '@pureadmin/utils';
-import { getUserCheck } from '../../api/user';
-import { decryptMessage, encryptMessage } from './utils/cryptojs';
+import { useUserStoreHook } from "../../store/modules/user";
+import { storageLocal } from "@pureadmin/utils";
+import { getUserCheck } from "../../api/user";
+import { decryptMessage, encryptMessage } from "./utils/cryptojs";
 
-const route = useRoute()
+const route = useRoute();
 const router = useRouter();
 
 const getKeyFromUrl = () => {
@@ -54,7 +54,7 @@ onMounted(() => {
     const password = decryptMessage(queryKey.key2);
     userInfo = { username, password };
   }
-  console.log('userInfo', userInfo);
+  console.log("userInfo", userInfo);
 
   if (userInfo) {
     useUserStoreHook()
@@ -63,9 +63,8 @@ onMounted(() => {
         password: userInfo?.password,
         site: userInfo?.site || null
       })
-      .then((res) => {
+      .then(res => {
         if (res.success) {
-
           return getUserCheck(res?.data)
             .then((res: any) => {
               // 模拟出Web端的ddUserInfo对象
@@ -75,37 +74,43 @@ onMounted(() => {
                   ...res?.data,
                   userid: res?.data?.id,
                   dept_id_list: [res?.data?.deptId],
-                  name: res?.data?.username,
+                  name: res?.data?.username
                 })
-              )
+              );
               // 需要有个新的对象来存储userCheckInfo
               localStorage.setItem(
                 "user-check-info",
                 JSON.stringify({
-                  ...res?.data,
+                  ...res?.data
                 })
-              )
+              );
             })
             .catch((error: any) => {
-              console.error('获取用户信息失败:', error)
-              message("获取用户信息失败:" + error.message, { type: "error" })
+              console.error("获取用户信息失败:", error);
+              message("获取用户信息失败:" + error.message, { type: "error" });
             })
             .then(() => {
               return initRouterAndRedirect();
-            })
+            });
 
           // 获取后端路由
           function initRouterAndRedirect() {
-            const redirectPath = localStorage.getItem('redirectPath') || '/';
-            if (redirectPath.includes('/examination')) {
+            const redirectPath = localStorage.getItem("redirectPath") || "/";
+            if (redirectPath.includes("/examination")) {
               return initRouter().then(() => {
-                router.push('/examination');
+                router.push("/examination");
               });
-            } else if (route.query.tabName == 'worker') {
+            } else if (redirectPath.includes("/aiDrawingApp")) {
               return initRouter().then(() => {
-                router.push({ path: '/my/index', query: { tabName: 'worker' } });
+                router.push("/aiDrawingApp");
               });
-
+            } else if (route.query.tabName == "worker") {
+              return initRouter().then(() => {
+                router.push({
+                  path: "/my/index",
+                  query: { tabName: "worker" }
+                });
+              });
             } else {
               return initRouter().then(() => {
                 router.push(getTopMenu(true).path).then(() => {
@@ -114,12 +119,11 @@ onMounted(() => {
               });
             }
           }
-
         } else {
           message("登录失败", { type: "error" });
           window.location.href = `https://login.peidigroup.cn/#/login?source=${encryptMessage(window.location.href)}`;
         }
-      })
+      });
   } else {
     if (process.env.NODE_ENV === "development") {
       // window.location.href = `http://localhost:8848/#/login?source=${encryptMessage(window.location.href)}`;
@@ -128,7 +132,7 @@ onMounted(() => {
       window.location.href = `https://login.peidigroup.cn/#/login?source=${encryptMessage(window.location.href)}`;
     }
   }
-})
+});
 </script>
 
 <template>
