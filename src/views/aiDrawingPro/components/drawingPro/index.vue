@@ -591,7 +591,7 @@ defineExpose({
                 }"
                 class="rounded-lg shadow-md"
               />
-              <div v-else>请从素材库中选择模板图片</div>
+              <div v-else class="text-center">请从素材库中选择模板图片</div>
 
               <div
                 v-for="item in imageConfig"

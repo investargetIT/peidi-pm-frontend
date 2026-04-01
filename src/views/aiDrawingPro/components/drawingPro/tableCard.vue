@@ -13,6 +13,13 @@ import ResultDialog from "./resultDialog.vue";
 import OnlineImg from "../../common/onlineImg.vue";
 import { Download, Refresh, Upload } from "@element-plus/icons-vue";
 import { FORMAT_PROMPT } from "./utils/prompt";
+import {
+  compositeImage,
+  generateCompositeElements,
+  downloadCompositeImage
+} from "../../utils/compositeImage";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 const props = defineProps({
   imageConfig: {
@@ -261,8 +268,16 @@ const importConfig = () => {
                 ...importedDataList.value,
                 ...dataWithId
               ];
+
               // const testB4 = await imageToBase64(imageUrl1);
               // generatedResults.value[importedDataList.value[0]._id] = [testB4];
+
+              // 为每条数据初始化生成结果
+              // const testB4 = await imageToBase64(imageUrl1);
+              // dataWithId.forEach(item => {
+              //   generatedResults.value[item._id] = [testB4];
+              // });
+
               console.log("导入数据:", importedDataList.value);
 
               ElMessage.success(`导入成功，共 ${importedData.length} 条数据`);
@@ -640,6 +655,301 @@ const handlePreviewImage = (imageUrl: string, rowData?: any) => {
   resultDialogRef.value?.open(imageUrl, rowData, props.imageConfig);
 };
 
+/**
+ * 从行数据中生成 Canvas 合成图片
+ */
+const generateCompositeFromRowData = async (
+  imageUrl: string,
+  rowData: Record<string, any>,
+  imageConfig: any[],
+  size: number = 800
+): Promise<string | null> => {
+  try {
+    console.log("\n=== 开始生成合成图片 ===");
+    console.log("背景图 URL:", imageUrl);
+    console.log("行数据:", rowData);
+    console.log("图片配置:", imageConfig);
+
+    // 收集所有需要加载的图片配置
+    const imageConfigs = imageConfig.filter(item => item.type === "image");
+    console.log("图片类型配置数量:", imageConfigs.length);
+
+    // 先收集所有需要加载的图片信息
+    const loadImageTasks: Array<{
+      config: any;
+      base64Data: string;
+    }> = [];
+
+    for (const config of imageConfigs) {
+      const imageKey = `${config.id}_image`;
+      const aiRefKey = `${config.id}_aiRef`;
+      const imageData = rowData[imageKey];
+      const isAiReferenced = rowData[aiRefKey] === true;
+
+      console.log(`\n处理配置: ${config.name}`, {
+        imageKey,
+        aiRefKey,
+        imageData,
+        isAiReferenced,
+        hasImageData: !!imageData,
+        rect: config.rect
+      });
+
+      if (imageData && !isAiReferenced) {
+        let base64Data: string | null = null;
+
+        if (
+          typeof imageData === "string" &&
+          imageData.startsWith("data:image")
+        ) {
+          base64Data = imageData;
+          console.log(`✓ 使用 base64 数据：${config.name}`);
+        } else if (typeof imageData === "string") {
+          try {
+            const material = props.materialList["componentMaterial"]?.find(
+              (mat: any) =>
+                mat.objectName === imageData || mat.url === imageData
+            );
+
+            console.log(`查找素材 ${config.name}:`, material);
+
+            if (material) {
+              // 优先使用 material.url，如果没有则尝试从 objectName 构建完整 URL
+              let materialUrl = material.url || material.objectName;
+
+              console.log(`使用素材 URL: ${materialUrl}`);
+
+              // 如果 URL 不是完整的 http 地址，需要从服务器下载
+              if (!materialUrl.startsWith("http")) {
+                // 使用 downloadFile API 下载文件
+                const { downloadFile } = await import("@/api/aiDraw");
+                const blob: any = await downloadFile({
+                  objectName: materialUrl
+                });
+                base64Data = await blobManager.blobToBase64(blob);
+                console.log(`✓ 从素材库下载并转换成功：${config.name}`);
+              } else {
+                const response = await fetch(materialUrl);
+                const blob = await response.blob();
+                base64Data = await blobManager.blobToBase64(blob);
+                console.log(`✓ 从 HTTP URL 加载成功：${config.name}`);
+              }
+            } else if (imageData.startsWith("http")) {
+              const response = await fetch(imageData);
+              const blob = await response.blob();
+              base64Data = await blobManager.blobToBase64(blob);
+              console.log(`✓ 从 HTTP URL 加载成功：${config.name}`);
+            } else {
+              console.warn(`✗ 未找到素材 ${config.name}`);
+            }
+          } catch (error) {
+            console.warn(`✗ 加载素材 ${config.name} 失败:`, error);
+            continue;
+          }
+        }
+
+        if (base64Data) {
+          loadImageTasks.push({
+            config,
+            base64Data
+          });
+          console.log(`✓ 添加到加载任务：${config.name}`);
+        } else {
+          console.warn(`✗ 没有 base64 数据：${config.name}`);
+        }
+      } else {
+        console.log(`⊘ 跳过 ${config.name}:`, {
+          hasImageData: !!imageData,
+          isAiReferenced
+        });
+      }
+    }
+
+    console.log(`\n准备加载 ${loadImageTasks.length} 个图片素材...`);
+
+    // 现在按顺序加载所有图片并创建元素
+    const elements: Array<{
+      src: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }> = [];
+
+    for (const task of loadImageTasks) {
+      const { config, base64Data } = task;
+
+      const img = new Image();
+      await new Promise<void>(resolve => {
+        img.onload = () => {
+          console.log(`✓ 图片加载成功：${config.name}`, {
+            width: img.width,
+            height: img.height
+          });
+          resolve();
+        };
+        img.onerror = () => {
+          console.warn(`✗ 图片加载失败：${config.name}`);
+          resolve();
+        };
+        img.src = base64Data;
+      });
+
+      if (img.width > 0 && img.height > 0) {
+        const element = {
+          src: base64Data,
+          x: (config.rect?.x * 700 || 50 + elements.length * 20) * (size / 700),
+          y: (config.rect?.y * 700 || 50 + elements.length * 20) * (size / 700),
+          width:
+            (config.rect?.width * 700 || Math.min(img.width, 200)) *
+            (size / 700),
+          height:
+            (config.rect?.height * 700 || Math.min(img.height, 200)) *
+            (size / 700)
+        };
+        elements.push(element);
+        console.log(`✓ 添加元素到数组：${config.name}`, element);
+      }
+    }
+
+    console.log(`\n最终加载的元素数量: ${elements.length}`);
+    console.log("元素列表:", elements);
+
+    if (elements.length > 0) {
+      console.log("开始 Canvas 合成...");
+      const compositeBase64 = await compositeImage(imageUrl, elements, size);
+      console.log("✓ Canvas 合成成功");
+      return compositeBase64;
+    } else {
+      console.warn("✗ 没有可合成的素材元素，返回 null");
+    }
+
+    return null;
+  } catch (error) {
+    console.error("✗ 根据配置生成图片失败:", error);
+    throw error;
+  }
+};
+
+/**
+ * 批量导出所有结果图
+ */
+const exportAllResults = async () => {
+  if (importedDataList.value.length === 0) {
+    ElMessage.warning("没有可导出的数据");
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要批量导出 ${importedDataList.value.length} 张图片吗？`,
+      "批量导出确认",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      }
+    );
+  } catch {
+    return;
+  }
+
+  const zip = new JSZip();
+  const successCount = ref(0);
+  const failCount = ref(0);
+  const exportProgress = ref(0);
+
+  const message = ElMessage({
+    message: "正在批量导出图片，请稍候...",
+    type: "info",
+    duration: 0
+  });
+
+  try {
+    for (let i = 0; i < importedDataList.value.length; i++) {
+      const rowData = importedDataList.value[i];
+      exportProgress.value = Math.round(
+        ((i + 1) / importedDataList.value.length) * 100
+      );
+
+      try {
+        // 获取生成的结果图 URL（base64）
+        const resultImageUrl = generatedResults.value[rowData._id]?.[0];
+
+        if (!resultImageUrl) {
+          console.warn(`第 ${i + 1} 行数据没有生成的结果图，跳过`);
+          failCount.value++;
+          continue;
+        }
+
+        console.log("批量导出:", resultImageUrl, rowData, props.imageConfig);
+
+        const compositeBase64 = await generateCompositeFromRowData(
+          resultImageUrl,
+          rowData,
+          props.imageConfig,
+          800
+        );
+
+        console.log("批量导出合成结果图:", compositeBase64);
+
+        if (compositeBase64) {
+          const fileName = `${rowData.productName || `AI_Image_${i + 1}`}.png`;
+
+          const base64Data = compositeBase64.split(",")[1];
+          const binaryString = atob(base64Data);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let j = 0; j < len; j++) {
+            bytes[j] = binaryString.charCodeAt(j);
+          }
+
+          zip.file(fileName, bytes);
+          successCount.value++;
+          console.log(`成功生成第 ${i + 1} 张图片：${fileName}`);
+        } else {
+          failCount.value++;
+          console.warn(`第 ${i + 1} 张图片没有可合成的素材`);
+        }
+      } catch (error) {
+        failCount.value++;
+        console.error(`导出第 ${i + 1} 张图片失败:`, error);
+      }
+
+      if (i < importedDataList.value.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+
+    message.close();
+
+    if (successCount.value > 0) {
+      const loadingMsg = ElMessage({
+        message: "正在打包压缩文件，请稍后...",
+        type: "info",
+        duration: 0
+      });
+
+      const content = await zip.generateAsync({ type: "blob" });
+
+      loadingMsg.close();
+
+      const timestamp = new Date().getTime();
+      saveAs(content, `AI_Images_Batch_Export_${timestamp}.zip`);
+
+      ElMessage.success(
+        `批量导出完成，成功 ${successCount.value} 张，失败 ${failCount.value} 张`
+      );
+    } else {
+      ElMessage.warning("所有图片导出失败，请检查是否有可合成的素材");
+    }
+  } catch (error) {
+    message.close();
+    console.error("批量导出失败:", error);
+    ElMessage.error("批量导出失败：" + (error as Error).message);
+  }
+};
+
 defineExpose({
   closeClearAll
 });
@@ -700,6 +1010,15 @@ defineExpose({
             :disabled="importedDataList.length === 0"
           >
             ✨ 开始绘制
+          </el-button>
+          <el-button
+            color="#CC6600"
+            type="primary"
+            size="small"
+            @click="exportAllResults"
+            :disabled="importedDataList.length === 0 || batchGenerating"
+          >
+            📥 导出全部结果图
           </el-button>
         </div>
       </div>

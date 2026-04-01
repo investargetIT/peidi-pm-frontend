@@ -5,6 +5,11 @@ import DEFAULT_IMG from "../../assests/images/default.png";
 import { snapdom } from "@zumer/snapdom";
 import { blobManager } from "../../utils/blobManager";
 import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterialLibrary";
+import {
+  compositeImage,
+  downloadCompositeImage,
+  generateCompositeElements
+} from "../../utils/compositeImage";
 
 interface ResultImageItem {
   id: number;
@@ -499,6 +504,48 @@ const handleOpen = (imageUrl: string, rowData?: any, imageConfig?: any[]) => {
 
     updateContainerRect();
 
+    // setTimeout(async () => {
+    //   await importMaterialElements();
+
+    //   await nextTick();
+
+    //   if (imageElements.length > 0) {
+    //     const elements = generateCompositeElements(
+    //       imageElements,
+    //       700,
+    //       Number(exportSize.value)
+    //     );
+
+    //     try {
+    //       const compositeBase64 = await compositeImage(
+    //         imageUrl,
+    //         elements,
+    //         Number(exportSize.value)
+    //       );
+
+    //       console.log("Canvas 合成图片成功:", {
+    //         base64Length: compositeBase64.length,
+    //         outputSize: exportSize.value,
+    //         elementsCount: imageElements.length
+    //       });
+
+    //       downloadCompositeImage(
+    //         compositeBase64,
+    //         `${selectedRowData.value?.productName || "AI_Generated_Image"}.png`
+    //       );
+
+    //       ElMessage.success("图片合成并导出成功");
+
+    //       return compositeBase64;
+    //     } catch (error) {
+    //       console.error("Canvas 合成失败:", error);
+    //       throw error;
+    //     }
+    //   } else {
+    //     console.warn("没有可合成的素材元素");
+    //     return null;
+    //   }
+    // }, 100);
     setTimeout(() => {
       importMaterialElements();
     }, 100);
