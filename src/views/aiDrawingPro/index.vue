@@ -3,7 +3,6 @@ import { onUnmounted, provide, ref, watch } from "vue";
 import { downloadFile } from "@/api/aiDraw";
 import { ElMessage } from "element-plus";
 import Material from "./components/material/index.vue";
-import Drawing from "./components/drawing/index.vue";
 import Creative from "./components/creative/index.vue";
 import DrawingPro from "./components/drawingPro/index.vue";
 import { imageCache } from "./utils/imageCache/index";
@@ -11,6 +10,8 @@ import { processImageCompression } from "./utils/compressImage/index";
 import { blobManager } from "./utils/blobManager";
 import { requestQueueManager } from "./utils/requestQueue";
 import NavBar from "./components/navBar/index.vue";
+import "./style/reset.scss";
+import "./style/element-plus.scss";
 
 // 自定义缓存图片类型
 export interface ImageCacheData {
@@ -234,23 +235,27 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <el-tabs
-    type="border-card"
-    v-model="activeTab"
-    class="peidi-el-tabs-modern-tabs"
-  >
-    <!-- <el-tab-pane label="绘图" name="Drawing" lazy>
-      <Drawing ref="drawingTabRef" />
-    </el-tab-pane> -->
-    <el-tab-pane label="素材库" name="Material" lazy>
-      <Material ref="materialTabRef" />
-    </el-tab-pane>
-    <el-tab-pane label="创意工作室" name="Creative">
-      <Creative ref="creativeTabRef" />
-    </el-tab-pane>
-    <el-tab-pane label="模板编辑器" name="DrawingPro">
-      <DrawingPro ref="drawingProTabRef" />
-    </el-tab-pane>
-  </el-tabs>
-  <NavBar />
+  <div>
+    <el-tabs
+      type="border-card"
+      v-model="activeTab"
+      class="peidi-el-tabs-modern-tabs"
+    >
+      <el-tab-pane label="素材库" name="Material" lazy>
+        <Material ref="materialTabRef" />
+      </el-tab-pane>
+      <el-tab-pane label="模板编辑器" name="DrawingPro">
+        <DrawingPro ref="drawingProTabRef" />
+      </el-tab-pane>
+      <el-tab-pane label="创意工作室" name="Creative">
+        <Creative ref="creativeTabRef" />
+      </el-tab-pane>
+    </el-tabs>
+
+    <!-- #region NavBar 用来实现TOKEN过期重登录 -->
+    <div>
+      <NavBar />
+    </div>
+    <!-- #endregion -->
+  </div>
 </template>
