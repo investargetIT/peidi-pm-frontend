@@ -462,6 +462,8 @@ const buildPrompt = (rowData: Record<string, any>) => {
   // 如果有备注字段，添加到 prompt 中
   if (rowData.remark) {
     return `${prompt}\n${rowData.remark}`;
+  } else {
+    return prompt;
   }
 };
 

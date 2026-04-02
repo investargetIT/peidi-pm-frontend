@@ -10,6 +10,7 @@ import { imageCache } from "./utils/imageCache/index";
 import { processImageCompression } from "./utils/compressImage/index";
 import { blobManager } from "./utils/blobManager";
 import { requestQueueManager } from "./utils/requestQueue";
+import NavBar from "./components/navBar/index.vue";
 
 // 自定义缓存图片类型
 export interface ImageCacheData {
@@ -251,4 +252,5 @@ onUnmounted(() => {
       <DrawingPro ref="drawingProTabRef" />
     </el-tab-pane>
   </el-tabs>
+  <NavBar />
 </template>
