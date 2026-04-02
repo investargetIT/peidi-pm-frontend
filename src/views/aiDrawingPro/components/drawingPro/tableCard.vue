@@ -9,6 +9,8 @@ import { transferDraw } from "@/api/aiDraw";
 import imageUrl1 from "@/views/debug/assets/绘图1.png";
 import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 import { blobManager } from "../../utils/blobManager";
+import { imageCache } from "../../utils/imageCache";
+import { downloadFile } from "@/api/aiDraw";
 import ResultDialog from "./resultDialog.vue";
 import OnlineImg from "../../common/onlineImg.vue";
 import { Download, Refresh, Upload } from "@element-plus/icons-vue";
@@ -198,9 +200,17 @@ const parseExcelData = (jsonData: any[]) => {
       });
 
       // 解析备注字段
-      if (row["备注 Remark"] || row["Remark"] || row["备注"]) {
+      if (
+        row["第一优先级提示词"] ||
+        row["备注 Remark"] ||
+        row["Remark"] ||
+        row["备注"]
+      ) {
         parsedRow["remark"] =
-          row["备注 Remark"] || row["Remark"] || row["备注"];
+          row["第一优先级提示词"] ||
+          row["备注 Remark"] ||
+          row["Remark"] ||
+          row["备注"];
       }
 
       result.push(parsedRow as Record<string, any> & { _id: number });
@@ -375,9 +385,55 @@ const closeClearAll = () => {
 };
 
 /**
- * 将图片 URL 转换为 base64
+ * 将图片 URL 转换为 base64（支持缓存）
+ * @param imageUrl 图片 URL 或相对路径
+ * @returns Promise<string> base64 字符串
  */
-const imageToBase64 = (imageUrl: string): Promise<string> => {
+const imageToBase64 = async (imageUrl: string): Promise<string> => {
+  console.log("将图片 URL 转换为 base64（支持缓存）:", imageUrl);
+  if (!imageUrl) {
+    throw new Error("图片 URL 不能为空");
+  }
+
+  // 如果已经是 base64，直接返回
+  if (imageUrl.startsWith("data:image/")) {
+    return imageUrl;
+  }
+
+  // 对于以 ai/ 开头的相对路径，先检查缓存
+  if (imageUrl.startsWith("ai/")) {
+    try {
+      const cachedImageData = await imageCache.getImageData(imageUrl);
+
+      if (cachedImageData) {
+        // 从缓存获取原图并转为 base64
+        const base64 = await blobManager.blobToBase64(
+          cachedImageData.originalBlob
+        );
+        console.log(`从缓存加载图片：${imageUrl}`);
+        return base64;
+      }
+
+      // 缓存中没有，需要下载并缓存
+      console.log(`缓存中未找到图片，正在下载：${imageUrl}`);
+      const response: any = await downloadFile({ objectName: imageUrl });
+
+      // 将 Blob 转为 base64
+      const base64 = await blobManager.blobToBase64(response);
+
+      // 存储到缓存（同时存储原图和压缩图，这里简化处理，存储两份相同的）
+      await imageCache.storeImage(imageUrl, response, response);
+
+      console.log(`图片已下载并缓存：${imageUrl}`);
+      return base64;
+    } catch (error) {
+      console.error(`图片处理失败 (${imageUrl}):`, error);
+      throw new Error(`图片 ${imageUrl} 处理失败：${error.message}`);
+    }
+  }
+
+  // 如果是完整的 http/https URL，使用原有的 Image 方式转换
+  // if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -399,12 +455,17 @@ const imageToBase64 = (imageUrl: string): Promise<string> => {
     };
     img.src = imageUrl;
   });
+  // }
+
+  // 其他情况（不支持的路径格式），抛出错误
+  // throw new Error(`不支持的图片路径格式：${imageUrl}`);
 };
 
 /**
  * 构建 AI 生成的 prompt
  */
 const buildPrompt = (rowData: Record<string, any>) => {
+  let imageCount = 0;
   const config = props.imageConfig.map((item, index) => {
     const baseItem = {
       id: item.id,
@@ -431,9 +492,10 @@ const buildPrompt = (rowData: Record<string, any>) => {
       const keepRef = rowData[`${item.id}_keepRef`];
 
       if (aiRef && imageData) {
+        imageCount++;
         return {
           ...baseItem,
-          image: `第 ${index + 2} 张图`
+          image: `第 ${imageCount + 1} 张图`
         };
       }
       if (!imageData && keepRef) {
@@ -473,19 +535,24 @@ const buildPrompt = (rowData: Record<string, any>) => {
 const collectImageUrls = (rowData: Record<string, any>): string[] => {
   const urls: string[] = [];
 
-  console.log("collectImageUrls", props.imageConfig);
+  console.log(
+    "collectImageUrls",
+    props.imageConfig,
+    rowData,
+    props.materialList
+  );
   props.imageConfig.forEach(item => {
     if (item.type === "image") {
       const imageData = rowData[`${item.id}_image`];
       const aiRef = rowData[`${item.id}_aiRef`];
 
       if (aiRef && imageData) {
-        if (props.materialList[item.id]) {
-          const material = props.materialList[item.id].find(
+        if (props.materialList["componentMaterial"]) {
+          const material = props.materialList["componentMaterial"].find(
             (mat: any) => mat.objectName === imageData || mat.url === imageData
           );
-          if (material && material.url) {
-            urls.push(material.url);
+          if (material && material.objectName) {
+            urls.push(material.objectName);
           } else if (
             typeof imageData === "string" &&
             imageData.startsWith("http")
