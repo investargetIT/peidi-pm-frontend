@@ -257,7 +257,21 @@ const importConfig = () => {
             return;
           }
 
-          const importedData = parseExcelData(jsonData);
+          const filteredData = jsonData.filter(row => {
+            const hasValidField = Object.keys(row).some(key => {
+              if (key === "__rowNum__" || key === "__rowIndex__") return false;
+              const value = row[key];
+              if (value === null || value === undefined) return false;
+              if (typeof value === "string" && value.trim() === "")
+                return false;
+              return true;
+            });
+            return hasValidField;
+          });
+
+          console.log("jsonData:", jsonData, filteredData);
+
+          const importedData = parseExcelData(filteredData);
 
           ElMessageBox.confirm(
             `成功导入 ${importedData.length} 条配置数据，是否添加到列表？`,
