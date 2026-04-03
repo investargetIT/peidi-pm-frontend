@@ -162,14 +162,25 @@ const exportAsPNG = async () => {
           <el-button type="primary" @click="exportAsPNG"> 导出 PNG </el-button>
         </div>
       </div>
-      <div class="inline-block">
-        <img
-          ref="exportContainer"
-          w-full
-          :src="previewImageUrl"
-          alt="图片预览"
-          v-loading="previewLoading"
-        />
+      <div>
+        <el-skeleton :loading="previewLoading" animated>
+          <template #template>
+            <el-skeleton-item
+              variant="image"
+              style="width: 100%; min-height: 300px; border-radius: 4px"
+            />
+          </template>
+          <template #default>
+            <el-image
+              ref="exportContainer"
+              w-full
+              :src="previewImageUrl"
+              alt="图片预览"
+              fit="contain"
+            >
+            </el-image>
+          </template>
+        </el-skeleton>
       </div>
     </el-dialog>
   </div>

@@ -9,7 +9,7 @@ import {
   inject
 } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import DEFAULT_IMG from "../../assests/images/default.png";
+import DEFAULT_IMG from "../../assets/images/default.png";
 import { snapdom } from "@zumer/snapdom";
 import { loadImage } from "../../utils/imageLoader";
 import { type ImageDataResult } from "../../utils/compressImage";

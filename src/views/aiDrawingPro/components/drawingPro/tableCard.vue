@@ -23,6 +23,14 @@ import {
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
+const AI_MODEL_OPTIONS = [
+  // { label: "阿里 wan2.7-image", value: "wan2.7-image" },
+  { label: "谷歌 nano-banana-2", value: "nano-banana-2" },
+  { label: "谷歌 nano-banana-pro", value: "nano-banana-pro" },
+  { label: "谷歌 nano-banana-fast", value: "nano-banana-fast" }
+];
+const aiModel = ref("nano-banana-2");
+
 const props = defineProps({
   imageConfig: {
     type: Array<any>,
@@ -618,7 +626,7 @@ const generateSingleImage = async (
     const base64Url1_ = await blobManager.blobToBase64(props.fileList[0].raw);
 
     const params = {
-      model: "nano-banana-2",
+      model: aiModel.value,
       prompt: buildPrompt(row),
       aspectRatio: "auto",
       imageSize: "4K",
@@ -1046,9 +1054,44 @@ defineExpose({
     >
       <template #header>
         <div class="card-header">
-          <span>
-            <span>批量生成模式</span>
-          </span>
+          <div class="flex justify-between items-center flex-wrap">
+            <div>批量生成模式</div>
+            <div class="flex items-center flex-wrap">
+              <div>
+                <el-select
+                  v-model="aiModel"
+                  placeholder="请选择 AI 模型"
+                  style="width: 180px; margin-right: 10px"
+                  size="small"
+                >
+                  <el-option
+                    v-for="item in AI_MODEL_OPTIONS"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+              </div>
+              <div class="flex items-center">
+                <el-button
+                  color="#217346"
+                  size="small"
+                  @click="exportConfig"
+                  :icon="Download"
+                >
+                  导出配置表
+                </el-button>
+                <el-button
+                  color="#427AED"
+                  size="small"
+                  @click="importConfig"
+                  :icon="Upload"
+                >
+                  导入配置表
+                </el-button>
+              </div>
+            </div>
+          </div>
         </div>
       </template>
       <div class="flex items-center justify-between mb-4 flex-wrap">
@@ -1060,20 +1103,13 @@ defineExpose({
         </div>
         <div class="flex items-center">
           <el-button
-            color="#217346"
+            color="#CC6600"
+            type="primary"
             size="small"
-            @click="exportConfig"
-            :icon="Download"
+            @click="exportAllResults"
+            :disabled="importedDataList.length === 0 || batchGenerating"
           >
-            导出配置表
-          </el-button>
-          <el-button
-            color="#427AED"
-            size="small"
-            @click="importConfig"
-            :icon="Upload"
-          >
-            导入配置表
+            📥 导出全部结果图
           </el-button>
           <el-button
             type="danger"
@@ -1083,15 +1119,6 @@ defineExpose({
             :icon="Refresh"
           >
             清空全部
-          </el-button>
-          <el-button
-            color="#CC6600"
-            type="primary"
-            size="small"
-            @click="exportAllResults"
-            :disabled="importedDataList.length === 0 || batchGenerating"
-          >
-            📥 导出全部结果图
           </el-button>
           <el-button
             color="#534CE7"

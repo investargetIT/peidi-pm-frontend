@@ -30,6 +30,11 @@ const fetchDrawRecordPageForUseNumber = () => {
         searchName: "type",
         searchType: "like",
         searchValue: `\"useNumber\":\"${useNumberTime}\"`
+      },
+      {
+        searchName: "type",
+        searchType: "like",
+        searchValue: `\"imgType\":\"Thumbnail\"`
       }
     ])
   })

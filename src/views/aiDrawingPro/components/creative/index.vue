@@ -11,7 +11,7 @@ import {
   UploadIcon,
   Save2Icon,
   StarIcon
-} from "../../assests/svg/index";
+} from "../../assets/svg/index";
 
 import {
   downloadFile,

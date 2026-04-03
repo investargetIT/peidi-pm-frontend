@@ -9,7 +9,7 @@ import { Check, Close, Delete, Edit } from "@element-plus/icons-vue";
 import { type ExcelTableItem } from "../../type/drawing";
 import { EXCEL_TABLE_ITEM_DEFAULT } from "../../config/drawing";
 import { generateID, getNameFromObjectName } from "../../utils/general";
-import { LoadingIcon, GoodIcon, EditIcon } from "../../assests/svg/index";
+import { LoadingIcon, GoodIcon, EditIcon } from "../../assets/svg/index";
 import OnlineImg from "../../common/onlineImg.vue";
 
 const props = defineProps({

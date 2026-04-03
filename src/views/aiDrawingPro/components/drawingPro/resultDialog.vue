@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, reactive, nextTick, onUnmounted, inject } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import DEFAULT_IMG from "../../assests/images/default.png";
+import DEFAULT_IMG from "../../assets/images/default.png";
 import { snapdom } from "@zumer/snapdom";
 import { blobManager } from "../../utils/blobManager";
 import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterialLibrary";
