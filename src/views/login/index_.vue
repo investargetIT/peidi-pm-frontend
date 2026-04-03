@@ -102,7 +102,10 @@ onMounted(() => {
               });
             } else if (redirectPath.includes("/aiDrawingApp")) {
               return initRouter().then(() => {
-                router.push("/aiDrawingApp");
+                router.push({
+                  path: "/aiDrawingApp",
+                  query: { firstLogin: "true" }
+                });
               });
             } else if (route.query.tabName == "worker") {
               return initRouter().then(() => {

@@ -239,6 +239,23 @@ watch(activeTab, (newVal, oldVal) => {
 });
 
 onMounted(() => {
+  // 检查是否为首次登录进入
+  if (route.query.firstLogin === "true") {
+    // 执行需要的初始化操作
+    console.log("首次登录，执行初始化...");
+
+    // 清除 URL 中的 firstLogin 参数，然后刷新页面
+    const newQuery = { ...route.query };
+    delete newQuery.firstLogin;
+
+    // 使用 replace 清除参数后刷新
+    router.replace({ query: newQuery }).then(() => {
+      window.location.reload();
+    });
+
+    return;
+  }
+
   // 从URL中解析问号后的tab参数
   const tab = route.query.tab as string;
   if (tab) {
