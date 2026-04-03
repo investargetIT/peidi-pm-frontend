@@ -541,7 +541,7 @@ const buildPrompt = (rowData: Record<string, any>) => {
 
   const prompt = FORMAT_PROMPT(
     JSON.stringify(props.imageConfig),
-    JSON.stringify(config),
+    JSON.stringify(config)
     // PromptType.Test
   );
 
@@ -831,14 +831,13 @@ const generateCompositeFromRowData = async (
     console.log("行数据:", rowData);
     console.log("图片配置:", imageConfig);
 
-    // 收集所有需要加载的图片配置
     const imageConfigs = imageConfig.filter(item => item.type === "image");
     console.log("图片类型配置数量:", imageConfigs.length);
 
-    // 先收集所有需要加载的图片信息
     const loadImageTasks: Array<{
       config: any;
       base64Data: string;
+      imgElement: HTMLImageElement;
     }> = [];
 
     for (const config of imageConfigs) {
@@ -847,7 +846,7 @@ const generateCompositeFromRowData = async (
       const imageData = rowData[imageKey];
       const isAiReferenced = rowData[aiRefKey] === true;
 
-      console.log(`\n处理配置: ${config.name}`, {
+      console.log(`\n处理配置：${config.name}`, {
         imageKey,
         aiRefKey,
         imageData,
@@ -875,14 +874,11 @@ const generateCompositeFromRowData = async (
             console.log(`查找素材 ${config.name}:`, material);
 
             if (material) {
-              // 优先使用 material.url，如果没有则尝试从 objectName 构建完整 URL
               let materialUrl = material.url || material.objectName;
 
               console.log(`使用素材 URL: ${materialUrl}`);
 
-              // 如果 URL 不是完整的 http 地址，需要从服务器下载
               if (!materialUrl.startsWith("http")) {
-                // 使用 downloadFile API 下载文件
                 const { downloadFile } = await import("@/api/aiDraw");
                 const blob: any = await downloadFile({
                   objectName: materialUrl
@@ -910,9 +906,17 @@ const generateCompositeFromRowData = async (
         }
 
         if (base64Data) {
+          const img = new Image();
+          await new Promise<void>(resolve => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+            img.src = base64Data;
+          });
+
           loadImageTasks.push({
             config,
-            base64Data
+            base64Data,
+            imgElement: img
           });
           console.log(`✓ 添加到加载任务：${config.name}`);
         } else {
@@ -928,7 +932,11 @@ const generateCompositeFromRowData = async (
 
     console.log(`\n准备加载 ${loadImageTasks.length} 个图片素材...`);
 
-    // 现在按顺序加载所有图片并创建元素
+    if (loadImageTasks.length === 0) {
+      console.warn("✗ 没有可合成的素材元素，返回 null");
+      return null;
+    }
+
     const elements: Array<{
       src: string;
       x: number;
@@ -938,54 +946,59 @@ const generateCompositeFromRowData = async (
     }> = [];
 
     for (const task of loadImageTasks) {
-      const { config, base64Data } = task;
+      const { config, imgElement } = task;
 
-      const img = new Image();
-      await new Promise<void>(resolve => {
-        img.onload = () => {
-          console.log(`✓ 图片加载成功：${config.name}`, {
-            width: img.width,
-            height: img.height
-          });
-          resolve();
-        };
-        img.onerror = () => {
-          console.warn(`✗ 图片加载失败：${config.name}`);
-          resolve();
-        };
-        img.src = base64Data;
-      });
+      let elementWidth: number;
+      let elementHeight: number;
+      let imgRatio: number;
+      let offsetX = 0;
+      let offsetY = 0;
 
-      if (img.width > 0 && img.height > 0) {
-        const element = {
-          src: base64Data,
-          x: (config.rect?.x * 700 || 50 + elements.length * 20) * (size / 700),
-          y: (config.rect?.y * 700 || 50 + elements.length * 20) * (size / 700),
-          width:
-            (config.rect?.width * 700 || Math.min(img.width, 200)) *
-            (size / 700),
-          height:
-            (config.rect?.height * 700 || Math.min(img.height, 200)) *
-            (size / 700)
-        };
-        elements.push(element);
-        console.log(`✓ 添加元素到数组：${config.name}`, element);
+      if (config.rect?.width && config.rect?.height) {
+        const targetWidth = config.rect.width * 700;
+        const targetHeight = config.rect.height * 700;
+
+        imgRatio = imgElement.width / imgElement.height;
+        const targetRatio = targetWidth / targetHeight;
+
+        if (imgRatio > targetRatio) {
+          elementWidth = targetWidth;
+          elementHeight = targetWidth / imgRatio;
+          offsetY = (targetHeight - elementHeight) / 2;
+        } else {
+          elementHeight = targetHeight;
+          elementWidth = targetHeight * imgRatio;
+          offsetX = (targetWidth - elementWidth) / 2;
+        }
+      } else {
+        elementWidth = Math.min(imgElement.width, 200);
+        elementHeight = Math.min(imgElement.height, 200);
+        imgRatio = imgElement.width / imgElement.height;
       }
+
+      const element = {
+        src: task.base64Data,
+        x: (config.rect?.x * 700 || 50 + elements.length * 20) + offsetX,
+        y: (config.rect?.y * 700 || 50 + elements.length * 20) + offsetY,
+        width: elementWidth,
+        height: elementHeight
+      };
+      elements.push(element);
+      console.log(`✓ 添加元素到数组：${config.name}`, element, {
+        originalSize: `${imgElement.width}x${imgElement.height}`,
+        elementSize: `${elementWidth.toFixed(2)}x${elementHeight.toFixed(2)}`,
+        ratio: imgRatio,
+        offset: `${offsetX.toFixed(2)}, ${offsetY.toFixed(2)}`
+      });
     }
 
-    console.log(`\n最终加载的元素数量: ${elements.length}`);
+    console.log(`\n最终加载的元素数量：${elements.length}`);
     console.log("元素列表:", elements);
 
-    if (elements.length > 0) {
-      console.log("开始 Canvas 合成...");
-      const compositeBase64 = await compositeImage(imageUrl, elements, size);
-      console.log("✓ Canvas 合成成功");
-      return compositeBase64;
-    } else {
-      console.warn("✗ 没有可合成的素材元素，返回 null");
-    }
-
-    return null;
+    console.log("开始 Canvas 合成...");
+    const compositeBase64 = await compositeImage(imageUrl, elements, size);
+    console.log("✓ Canvas 合成成功");
+    return compositeBase64;
   } catch (error) {
     console.error("✗ 根据配置生成图片失败:", error);
     throw error;

@@ -49,14 +49,11 @@ export const compositeImage = async (
     canvas.width = outputSize;
     canvas.height = outputSize;
 
-    // 填充白色背景
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, outputSize, outputSize);
 
-    // 1. 绘制背景图
     const bgImg = await loadImage(backgroundImage);
 
-    // 计算背景图的绘制参数（保持比例，cover 模式）
     const bgRatio = bgImg.width / bgImg.height;
     const canvasRatio = outputSize / outputSize;
 
@@ -66,35 +63,33 @@ export const compositeImage = async (
     let bgDrawHeight = outputSize;
 
     if (bgRatio > canvasRatio) {
-      // 图片更宽，按高度缩放
       bgDrawWidth = outputSize * bgRatio;
       bgDrawX = (outputSize - bgDrawWidth) / 2;
     } else {
-      // 图片更高，按宽度缩放
       bgDrawHeight = outputSize / bgRatio;
       bgDrawY = (outputSize - bgDrawHeight) / 2;
     }
 
     ctx.drawImage(bgImg, bgDrawX, bgDrawY, bgDrawWidth, bgDrawHeight);
 
-    // 2. 依次绘制所有素材元素
+    const contentScaleX = bgDrawWidth / 700;
+    const contentScaleY = bgDrawHeight / 700;
+
     for (const element of elements) {
       try {
         const elementImg = await loadImage(element.src);
-        ctx.drawImage(
-          elementImg,
-          element.x,
-          element.y,
-          element.width,
-          element.height
-        );
+
+        const scaledX = bgDrawX + element.x * contentScaleX;
+        const scaledY = bgDrawY + element.y * contentScaleY;
+        const scaledWidth = element.width * contentScaleX;
+        const scaledHeight = element.height * contentScaleY;
+
+        ctx.drawImage(elementImg, scaledX, scaledY, scaledWidth, scaledHeight);
       } catch (error) {
         console.warn(`素材图片绘制失败：`, error);
-        // 继续绘制其他元素
       }
     }
 
-    // 3. 返回 base64 数据
     return canvas.toDataURL("image/png", 1.0);
   } catch (error) {
     console.error("Canvas 合成错误:", error);

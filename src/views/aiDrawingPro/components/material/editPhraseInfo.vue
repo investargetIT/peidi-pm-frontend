@@ -114,15 +114,15 @@ const submitForm = async (formEl: FormInstance | undefined) => {
       updateMaterial(temp)
         .then((res: any) => {
           if (res.code === 200) {
-            ElMessage.success("描述词保存成功");
+            ElMessage.success("编辑词保存成功");
             props.fetchMaterialPage();
             dialogVisible.value = false;
           } else {
-            ElMessage.error("保存描述词失败:" + res?.msg);
+            ElMessage.error("保存编辑词失败:" + res?.msg);
           }
         })
         .catch(error => {
-          ElMessage.error("保存描述词失败:" + error.message);
+          ElMessage.error("保存编辑词失败:" + error.message);
         })
         .finally(() => {
           loading.value = false;
@@ -232,7 +232,8 @@ const handleGenerateDescriptorInfo = async () => {
   const TASK_REQUIREMENT = `
 第一张图是模板图，第二张图是进行了标记的模板图。
 请返回给我一个可以在模板图上渲染方块（包含方块信息）的参数数组，
-我用来告诉用户哪些地方是可以修改的，你还应该告诉我里面的内容，比如产品卖点 可以修改卖点文案 内容为特色酥骨工艺
+我用来告诉用户哪些地方是可以修改的，你还应该告诉我里面的内容，比如产品卖点 可以修改卖点文案 内容为特色酥骨工艺。
+特别注意如果type为text时，content中的label需要加上name前置，比如"产品卖点_卖点文案"。
 参考格式：
 [
   {
@@ -251,7 +252,7 @@ const handleGenerateDescriptorInfo = async () => {
     name: "1.产品卖点",
     content: [
       {
-        label: "卖点文案",
+        label: "产品卖点_卖点文案",
         text: "特色酥骨工艺"
       },
     ]
@@ -318,7 +319,7 @@ const handleGenerateDescriptorInfo = async () => {
 
             ruleForm.editPhraseInfo = JSON.stringify(jsonArray, null, 2);
 
-            ElMessage.success("生成描述词成功");
+            ElMessage.success("生成编辑词成功");
           } else {
             throw new Error("未找到 JSON 代码块");
           }
@@ -327,11 +328,11 @@ const handleGenerateDescriptorInfo = async () => {
           ElMessage.error("解析 AI 返回内容失败：" + (error as Error).message);
         }
       } else {
-        ElMessage.error("生成描述词失败:" + res?.msg);
+        ElMessage.error("生成编辑词失败:" + res?.msg);
       }
     })
     .catch(err => {
-      ElMessage.error("生成描述词失败:" + err.message);
+      ElMessage.error("生成编辑词失败:" + err.message);
     })
     .finally(() => {
       geminiLoading.value = false;
