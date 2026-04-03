@@ -1,15 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
-import type { UploadProps, UploadUserFile } from "element-plus";
+import { onUnmounted, reactive, ref } from "vue";
+import { ElMessage } from "element-plus";
+import type { UploadProps } from "element-plus";
+
 import { Plus } from "@element-plus/icons-vue";
-import {
-  downloadFile,
-  getMaterialPage,
-  newMaterial,
-  uploadDraw,
-  transferDraw
-} from "@/api/aiDraw";
 import {
   PictureIcon,
   RefreshIcon,
@@ -18,6 +12,15 @@ import {
   Save2Icon,
   StarIcon
 } from "../../assests/svg/index";
+
+import {
+  downloadFile,
+  getMaterialPage,
+  newMaterial,
+  uploadDraw,
+  transferDraw
+} from "@/api/aiDraw";
+
 import {
   fileToBase64,
   downloadImageFromUrl,
@@ -26,6 +29,7 @@ import {
 import { imageCache } from "../../utils/imageCache";
 import { blobManager } from "../../utils/blobManager";
 import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterialLibrary";
+
 import PictureSizeDailog from "./pictureSizeDailog.vue";
 import ResultCard from "./resultCard.vue";
 
@@ -33,7 +37,7 @@ const pictureSizeDailogRef = ref(null);
 const resultCardRef = ref(null);
 
 const loading = ref(false);
-const aiModel = ref("nano-banana-pro");
+const aiModel = ref("nano-banana-2");
 const configForm = reactive({
   size: "4K",
   ratio: "auto",
@@ -51,6 +55,7 @@ const dialogImageUrl = ref("");
 const dialogVisible = ref(false);
 const MAX_IMAGE_COUNT = 9;
 
+//#region 素材图片相关逻辑
 const handleFileChange: UploadProps["onChange"] = (uploadFile, uploadFiles) => {
   if (uploadFiles.length > MAX_IMAGE_COUNT) {
     ElMessage.warning(
@@ -86,20 +91,9 @@ const handlePictureCardPreview: UploadProps["onPreview"] = uploadFile => {
   dialogImageUrl.value = uploadFile.url!;
   dialogVisible.value = true;
 };
+//#endregion
 
-onUnmounted(() => {
-  fileList.value.forEach(file => {
-    if (file.url && file.url.startsWith("blob:")) {
-      URL.revokeObjectURL(file.url);
-    }
-  });
-  resultPictures.value.forEach(pic => {
-    if (pic && pic.startsWith("blob:")) {
-      URL.revokeObjectURL(pic);
-    }
-  });
-});
-
+//#region 历史记录相关逻辑
 const handleGenerateClick = async () => {
   // 检查是否已生成 100 条记录
   if (resultCardRef.value?.isMonthlyLimitReached()) {
@@ -199,7 +193,9 @@ const formatParams = async () => {
     shutProgress: false
   };
 };
+//#endregion
 
+//#region 预览相关逻辑
 const handleDownloadClick = () => {
   if (!resultPictures.value[selectedPictureIndex.value]) {
     ElMessage.warning("没有可下载的图片");
@@ -225,6 +221,7 @@ const handleSaveToMaterialLibraryClick = () => {
 const selectPicture = (index: number) => {
   selectedPictureIndex.value = index;
 };
+//#endregion
 
 const initCreativeStudio = async (url: string) => {
   try {
@@ -268,240 +265,264 @@ const initCreativeStudio = async (url: string) => {
 defineExpose({
   initCreativeStudio
 });
+
+onUnmounted(() => {
+  fileList.value.forEach(file => {
+    if (file.url && file.url.startsWith("blob:")) {
+      URL.revokeObjectURL(file.url);
+    }
+  });
+  resultPictures.value.forEach(pic => {
+    if (pic && pic.startsWith("blob:")) {
+      URL.revokeObjectURL(pic);
+    }
+  });
+});
 </script>
 
 <template>
   <div>
-    <el-row :gutter="20">
-      <el-col :xs="24" :sm="24" :md="12" :lg="8" class="mb-5 xl:mb-0 ">
-        <el-card
-          shadow="never"
-          style="border-radius: 10px"
-          class="peidi-aiDrawingPro-creative-card-equal-height"
-        >
-          <div class="flex items-center justify-between mb-[24px]">
-            <h2 class="text-xl font-semibold text-[#0a0a0a]">生成器</h2>
-            <el-select
-              v-model="aiModel"
-              placeholder="请选择 AI 模型"
-              style="width: 180px"
+    <el-scrollbar height="calc(100vh - 100px)">
+      <div class="px-[10px]">
+        <el-row :gutter="20">
+          <el-col :xs="24" :sm="24" :md="12" :lg="8" class="mb-5 xl:mb-0">
+            <el-card
+              shadow="never"
+              style="border-radius: 10px"
+              class="peidi-aiDrawingPro-creative-card-equal-height"
             >
-              <el-option
-                label="nano-banana-pro"
-                value="nano-banana-pro"
-              ></el-option>
-              <el-option label="nano-banana" value="nano-banana"></el-option>
-              <el-option
-                label="nano-banana-fast"
-                value="nano-banana-fast"
-              ></el-option>
-            </el-select>
-          </div>
-
-          <el-form :model="configForm" :label-position="'top'">
-            <el-form-item label="素材图片">
-              <el-upload
-                v-model:file-list="fileList"
-                action=""
-                list-type="picture-card"
-                :auto-upload="false"
-                :on-change="handleFileChange"
-                :on-remove="handleRemove"
-                :on-preview="handlePictureCardPreview"
-                accept="image/*"
-                multiple
-                :limit="MAX_IMAGE_COUNT"
-              >
-                <el-icon class="text-gray-400">
-                  <Plus />
-                </el-icon>
-                <template #tip>
-                  <div class="text-xs text-gray-500 mt-[8px]">
-                    最多上传 {{ MAX_IMAGE_COUNT }} 张图片，支持 JPG, JPEG, PNG,
-                    WEBP 格式
-                  </div>
-                </template>
-              </el-upload>
-            </el-form-item>
-
-            <div class="flex items-center justify-between">
-              <el-form-item label="图片尺寸" style="width: 50%">
+              <div class="flex items-center justify-between mb-[24px]">
+                <h2 class="text-xl font-semibold text-[#0a0a0a]">生成器</h2>
                 <el-select
-                  v-model="configForm.size"
-                  placeholder="请选择图片尺寸"
-                  style="width: 160px"
+                  v-model="aiModel"
+                  placeholder="请选择 AI 模型"
+                  style="width: 180px"
                 >
-                  <el-option label="1K" value="1K" />
-                  <el-option label="2K" value="2K" />
-                  <el-option label="4K" value="4K" />
+                  <el-option
+                    label="nano-banana-2"
+                    value="nano-banana-2"
+                  ></el-option>
+                  <el-option
+                    label="nano-banana-pro"
+                    value="nano-banana-pro"
+                  ></el-option>
+                  <el-option
+                    label="nano-banana"
+                    value="nano-banana"
+                  ></el-option>
+                  <el-option
+                    label="nano-banana-fast"
+                    value="nano-banana-fast"
+                  ></el-option>
                 </el-select>
-              </el-form-item>
-              <el-form-item label="宽高比" style="width: 50%">
-                <el-select
-                  v-model="configForm.ratio"
-                  placeholder="请选择宽高比"
-                  style="width: 160px"
-                >
-                  <el-option label="自动" value="auto" />
-                  <el-option label="1:1" value="1:1" />
-                  <el-option label="16:9" value="16:9" />
-                  <el-option label="9:16" value="9:16" />
-                  <el-option label="4:3" value="4:3" />
-                  <el-option label="3:4" value="3:4" />
-                  <el-option label="3:2" value="3:2" />
-                  <el-option label="2:3" value="2:3" />
-                  <el-option label="5:4" value="5:4" />
-                  <el-option label="4:5" value="4:5" />
-                  <el-option label="21:9" value="21:9" />
-                </el-select>
-              </el-form-item>
-            </div>
-
-            <el-form-item label="提示词">
-              <el-input
-                v-model="configForm.prompt"
-                placeholder="描述你想要生成的图片内容..."
-                type="textarea"
-                :rows="5"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button
-                color="#000"
-                @click="handleGenerateClick"
-                style="width: 100%; font-size: 16px; padding: 24px 0"
-                :loading="loading"
-              >
-                <StarIcon
-                  color="none"
-                  style="width: 16px; height: 16px"
-                  v-show="!loading"
-                />
-                生成图片
-              </el-button>
-              <el-alert
-                v-if="resultInfo"
-                :title="resultInfo"
-                type="primary"
-                :closable="false"
-                show-icon
-                style="margin-top: 16px"
-              />
-            </el-form-item>
-          </el-form>
-        </el-card>
-      </el-col>
-
-      <el-col :xs="24" :sm="24" :md="12" :lg="9" class="mb-5 xl:mb-0">
-        <el-card
-          shadow="never"
-          style="border-radius: 10px"
-          class="peidi-aiDrawingPro-creative-card-equal-height"
-        >
-          <div class="flex items-center justify-between mb-[16px]">
-            <h2 class="text-xl font-semibold text-[#0a0a0a]">预览</h2>
-            <div class="flex" v-show="resultPictures.length > 0">
-              <el-button
-                color="#F3F5F8"
-                style="font-size: 13px"
-                @click="handleGenerateClick"
-              >
-                <RefreshIcon color="none" /> 重新生成</el-button
-              >
-              <el-button
-                color="#F3F5F8"
-                style="font-size: 13px"
-                @click="handleDownloadClick"
-              >
-                <DownloadIcon color="none" /> 下载</el-button
-              >
-              <el-button
-                type="primary"
-                style="font-size: 13px"
-                @click="handleSaveToMaterialLibraryClick"
-              >
-                <Save2Icon color="none" /> 保存到素材库</el-button
-              >
-            </div>
-          </div>
-
-          <div
-            class="relative aspect-square rounded-lg overflow-hidden bg-[#eaeff5]"
-            v-if="resultPictures.length === 0"
-          >
-            <div
-              class="absolute inset-0 flex flex-col items-center justify-center text-[#0a0a0a]"
-            >
-              <div
-                class="w-16 h-16 rounded-full bg-[#eaeff5] flex items-center justify-center mb-4"
-              >
-                <PictureIcon color="none" />
               </div>
-              <p class="text-sm font-medium">生成的图片将显示在这里</p>
-              <p class="text-xs mt-1">请在左侧输入提示词并点击生成</p>
-            </div>
-          </div>
 
-          <div v-else>
-            <div class="grid grid-cols-2 gap-2 mb-3">
-              <div
-                v-for="(picture, index) in resultPictures"
-                :key="index"
-                class="relative aspect-square rounded-lg overflow-hidden bg-[#eaeff5] cursor-pointer border-2 transition-all"
-                :class="
-                  selectedPictureIndex === index
-                    ? 'border-[#000]'
-                    : 'border-transparent hover:border-gray-300'
-                "
-                @click="selectPicture(index)"
-              >
-                <img
-                  :alt="`Generated ${index + 1}`"
-                  class="w-full h-full object-cover"
-                  :src="picture"
-                />
-                <div
-                  v-if="selectedPictureIndex === index"
-                  class="absolute top-1 right-1 w-5 h-5 bg-[#000] rounded-full flex items-center justify-center"
-                >
-                  <svg
-                    class="w-3 h-3 text-white"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
+              <el-form :model="configForm" :label-position="'top'">
+                <el-form-item label="素材图片">
+                  <el-upload
+                    v-model:file-list="fileList"
+                    action=""
+                    list-type="picture-card"
+                    :auto-upload="false"
+                    :on-change="handleFileChange"
+                    :on-remove="handleRemove"
+                    :on-preview="handlePictureCardPreview"
+                    accept="image/*"
+                    multiple
+                    :limit="MAX_IMAGE_COUNT"
                   >
-                    <path
-                      fill-rule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clip-rule="evenodd"
+                    <el-icon class="text-gray-400">
+                      <Plus />
+                    </el-icon>
+                    <template #tip>
+                      <div class="text-xs text-gray-500 mt-[8px]">
+                        最多上传 {{ MAX_IMAGE_COUNT }} 张图片，支持 JPG, JPEG,
+                        PNG, WEBP 格式
+                      </div>
+                    </template>
+                  </el-upload>
+                </el-form-item>
+
+                <div class="flex items-center justify-between">
+                  <el-form-item label="图片尺寸" style="width: 50%">
+                    <el-select
+                      v-model="configForm.size"
+                      placeholder="请选择图片尺寸"
+                      style="width: 160px"
+                    >
+                      <el-option label="1K" value="1K" />
+                      <el-option label="2K" value="2K" />
+                      <el-option label="4K" value="4K" />
+                    </el-select>
+                  </el-form-item>
+                  <el-form-item label="宽高比" style="width: 50%">
+                    <el-select
+                      v-model="configForm.ratio"
+                      placeholder="请选择宽高比"
+                      style="width: 160px"
+                    >
+                      <el-option label="自动" value="auto" />
+                      <el-option label="1:1" value="1:1" />
+                      <el-option label="16:9" value="16:9" />
+                      <el-option label="9:16" value="9:16" />
+                      <el-option label="4:3" value="4:3" />
+                      <el-option label="3:4" value="3:4" />
+                      <el-option label="3:2" value="3:2" />
+                      <el-option label="2:3" value="2:3" />
+                      <el-option label="5:4" value="5:4" />
+                      <el-option label="4:5" value="4:5" />
+                      <el-option label="21:9" value="21:9" />
+                    </el-select>
+                  </el-form-item>
+                </div>
+
+                <el-form-item label="提示词">
+                  <el-input
+                    v-model="configForm.prompt"
+                    placeholder="描述你想要生成的图片内容..."
+                    type="textarea"
+                    :rows="5"
+                  />
+                </el-form-item>
+                <el-form-item>
+                  <el-button
+                    type="primary"
+                    @click="handleGenerateClick"
+                    style="width: 100%; font-size: 16px; padding: 24px 0"
+                    :loading="loading"
+                  >
+                    <StarIcon
+                      color="none"
+                      style="width: 16px; height: 16px"
+                      v-show="!loading"
                     />
-                  </svg>
+                    生成图片
+                  </el-button>
+                  <el-alert
+                    v-if="resultInfo"
+                    :title="resultInfo"
+                    type="primary"
+                    :closable="false"
+                    show-icon
+                    style="margin-top: 16px"
+                  />
+                </el-form-item>
+              </el-form>
+            </el-card>
+          </el-col>
+
+          <el-col :xs="24" :sm="24" :md="12" :lg="9" class="mb-5 xl:mb-0">
+            <el-card
+              shadow="never"
+              style="border-radius: 10px"
+              class="peidi-aiDrawingPro-creative-card-equal-height"
+            >
+              <div class="flex items-center justify-between mb-[16px]">
+                <h2 class="text-xl font-semibold text-[#0a0a0a]">预览</h2>
+                <div class="flex" v-show="resultPictures.length > 0">
+                  <el-button
+                    color="#F3F5F8"
+                    style="font-size: 13px"
+                    @click="handleGenerateClick"
+                  >
+                    <RefreshIcon color="none" /> 重新生成</el-button
+                  >
+                  <el-button
+                    color="#F3F5F8"
+                    style="font-size: 13px"
+                    @click="handleDownloadClick"
+                  >
+                    <DownloadIcon color="none" /> 下载</el-button
+                  >
+                  <el-button
+                    type="primary"
+                    style="font-size: 13px"
+                    @click="handleSaveToMaterialLibraryClick"
+                  >
+                    <Save2Icon color="none" /> 保存到素材库</el-button
+                  >
                 </div>
               </div>
-            </div>
 
-            <div
-              class="relative aspect-[4/3] rounded-lg overflow-hidden bg-[#eaeff5]"
+              <div
+                class="relative aspect-square rounded-lg overflow-hidden bg-[#eaeff5]"
+                v-if="resultPictures.length === 0"
+              >
+                <div
+                  class="absolute inset-0 flex flex-col items-center justify-center text-[#0a0a0a]"
+                >
+                  <div
+                    class="w-16 h-16 rounded-full bg-[#eaeff5] flex items-center justify-center mb-4"
+                  >
+                    <PictureIcon color="none" />
+                  </div>
+                  <p class="text-sm font-medium">生成的图片将显示在这里</p>
+                  <p class="text-xs mt-1">请在左侧输入提示词并点击生成</p>
+                </div>
+              </div>
+
+              <div v-else>
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                  <div
+                    v-for="(picture, index) in resultPictures"
+                    :key="index"
+                    class="relative aspect-square rounded-lg overflow-hidden bg-[#eaeff5] cursor-pointer border-2 transition-all"
+                    :class="
+                      selectedPictureIndex === index
+                        ? 'border-[var(--el-color-primary)]'
+                        : 'border-transparent hover:border-gray-300'
+                    "
+                    @click="selectPicture(index)"
+                  >
+                    <img
+                      :alt="`Generated ${index + 1}`"
+                      class="w-full h-full object-cover"
+                      :src="picture"
+                    />
+                    <div
+                      v-if="selectedPictureIndex === index"
+                      class="absolute top-1 right-1 w-5 h-5 bg-[var(--el-color-primary)] rounded-full flex items-center justify-center"
+                    >
+                      <svg
+                        class="w-3 h-3 text-white"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  class="relative aspect-[4/3] rounded-lg overflow-hidden bg-[#eaeff5]"
+                >
+                  <img
+                    alt="Selected"
+                    class="w-full h-full object-contain"
+                    :src="resultPictures[selectedPictureIndex]"
+                  />
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+
+          <el-col :xs="24" :sm="24" :md="12" :lg="7" class="mb-5 xl:mb-0">
+            <el-card
+              shadow="never"
+              style="border-radius: 10px"
+              class="peidi-aiDrawingPro-creative-card-equal-height"
             >
-              <img
-                alt="Selected"
-                class="w-full h-full object-contain"
-                :src="resultPictures[selectedPictureIndex]"
-              />
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-
-      <el-col :xs="24" :sm="24" :md="12" :lg="7" class="mb-5 xl:mb-0">
-        <el-card
-          shadow="never"
-          style="border-radius: 10px"
-          class="peidi-aiDrawingPro-creative-card-equal-height"
-        >
-          <ResultCard ref="resultCardRef" />
-        </el-card>
-      </el-col>
-    </el-row>
+              <ResultCard ref="resultCardRef" />
+            </el-card>
+          </el-col>
+        </el-row>
+      </div>
+    </el-scrollbar>
 
     <div>
       <PictureSizeDailog ref="pictureSizeDailogRef" />
@@ -543,9 +564,9 @@ defineExpose({
 }
 
 :deep(.el-upload-list__item) {
-  width: 100px;
-  height: 100px;
   margin-right: 8px;
   margin-bottom: 8px;
+  width: 100px;
+  height: 100px;
 }
 </style>

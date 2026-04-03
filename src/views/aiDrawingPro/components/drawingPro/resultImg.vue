@@ -406,7 +406,7 @@ defineExpose({
 </script>
 
 <template>
-  <div v-if="showStatus">
+  <div v-if="showStatus && resultImage">
     <div class="text-base font-bold mb-4 text-gray-800">演示生成结果图</div>
     <div class="text-red-500 text-sm" v-if="props.errorMsg">
       生成失败：{{ props.errorMsg }}

@@ -5,6 +5,7 @@ import ClickRateCharts from "./clickRateCharts.vue";
 import { getNameFromObjectName } from "../../utils/general/index";
 import { deleteMaterial } from "@/api/aiDraw";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { Delete } from "@element-plus/icons-vue";
 
 const props = defineProps({
   data: {
@@ -36,6 +37,10 @@ const props = defineProps({
     required: true
   },
   handleModuleEdit: {
+    type: Function,
+    required: true
+  },
+  handleChangeChangeFolder: {
     type: Function,
     required: true
   }
@@ -94,28 +99,39 @@ const handleDelete = () => {
 
 <template>
   <div>
-    <el-card shadow="hover" style="width: 240px">
+    <el-card shadow="hover" style="width: 240px; border-radius: 10px">
       <template #header>
-        <el-tooltip
-          :content="getNameFromObjectName(props.data.objectName)"
-          placement="top"
-          :show-after="300"
-        >
-          <el-text
-            class="w-full cursor-pointer hover:text-[var(--el-color-primary)]"
-            truncated
-            size="large"
-            @click="copyName"
+        <div class="flex justify-between">
+          <el-tooltip
+            :content="getNameFromObjectName(props.data.objectName)"
+            placement="top"
+            :show-after="300"
           >
-            <span class="text-[#000] font-bold text-[14px]">{{
-              getNameFromObjectName(props.data.objectName)
-            }}</span>
-          </el-text>
-        </el-tooltip>
+            <el-text
+              class="w-full cursor-pointer hover:text-[var(--el-color-primary)]"
+              truncated
+              size="large"
+              @click="copyName"
+            >
+              <span class="text-[#000] font-bold text-[14px]">{{
+                getNameFromObjectName(props.data.objectName)
+              }}</span>
+            </el-text>
+          </el-tooltip>
+          <div>
+            <el-button
+              :icon="Delete"
+              type="danger"
+              text
+              size="small"
+              @click="handleDelete"
+            />
+          </div>
+        </div>
       </template>
       <template #footer>
         <el-space wrap>
-          <el-button type="danger" @click="handleDelete" text>删除</el-button>
+          <!-- <el-button type="danger" @click="handleDelete" text>删除</el-button> -->
           <el-button
             type="primary"
             @click="props.handleContact(props.data)"
@@ -129,6 +145,7 @@ const handleDelete = () => {
             @click="props.handleCreate(props.data)"
             text
             v-if="getMTType === 'template'"
+            size="small"
           >
             创意
           </el-button>
@@ -145,6 +162,7 @@ const handleDelete = () => {
             @click="props.handleEditPhraseInfo(props.data)"
             text
             v-if="getMTType === 'template'"
+            size="small"
           >
             编辑词
           </el-button>
@@ -161,6 +179,7 @@ const handleDelete = () => {
                 text
                 v-if="getMTType === 'template'"
                 :disabled="getEditPhraseInfo"
+                size="small"
               >
                 模板编辑
               </el-button>
@@ -171,8 +190,18 @@ const handleDelete = () => {
             @click="props.handleClickRate(props.data)"
             text
             v-if="getMTType === 'resultImage'"
+            size="small"
           >
             点击率
+          </el-button>
+          <el-button
+            type="primary"
+            @click="props.handleChangeChangeFolder(props.data)"
+            text
+            v-if="getMTType === 'componentMaterial'"
+            size="small"
+          >
+            更换文件夹
           </el-button>
         </el-space>
       </template>

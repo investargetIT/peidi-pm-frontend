@@ -544,372 +544,395 @@ defineExpose({
 
 <template>
   <div>
-    <el-card
-      shadow="never"
-      style="border-radius: 10px; background-color: #f5f7fa"
-    >
-      <template #header>
-        <div class="card-header">
-          <span>
-            <span>演示模式</span>
-            <span class="text-sm text-gray-500">
-              (实时编辑预览单张模板图，可调整模板图价格、活动时间等元素，确认效果后可批量生成)
-            </span>
-          </span>
-        </div>
-      </template>
-      <div class="text-base font-bold text-gray-800">
-        {{ imageName }}
-      </div>
-      <el-row>
-        <!-- 左侧：图片展示区域 -->
-        <el-col :xs="24" :sm="24" :md="16">
-          <div
-            class="w-full h-full flex flex-col items-center justify-center"
-            :style="{ flexShrink: 0, minWidth: `${CANVAS_SIZE}px` }"
-          >
-            <div class="text-center text-gray-500 text-sm mb-4">
-              点击画布中的元素区域即可在右侧编辑
+    <el-scrollbar height="calc(100vh - 100px)">
+      <div class="px-[10px]">
+        <el-card
+          shadow="never"
+          style="border-radius: 10px; background-color: #f5f7fa"
+        >
+          <template #header>
+            <div class="card-header">
+              <span>
+                <span>演示模式</span>
+                <span class="text-sm text-gray-500">
+                  (实时编辑预览单张模板图，可调整模板图价格、活动时间等元素，确认效果后可批量生成)
+                </span>
+              </span>
             </div>
-            <div
-              class="relative"
-              :style="{
-                width: `${CANVAS_SIZE}px`,
-                height: `${CANVAS_SIZE}px`,
-                flexShrink: 0,
-                minWidth: `${CANVAS_SIZE}px`,
-                minHeight: `${CANVAS_SIZE}px`
-              }"
-            >
-              <img
-                v-if="fileList[0]?.url"
-                :src="fileList[0]?.url || ''"
-                alt="图片"
-                :style="{
-                  width: `${CANVAS_SIZE}px`,
-                  height: `${CANVAS_SIZE}px`
-                }"
-                class="rounded-lg shadow-md"
-              />
-              <div v-else class="text-center">请从素材库中选择模板图片</div>
-
-              <div
-                v-for="item in imageConfig"
-                :key="item.id"
-                :style="{
-                  left: `${item.rect.x * CANVAS_SIZE}px`,
-                  top: `${item.rect.y * CANVAS_SIZE}px`,
-                  width: `${item.rect.width * CANVAS_SIZE}px`,
-                  height: `${item.rect.height * CANVAS_SIZE}px`
-                }"
-                @click.stop="handleSelectItem(item.id)"
-                :class="[
-                  'absolute cursor-pointer transition-all duration-200 p-1 text-sm font-medium rounded',
-                  selectedId === item.id
-                    ? 'bg-blue-500 border-2 border-blue-700 text-white shadow-lg scale-[1.02]'
-                    : 'bg-red-500 bg-opacity-60 border border-red-700 text-white hover:bg-opacity-80'
-                ]"
-              >
-                {{ item.name }}
-                <span v-if="selectedId === item.id" class="ml-1">✓</span>
-              </div>
-            </div>
+          </template>
+          <div class="text-base font-bold text-gray-800">
+            {{ imageName }}
           </div>
-        </el-col>
-
-        <!-- 右侧：元素编辑区域 -->
-        <el-col :xs="24" :sm="24" :md="8">
-          <div class="p-4">
-            <div class="text-base font-bold mb-4 text-gray-800">元素编辑</div>
-            <el-scrollbar height="500px">
-              <div class="space-y-4">
+          <el-row>
+            <!-- 左侧：图片展示区域 -->
+            <el-col :xs="24" :sm="24" :md="16">
+              <div
+                class="w-full h-full flex flex-col items-center justify-center"
+                :style="{ flexShrink: 0, minWidth: `${CANVAS_SIZE}px` }"
+              >
+                <div class="text-center text-gray-500 text-sm mb-4">
+                  点击画布中的元素区域即可在右侧编辑
+                </div>
                 <div
-                  v-for="item in imageConfig"
-                  :key="item.id"
-                  :ref="el => (cardRefs[item.id] = el)"
-                  :class="[
-                    'p-3 rounded-lg border-2 transition-all duration-200',
-                    selectedId === item.id
-                      ? 'bg-blue-50 border-blue-500 shadow-md'
-                      : 'bg-gray-50 border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                  ]"
+                  class="relative"
+                  :style="{
+                    width: `${CANVAS_SIZE}px`,
+                    height: `${CANVAS_SIZE}px`,
+                    flexShrink: 0,
+                    minWidth: `${CANVAS_SIZE}px`,
+                    minHeight: `${CANVAS_SIZE}px`
+                  }"
                 >
+                  <img
+                    v-if="fileList[0]?.url"
+                    :src="fileList[0]?.url || ''"
+                    alt="图片"
+                    :style="{
+                      width: `${CANVAS_SIZE}px`,
+                      height: `${CANVAS_SIZE}px`
+                    }"
+                    class="rounded-lg shadow-md"
+                  />
+                  <div v-else class="text-center">请从素材库中选择模板图片</div>
+
                   <div
-                    class="font-semibold mb-2 text-green-700 cursor-pointer flex justify-between items-center"
+                    v-for="item in imageConfig"
+                    :key="item.id"
+                    :style="{
+                      left: `${item.rect.x * CANVAS_SIZE}px`,
+                      top: `${item.rect.y * CANVAS_SIZE}px`,
+                      width: `${item.rect.width * CANVAS_SIZE}px`,
+                      height: `${item.rect.height * CANVAS_SIZE}px`
+                    }"
                     @click.stop="handleSelectItem(item.id)"
+                    :class="[
+                      'absolute cursor-pointer transition-all duration-200 p-1 text-sm font-medium rounded',
+                      selectedId === item.id
+                        ? 'bg-blue-500 border-2 border-blue-700 text-white shadow-lg scale-[1.02]'
+                        : 'bg-red-500 bg-opacity-60 border border-red-700 text-white hover:bg-opacity-80'
+                    ]"
                   >
-                    <span>{{ item.name }}</span>
-                    <span v-if="selectedId === item.id" class="text-blue-600"
-                      >✓ 已选中</span
-                    >
+                    {{ item.name }}
+                    <span v-if="selectedId === item.id" class="ml-1">✓</span>
                   </div>
+                </div>
+              </div>
+            </el-col>
 
-                  <div v-if="item.type === 'image'" class="ml-2">
-                    <!-- 模式切换 -->
-                    <div class="flex gap-2 mb-2">
-                      <el-button
-                        size="small"
-                        :type="
-                          imageSelectMode[item.id] === 'upload' ? 'primary' : ''
-                        "
-                        :plain="imageSelectMode[item.id] !== 'upload'"
-                        @click="imageSelectMode[item.id] = 'upload'"
-                        class="flex-1"
-                      >
-                        📤 本地上传
-                      </el-button>
-                      <el-button
-                        size="small"
-                        :type="
-                          imageSelectMode[item.id] === 'material'
-                            ? 'primary'
-                            : ''
-                        "
-                        :plain="imageSelectMode[item.id] !== 'material'"
-                        @click="imageSelectMode[item.id] = 'material'"
-                        class="flex-1"
-                      >
-                        🗂️ 素材库选择
-                      </el-button>
-                    </div>
-
-                    <!-- 本地上传模式 -->
-                    <div v-if="imageSelectMode[item.id] === 'upload'">
-                      <el-upload
-                        :file-list="[]"
-                        :auto-upload="false"
-                        :show-file-list="false"
-                        :on-change="
-                          (file: any) => handleImageSelect(item.id, file.raw)
-                        "
-                        accept="image/*"
-                        class="w-full"
-                      >
-                        <div
-                          class="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-500 transition-colors cursor-pointer hover:bg-gray-50"
-                        >
-                          <div v-if="tempImageData[item.id]" class="relative">
-                            <img
-                              :src="tempImageData[item.id]"
-                              class="max-h-[120px] max-w-full mx-auto rounded"
-                            />
-                            <div class="flex justify-center gap-2 mt-2">
-                              <el-button
-                                type="primary"
-                                size="small"
-                                @click.stop="handleConfirmUpload(item.id)"
-                                >确认</el-button
-                              >
-                              <el-button
-                                type="danger"
-                                size="small"
-                                @click.stop="handleCancelUpload(item.id)"
-                                >取消</el-button
-                              >
-                            </div>
-                          </div>
-                          <div v-else-if="formData[item.id]" class="relative">
-                            <img
-                              :src="formData[item.id]"
-                              class="max-h-[120px] max-w-full mx-auto rounded"
-                            />
-                            <div class="absolute top-1 right-1">
-                              <el-button
-                                type="danger"
-                                size="small"
-                                circle
-                                @click.stop="handleDeleteImage(item.id)"
-                              >
-                                <el-icon><Delete /></el-icon>
-                              </el-button>
-                            </div>
-                            <div class="text-sm text-gray-600 mt-2">
-                              点击重新上传
-                            </div>
-                          </div>
-                          <div v-else class="py-3">
-                            <div class="text-gray-400 mb-1 text-xl">📁</div>
-                            <div class="text-xs text-gray-500">
-                              点击上传图片
-                            </div>
-                          </div>
-                        </div>
-                      </el-upload>
-                    </div>
-
-                    <!-- 素材库选择模式 -->
-                    <div v-else-if="imageSelectMode[item.id] === 'material'">
-                      <MaterialSelectorWithThumb
-                        v-model="tempMaterialSelect[item.id]"
-                        :material-list="materialList['componentMaterial'] || []"
-                        placeholder="请选择素材"
-                        :cache-key="`material_thumb:${item.id}`"
-                        @change="
-                          value => handleSelectFromMaterial(item.id, value)
-                        "
-                      />
-
+            <!-- 右侧：元素编辑区域 -->
+            <el-col :xs="24" :sm="24" :md="8">
+              <div class="p-4">
+                <div class="text-base font-bold mb-4 text-gray-800">
+                  元素编辑
+                </div>
+                <el-scrollbar height="500px">
+                  <div class="space-y-4">
+                    <div
+                      v-for="item in imageConfig"
+                      :key="item.id"
+                      :ref="el => (cardRefs[item.id] = el)"
+                      :class="[
+                        'p-3 rounded-lg border-2 transition-all duration-200',
+                        selectedId === item.id
+                          ? 'bg-blue-50 border-blue-500 shadow-md'
+                          : 'bg-gray-50 border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                      ]"
+                    >
                       <div
-                        v-if="formData[item.id] && !tempImageData[item.id]"
-                        class="mt-2"
+                        class="font-semibold mb-2 text-green-700 cursor-pointer flex justify-between items-center"
+                        @click.stop="handleSelectItem(item.id)"
                       >
-                        <div class="relative inline-block">
-                          <img
-                            :src="formData[item.id]"
-                            class="max-h-[120px] max-w-full rounded border-2 border-blue-200"
-                          />
-                          <div class="absolute top-1 right-1">
-                            <el-button
-                              type="danger"
-                              size="small"
-                              circle
-                              @click.stop="handleDeleteImage(item.id)"
+                        <span>{{ item.name }}</span>
+                        <span
+                          v-if="selectedId === item.id"
+                          class="text-blue-600"
+                          >✓ 已选中</span
+                        >
+                      </div>
+
+                      <div v-if="item.type === 'image'" class="ml-2">
+                        <!-- 模式切换 -->
+                        <div class="flex gap-2 mb-2">
+                          <el-button
+                            size="small"
+                            :type="
+                              imageSelectMode[item.id] === 'upload'
+                                ? 'primary'
+                                : ''
+                            "
+                            :plain="imageSelectMode[item.id] !== 'upload'"
+                            @click="imageSelectMode[item.id] = 'upload'"
+                            class="flex-1"
+                          >
+                            📤 本地上传
+                          </el-button>
+                          <el-button
+                            size="small"
+                            :type="
+                              imageSelectMode[item.id] === 'material'
+                                ? 'primary'
+                                : ''
+                            "
+                            :plain="imageSelectMode[item.id] !== 'material'"
+                            @click="imageSelectMode[item.id] = 'material'"
+                            class="flex-1"
+                          >
+                            🗂️ 素材库选择
+                          </el-button>
+                        </div>
+
+                        <!-- 本地上传模式 -->
+                        <div v-if="imageSelectMode[item.id] === 'upload'">
+                          <el-upload
+                            :file-list="[]"
+                            :auto-upload="false"
+                            :show-file-list="false"
+                            :on-change="
+                              (file: any) =>
+                                handleImageSelect(item.id, file.raw)
+                            "
+                            accept="image/*"
+                            class="w-full"
+                          >
+                            <div
+                              class="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-500 transition-colors cursor-pointer hover:bg-gray-50"
                             >
-                              <el-icon><Delete /></el-icon>
-                            </el-button>
+                              <div
+                                v-if="tempImageData[item.id]"
+                                class="relative"
+                              >
+                                <img
+                                  :src="tempImageData[item.id]"
+                                  class="max-h-[120px] max-w-full mx-auto rounded"
+                                />
+                                <div class="flex justify-center gap-2 mt-2">
+                                  <el-button
+                                    type="primary"
+                                    size="small"
+                                    @click.stop="handleConfirmUpload(item.id)"
+                                    >确认</el-button
+                                  >
+                                  <el-button
+                                    type="danger"
+                                    size="small"
+                                    @click.stop="handleCancelUpload(item.id)"
+                                    >取消</el-button
+                                  >
+                                </div>
+                              </div>
+                              <div
+                                v-else-if="formData[item.id]"
+                                class="relative"
+                              >
+                                <img
+                                  :src="formData[item.id]"
+                                  class="max-h-[120px] max-w-full mx-auto rounded"
+                                />
+                                <div class="absolute top-1 right-1">
+                                  <el-button
+                                    type="danger"
+                                    size="small"
+                                    circle
+                                    @click.stop="handleDeleteImage(item.id)"
+                                  >
+                                    <el-icon><Delete /></el-icon>
+                                  </el-button>
+                                </div>
+                                <div class="text-sm text-gray-600 mt-2">
+                                  点击重新上传
+                                </div>
+                              </div>
+                              <div v-else class="py-3">
+                                <div class="text-gray-400 mb-1 text-xl">📁</div>
+                                <div class="text-xs text-gray-500">
+                                  点击上传图片
+                                </div>
+                              </div>
+                            </div>
+                          </el-upload>
+                        </div>
+
+                        <!-- 素材库选择模式 -->
+                        <div
+                          v-else-if="imageSelectMode[item.id] === 'material'"
+                        >
+                          <MaterialSelectorWithThumb
+                            v-model="tempMaterialSelect[item.id]"
+                            :material-list="
+                              materialList['componentMaterial'] || []
+                            "
+                            placeholder="请选择素材"
+                            :cache-key="`material_thumb:${item.id}`"
+                            @change="
+                              value => handleSelectFromMaterial(item.id, value)
+                            "
+                          />
+
+                          <div
+                            v-if="formData[item.id] && !tempImageData[item.id]"
+                            class="mt-2"
+                          >
+                            <div class="relative inline-block">
+                              <img
+                                :src="formData[item.id]"
+                                class="max-h-[120px] max-w-full rounded border-2 border-blue-200"
+                              />
+                              <div class="absolute top-1 right-1">
+                                <el-button
+                                  type="danger"
+                                  size="small"
+                                  circle
+                                  @click.stop="handleDeleteImage(item.id)"
+                                >
+                                  <el-icon><Delete /></el-icon>
+                                </el-button>
+                              </div>
+                            </div>
                           </div>
                         </div>
+
+                        <div
+                          v-if="formData[item.id]"
+                          class="text-sm text-gray-500 mt-3 flex items-center"
+                        >
+                          <span>AI 引用</span>
+                          <el-tooltip
+                            effect="dark"
+                            content="开启后由 AI 负责渲染图片"
+                            placement="top-start"
+                            :show-after="250"
+                          >
+                            <el-icon class="mr-2 cursor-pointer"
+                              ><QuestionFilled
+                            /></el-icon>
+                          </el-tooltip>
+
+                          <el-switch v-model="aiReferenceStatus[item.id]" />
+                        </div>
+
+                        <div
+                          v-else
+                          class="text-sm text-gray-500 mt-3 flex items-center"
+                        >
+                          <span>是否保留</span>
+                          <el-tooltip
+                            effect="dark"
+                            content="开启后会自动保留图片，不被 AI 擦除"
+                            placement="top-start"
+                            :show-after="250"
+                          >
+                            <el-icon class="mr-2 cursor-pointer"
+                              ><QuestionFilled
+                            /></el-icon>
+                          </el-tooltip>
+
+                          <el-switch v-model="isKeepStatus[item.id]" />
+                        </div>
+                      </div>
+
+                      <div v-else-if="item.content" class="space-y-2 ml-2">
+                        <div
+                          v-for="(field, index) in item.content"
+                          :key="index"
+                          class="text-sm"
+                        >
+                          <span class="text-gray-600 mr-2 font-medium"
+                            >{{ field.label }}:</span
+                          >
+                          <el-input
+                            v-model="formData[`${item.id}_${field.label}`]"
+                            size="small"
+                            class="w-[200px]"
+                            placeholder="请输入内容"
+                          />
+                        </div>
+                      </div>
+
+                      <div v-else class="text-sm text-gray-500 ml-2">
+                        <span class="text-gray-600 mr-2 font-medium"
+                          >类型:</span
+                        >
+                        <span class="text-gray-900">{{ item.type }}</span>
                       </div>
                     </div>
 
-                    <div
-                      v-if="formData[item.id]"
-                      class="text-sm text-gray-500 mt-3 flex items-center"
-                    >
-                      <span>AI 引用</span>
-                      <el-tooltip
-                        effect="dark"
-                        content="开启后由 AI 负责渲染图片"
-                        placement="top-start"
-                        :show-after="250"
-                      >
-                        <el-icon class="mr-2 cursor-pointer"
-                          ><QuestionFilled
-                        /></el-icon>
-                      </el-tooltip>
+                    <!-- AI 生成面板 -->
+                    <div class="mt-6 ai-generate-panel rounded-xl p-5">
+                      <div class="mb-3" v-if="false">
+                        <div class="panel-title mb-2 flex items-center">
+                          <span class="mr-2">✨</span>
+                          描述你想要的 Banner 内容
+                        </div>
+                        <div class="panel-example">
+                          例如：生成一张宠物食品促销
+                          Banner，绿色主题，包含产品图和价格标签...
+                        </div>
+                      </div>
 
-                      <el-switch v-model="aiReferenceStatus[item.id]" />
-                    </div>
-
-                    <div
-                      v-else
-                      class="text-sm text-gray-500 mt-3 flex items-center"
-                    >
-                      <span>是否保留</span>
-                      <el-tooltip
-                        effect="dark"
-                        content="开启后会自动保留图片，不被 AI 擦除"
-                        placement="top-start"
-                        :show-after="250"
-                      >
-                        <el-icon class="mr-2 cursor-pointer"
-                          ><QuestionFilled
-                        /></el-icon>
-                      </el-tooltip>
-
-                      <el-switch v-model="isKeepStatus[item.id]" />
-                    </div>
-                  </div>
-
-                  <div v-else-if="item.content" class="space-y-2 ml-2">
-                    <div
-                      v-for="(field, index) in item.content"
-                      :key="index"
-                      class="text-sm"
-                    >
-                      <span class="text-gray-600 mr-2 font-medium"
-                        >{{ field.label }}:</span
-                      >
                       <el-input
-                        v-model="formData[`${item.id}_${field.label}`]"
-                        size="small"
-                        class="w-[200px]"
-                        placeholder="请输入内容"
+                        v-model="prompt"
+                        type="textarea"
+                        :rows="3"
+                        placeholder="效果不好时才输入更详细的描述，否则请保持为空..."
+                        class="w-full mb-4"
+                        v-if="true"
                       />
+
+                      <div
+                        class="flex items-center justify-between mb-4 p-3 bg-white/60 rounded-lg"
+                        v-if="false"
+                      >
+                        <span class="text-sm text-gray-600"
+                          >演示模式（使用示例图片测试）</span
+                        >
+                        <el-switch v-model="demoMode" size="large" />
+                      </div>
+
+                      <el-button
+                        type="primary"
+                        size="large"
+                        class="w-full generate-button"
+                        @click="generateImage"
+                        :loading="loading"
+                        :disabled="!fileList[0]?.url"
+                      >
+                        <i class="el-icon-star"></i> ✨立即生成
+                        <span
+                          v-if="loading && timerInterval > 0"
+                          class="ml-2 text-sm"
+                        >
+                          ({{ formatTime(timerInterval) }})
+                        </span>
+                      </el-button>
+
+                      <div class="panel-footer mt-3 text-center" v-if="false">
+                        💡 输入提示词，生成的图片将保留在此处
+                      </div>
                     </div>
                   </div>
-
-                  <div v-else class="text-sm text-gray-500 ml-2">
-                    <span class="text-gray-600 mr-2 font-medium">类型:</span>
-                    <span class="text-gray-900">{{ item.type }}</span>
-                  </div>
-                </div>
-
-                <!-- AI 生成面板 -->
-                <div class="mt-6 ai-generate-panel rounded-xl p-5">
-                  <div class="mb-3" v-if="false">
-                    <div class="panel-title mb-2 flex items-center">
-                      <span class="mr-2">✨</span>
-                      描述你想要的 Banner 内容
-                    </div>
-                    <div class="panel-example">
-                      例如：生成一张宠物食品促销
-                      Banner，绿色主题，包含产品图和价格标签...
-                    </div>
-                  </div>
-
-                  <el-input
-                    v-model="prompt"
-                    type="textarea"
-                    :rows="3"
-                    placeholder="效果不好时才输入更详细的描述，否则请保持为空..."
-                    class="w-full mb-4"
-                    v-if="true"
-                  />
-
-                  <div
-                    class="flex items-center justify-between mb-4 p-3 bg-white/60 rounded-lg"
-                    v-if="false"
-                  >
-                    <span class="text-sm text-gray-600"
-                      >演示模式（使用示例图片测试）</span
-                    >
-                    <el-switch v-model="demoMode" size="large" />
-                  </div>
-
-                  <el-button
-                    type="primary"
-                    size="large"
-                    class="w-full generate-button"
-                    @click="generateImage"
-                    :loading="loading"
-                    :disabled="!fileList[0]?.url"
-                  >
-                    <i class="el-icon-star"></i> ✨立即生成
-                    <span
-                      v-if="loading && timerInterval > 0"
-                      class="ml-2 text-sm"
-                    >
-                      ({{ formatTime(timerInterval) }})
-                    </span>
-                  </el-button>
-
-                  <div class="panel-footer mt-3 text-center" v-if="false">
-                    💡 输入提示词，生成的图片将保留在此处
-                  </div>
-                </div>
+                </el-scrollbar>
               </div>
-            </el-scrollbar>
+            </el-col>
+          </el-row>
+
+          <el-divider />
+
+          <div class="mt-4" v-if="fileList[0]?.url">
+            <ResultImg ref="resultImgRef" :errorMsg="errorMsg" />
           </div>
-        </el-col>
-      </el-row>
+        </el-card>
 
-      <el-divider />
-
-      <div class="mt-4" v-if="fileList[0]?.url">
-        <ResultImg ref="resultImgRef" :errorMsg="errorMsg" />
+        <div class="mt-4" v-if="fileList[0]?.url">
+          <TableCard
+            :imageConfig="imageConfig"
+            :imageName="imageName"
+            ref="tableCardRef"
+            :fileList="fileList"
+            :materialList="materialList"
+          />
+        </div>
       </div>
-    </el-card>
-
-    <div class="mt-4" v-if="fileList[0]?.url">
-      <TableCard
-        :imageConfig="imageConfig"
-        :imageName="imageName"
-        ref="tableCardRef"
-        :fileList="fileList"
-        :materialList="materialList"
-      />
-    </div>
+    </el-scrollbar>
   </div>
 </template>
 

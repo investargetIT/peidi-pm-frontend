@@ -1068,7 +1068,7 @@ defineExpose({
             导出配置表
           </el-button>
           <el-button
-            type="primary"
+            color="#427AED"
             size="small"
             @click="importConfig"
             :icon="Upload"
@@ -1085,6 +1085,15 @@ defineExpose({
             清空全部
           </el-button>
           <el-button
+            color="#CC6600"
+            type="primary"
+            size="small"
+            @click="exportAllResults"
+            :disabled="importedDataList.length === 0 || batchGenerating"
+          >
+            📥 导出全部结果图
+          </el-button>
+          <el-button
             color="#534CE7"
             type="primary"
             size="small"
@@ -1093,15 +1102,6 @@ defineExpose({
             :disabled="importedDataList.length === 0"
           >
             ✨ 开始绘制
-          </el-button>
-          <el-button
-            color="#CC6600"
-            type="primary"
-            size="small"
-            @click="exportAllResults"
-            :disabled="importedDataList.length === 0 || batchGenerating"
-          >
-            📥 导出全部结果图
           </el-button>
         </div>
       </div>

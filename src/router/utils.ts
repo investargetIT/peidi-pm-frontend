@@ -255,7 +255,7 @@ function initRouter() {
         showLink: [
           // "1850741012504838145", // 张思宇
           // "1887377779519434753", // 王家琦
-          "1926449443739600965", // 沈皓钰
+          "1926449443739600965" // 沈皓钰
           // "1846392647319093250", // Summer
           // "1874713377599172609", // 熊玉葵
           // "1919685162362777602", // 张悦
@@ -266,6 +266,7 @@ function initRouter() {
         {
           path: "/aiDrawing/index",
           name: "aiDrawing",
+          redirect: "/aiDrawingApp",
           component: () => import("@/views/aiDrawingPro/index.vue"),
           meta: {
             title: "AI绘图",

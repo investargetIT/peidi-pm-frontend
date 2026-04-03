@@ -305,7 +305,7 @@ router.beforeEach((to: ToRouteType, _from, next) => {
   }
   if (to.path === "/examination" || to.path === "/aiDrawingApp") {
     localStorage.setItem("redirectPath", to.fullPath);
-  } else if (to.path !== "/login") {
+  } else if (to.path !== "/login" && to.path !== "/login_") {
     localStorage.removeItem("redirectPath");
   }
   const userInfo = storageLocal().getItem<DataInfo<number>>(userKey);

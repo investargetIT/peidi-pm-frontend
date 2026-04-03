@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ElMessage } from "element-plus";
 import { ref } from "vue";
+import { ElMessage } from "element-plus";
+
 import { downloadImageFromUrl } from "../../utils/general";
 
 const SIZE_OPTIONS = [

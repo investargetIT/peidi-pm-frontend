@@ -5,11 +5,13 @@ import RiAddLine from "@iconify-icons/ri/add-line";
 import { getClickRateTrend, getMaterialPage } from "@/api/aiDraw";
 import { MATERIAL_LIBRARY_TABS } from "../../config/material";
 import PictureCard from "./pictureCard.vue";
+import FolderCard from "./folderCard.vue";
 import DetailForm from "./detailForm.vue";
 import ContactForm from "./contactForm.vue";
 import ClickRateForm from "./clickRateForm.vue";
 import DescriptorInfo from "./descriptorInfo.vue";
 import EditPhraseInfo from "./editPhraseInfo.vue";
+import ChangeFolder from "./changeFolder.vue";
 import dayjs from "dayjs";
 import { type ClickRateTrendItem } from "../../type/material";
 
@@ -24,6 +26,7 @@ const contactFormRef = ref(null);
 const clickRateFormRef = ref(null);
 const descriptorInfoRef = ref(null);
 const editPhraseInfoRef = ref(null);
+const changeFolderRef = ref(null);
 
 const updateCardData = () => {
   cardData.value = materialList.value[radio.value] || [];
@@ -180,6 +183,10 @@ const handleModuleEdit = (data: any) => {
   initDrawingPro(data);
 };
 
+const handleChangeChangeFolder = (data: any) => {
+  changeFolderRef.value.initChangeFolderForm(data);
+};
+
 defineExpose({
   fetchMaterialPage
 });
@@ -210,20 +217,18 @@ defineExpose({
     <el-divider />
 
     <div>
-      <el-space wrap :size="'large'">
-        <PictureCard
-          v-for="item in cardData"
-          :key="item.id"
-          :data="item"
-          :fetchMaterialPage="fetchMaterialPage"
-          :handleContact="handleContact"
-          :handleCreate="handleCreate"
-          :handleClickRate="handleClickRate"
-          :handleDescriptorInfo="handleDescriptorInfo"
-          :handleEditPhraseInfo="handleEditPhraseInfo"
-          :handleModuleEdit="handleModuleEdit"
-        />
-      </el-space>
+      <FolderCard
+        :mtype="radio"
+        :cardData="cardData"
+        :fetchMaterialPage="fetchMaterialPage"
+        :handleContact="handleContact"
+        :handleCreate="handleCreate"
+        :handleClickRate="handleClickRate"
+        :handleDescriptorInfo="handleDescriptorInfo"
+        :handleEditPhraseInfo="handleEditPhraseInfo"
+        :handleModuleEdit="handleModuleEdit"
+        :handleChangeChangeFolder="handleChangeChangeFolder"
+      />
     </div>
 
     <div>
@@ -261,6 +266,14 @@ defineExpose({
     <div>
       <EditPhraseInfo
         ref="editPhraseInfoRef"
+        :fetchMaterialPage="fetchMaterialPage"
+      />
+    </div>
+
+    <div>
+      <ChangeFolder
+        ref="changeFolderRef"
+        :materialList="materialList"
         :fetchMaterialPage="fetchMaterialPage"
       />
     </div>

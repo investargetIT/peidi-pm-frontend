@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-import { getDrawRecordPage, getDrawRecordNew, uploadDraw } from "@/api/aiDraw";
 import { ElMessage } from "element-plus";
 import dayjs from "dayjs";
-import OnlineImg from "../../common/onlineImg.vue";
-import OnlineImgCompress from "../../common/onlineImgCompress.vue";
+
+import { getDrawRecordPage, getDrawRecordNew, uploadDraw } from "@/api/aiDraw";
+
 import { processImageCompression } from "../../utils/compressImage/index";
 import { blobManager } from "../../utils/blobManager/index";
 import { generateID } from "../../utils/general";
+
+import OnlineImgCompress from "../../common/onlineImgCompress.vue";
 
 const currentPage = ref(1);
 const pageSize = ref(9);
@@ -253,12 +255,6 @@ defineExpose({
 
     <div class="w-full">
       <el-space :size="16" wrap>
-        <!-- <OnlineImg
-          v-for="item in drawRecordList"
-          :key="item?.id"
-          :url="item?.path"
-          size="120px"
-        /> -->
         <OnlineImgCompress
           v-for="item in drawRecordList"
           :key="item?.id"

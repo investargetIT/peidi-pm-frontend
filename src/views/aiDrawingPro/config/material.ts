@@ -3,6 +3,10 @@ export const MATERIAL_LIBRARY_TABS = [
     label: "模板",
     name: "template"
   },
+  {
+    label: "组件素材",
+    name: "componentMaterial"
+  },
   // {
   //   label: "产品",
   //   name: "product"
@@ -26,9 +30,5 @@ export const MATERIAL_LIBRARY_TABS = [
   {
     label: "结果图片",
     name: "resultImage"
-  },
-  {
-    label: "组件素材",
-    name: "componentMaterial"
   }
 ];
