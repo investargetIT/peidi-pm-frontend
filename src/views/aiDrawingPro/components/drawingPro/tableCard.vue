@@ -5,7 +5,7 @@ import {
   exportConfigToExcel,
   importConfigFromExcel
 } from "./utils/exportConfigExcel";
-import { transferDraw } from "@/api/aiDraw";
+import { transferDraw, transferDrawAliyun } from "@/api/aiDraw";
 import imageUrl1 from "@/views/debug/assets/绘图1.png";
 import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 import { blobManager } from "../../utils/blobManager";
@@ -14,7 +14,7 @@ import { downloadFile } from "@/api/aiDraw";
 import ResultDialog from "./resultDialog.vue";
 import OnlineImg from "../../common/onlineImg.vue";
 import { Download, Refresh, Upload } from "@element-plus/icons-vue";
-import { FORMAT_PROMPT } from "./utils/prompt";
+import { FORMAT_PROMPT, PromptType } from "./utils/prompt";
 import {
   compositeImage,
   generateCompositeElements,
@@ -24,7 +24,8 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
 const AI_MODEL_OPTIONS = [
-  // { label: "阿里 wan2.7-image", value: "wan2.7-image" },
+  { label: "阿里 wan2.7-image", value: "wan2.7-image" },
+  { label: "阿里 wan2.7-image-pro", value: "wan2.7-image-pro" },
   { label: "谷歌 nano-banana-2", value: "nano-banana-2" },
   { label: "谷歌 nano-banana-pro", value: "nano-banana-pro" },
   { label: "谷歌 nano-banana-fast", value: "nano-banana-fast" }
@@ -540,7 +541,8 @@ const buildPrompt = (rowData: Record<string, any>) => {
 
   const prompt = FORMAT_PROMPT(
     JSON.stringify(props.imageConfig),
-    JSON.stringify(config)
+    JSON.stringify(config),
+    // PromptType.Test
   );
 
   // 如果有备注字段，添加到 prompt 中
@@ -625,49 +627,117 @@ const generateSingleImage = async (
 
     const base64Url1_ = await blobManager.blobToBase64(props.fileList[0].raw);
 
-    const params = {
-      model: aiModel.value,
-      prompt: buildPrompt(row),
-      aspectRatio: "auto",
-      imageSize: "4K",
-      shutProgress: false,
-      urls: [base64Url1_, ...base64MaterialUrls]
-      // urls: [base64Url1_]
-    };
-    console.log("params:", params);
-    // return;
-
-    const response: any = await transferDraw({
-      urlParam: JSON.stringify(params)
-    });
-
-    if (response.code === 200 && response.data?.[0]) {
-      // 将结果图片转为 base64
-      const resultImg = new Image();
-      resultImg.crossOrigin = "anonymous";
-
-      return new Promise<string>((resolve, reject) => {
-        resultImg.onload = () => {
-          const canvas = document.createElement("canvas");
-          canvas.width = resultImg.width;
-          canvas.height = resultImg.height;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            reject(new Error("无法获取 canvas 上下文"));
-            return;
-          }
-          ctx.drawImage(resultImg, 0, 0);
-          const base64 = canvas.toDataURL("image/png");
-          resolve(base64);
-        };
-        resultImg.onerror = () => {
-          reject(new Error("结果图片加载失败"));
-        };
-        resultImg.src = response.data[0];
+    //#region 两套模型逻辑
+    let params = {};
+    let response = null;
+    if (
+      aiModel.value === "wan2.7-image" ||
+      aiModel.value === "wan2.7-image-pro"
+    ) {
+      params = {
+        model: aiModel.value,
+        input: {
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  text: buildPrompt(row)
+                },
+                {
+                  image: base64Url1_
+                },
+                ...base64MaterialUrls.map(url => ({ image: url }))
+              ]
+            }
+          ]
+        },
+        parameters: {
+          size: "2K",
+          n: 1,
+          watermark: false,
+          thinking_mode: true
+        }
+      };
+      console.log("params:", params);
+      // return;
+      response = await transferDrawAliyun({
+        urlParam: JSON.stringify(params)
       });
+      console.log("response:", response);
+
+      if (response.code === 200 && response.data) {
+        // 将结果图片转为 base64
+        const resultImg = new Image();
+        resultImg.crossOrigin = "anonymous";
+
+        return new Promise<string>((resolve, reject) => {
+          resultImg.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = resultImg.width;
+            canvas.height = resultImg.height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              reject(new Error("无法获取 canvas 上下文"));
+              return;
+            }
+            ctx.drawImage(resultImg, 0, 0);
+            const base64 = canvas.toDataURL("image/png");
+            resolve(base64);
+          };
+          resultImg.onerror = () => {
+            reject(new Error("结果图片加载失败"));
+          };
+          resultImg.src = response.data;
+        });
+      } else {
+        throw new Error(response?.msg || "生成失败");
+      }
     } else {
-      throw new Error(response?.msg || "生成失败");
+      params = {
+        model: aiModel.value,
+        prompt: buildPrompt(row),
+        aspectRatio: "auto",
+        imageSize: "4K",
+        shutProgress: false,
+        urls: [base64Url1_, ...base64MaterialUrls]
+        // urls: [base64Url1_]
+      };
+      console.log("params:", params);
+      // return;
+      response = await transferDraw({
+        urlParam: JSON.stringify(params)
+      });
+      console.log("response:", response);
+      if (response.code === 200 && response.data?.[0]) {
+        // 将结果图片转为 base64
+        const resultImg = new Image();
+        resultImg.crossOrigin = "anonymous";
+
+        return new Promise<string>((resolve, reject) => {
+          resultImg.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = resultImg.width;
+            canvas.height = resultImg.height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              reject(new Error("无法获取 canvas 上下文"));
+              return;
+            }
+            ctx.drawImage(resultImg, 0, 0);
+            const base64 = canvas.toDataURL("image/png");
+            resolve(base64);
+          };
+          resultImg.onerror = () => {
+            reject(new Error("结果图片加载失败"));
+          };
+          resultImg.src = response.data[0];
+        });
+      } else {
+        throw new Error(response?.msg || "生成失败");
+      }
     }
+    //#endregion
   } catch (error: any) {
     console.error("生成图片失败:", error);
     throw error;
@@ -1224,7 +1294,7 @@ defineExpose({
               </div>
               <div
                 v-else
-                v-html="renderCell(row, { property: col.prop })"
+                v-text="renderCell(row, { property: col.prop })"
               ></div>
             </template>
           </el-table-column>

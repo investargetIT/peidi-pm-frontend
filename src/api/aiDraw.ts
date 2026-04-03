@@ -108,6 +108,14 @@ export const transferDraw = (data: { urlParam: string }) => {
   });
 };
 
+// 中转 阿里云百炼wan2.7-image模型
+export const transferDrawAliyun = (data: { urlParam: string }) => {
+  return http.request("post", baseUrlApi("/ai/draw/transfer/aliyun"), {
+    data,
+    timeout: 0
+  });
+};
+
 // 获取bi_almama_image数据 点击率数据
 export const getClickRateTrend = (params: AiDrawPageRequest) => {
   return http.request("get", baseUrlApi("/oms/bi/almama-image"), {
