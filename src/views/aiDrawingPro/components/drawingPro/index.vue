@@ -23,6 +23,7 @@ let timerId: number | null = null;
 const fileList = ref<any[]>([]);
 const imageConfig = ref<any>([]);
 const imageName = ref("");
+const imageConfigFirstPrompt = ref("");
 
 const materialList = ref<any>({});
 
@@ -522,6 +523,7 @@ const initDrawingPro = async (data: any) => {
     const editPhraseInfo = JSON.parse(data.type)?.editPhraseInfo || {};
     // console.log("解析的editPhraseInfo:", editPhraseInfo);
     imageConfig.value = JSON.parse(editPhraseInfo.editPhraseInfo) || [];
+    imageConfigFirstPrompt.value = editPhraseInfo.editPhraseInfoPrompt || "";
   } catch (error) {
     console.error("解析data.type失败:", error);
     ElMessage.error("编辑词解析失败：" + error.message);
@@ -929,6 +931,7 @@ defineExpose({
             ref="tableCardRef"
             :fileList="fileList"
             :materialList="materialList"
+            :imageConfigFirstPrompt="imageConfigFirstPrompt"
           />
         </div>
       </div>

@@ -13,7 +13,7 @@ import { imageCache } from "../../utils/imageCache";
 import { downloadFile } from "@/api/aiDraw";
 import ResultDialog from "./resultDialog.vue";
 import OnlineImg from "../../common/onlineImg.vue";
-import { Download, Refresh, Upload } from "@element-plus/icons-vue";
+import { Delete, Download, Refresh, Upload } from "@element-plus/icons-vue";
 import { FORMAT_PROMPT, PromptType } from "./utils/prompt";
 import {
   compositeImage,
@@ -30,7 +30,7 @@ const AI_MODEL_OPTIONS = [
   { label: "谷歌 nano-banana-pro", value: "nano-banana-pro" },
   { label: "谷歌 nano-banana-fast", value: "nano-banana-fast" }
 ];
-const aiModel = ref("nano-banana-2");
+const aiModel = ref("wan2.7-image");
 
 const props = defineProps({
   imageConfig: {
@@ -48,6 +48,10 @@ const props = defineProps({
   materialList: {
     type: Object as PropType<{ [key: string]: any[] }>,
     default: () => ({})
+  },
+  imageConfigFirstPrompt: {
+    type: String,
+    default: ""
   }
 });
 
@@ -222,6 +226,12 @@ const parseExcelData = (jsonData: any[]) => {
           row["备注"];
       }
 
+      // 如果存在全局的第一优先级提示词，则添加到 remark 字段
+      if (props.imageConfigFirstPrompt) {
+        parsedRow["remark"] =
+          props.imageConfigFirstPrompt + "\\n" + (parsedRow["remark"] || "");
+      }
+
       result.push(parsedRow as Record<string, any> & { _id: number });
     } catch (error) {
       console.error("解析 Excel 行数据错误:", error);
@@ -358,6 +368,34 @@ const deleteRow = (index: number) => {
     .catch(() => {
       // 用户取消
     });
+};
+
+// 重新生成某行数据
+const regenerateRow = async (index: number, row: any) => {
+  try {
+    await ElMessageBox.confirm("确定要重新生成这张图片吗？", "重新生成确认", {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "warning"
+    });
+  } catch {
+    return;
+  }
+
+  const rowId = row._id;
+  currentGeneratingId.value = rowId;
+
+  try {
+    ElMessage.info("正在生成图片...");
+    const resultBase64 = await generateSingleImage(row);
+    generatedResults.value[rowId] = [resultBase64];
+    ElMessage.success("图片重新生成成功");
+  } catch (error: any) {
+    ElMessage.error(`图片重新生成失败：${error.message}`);
+    generatedResults.value[rowId] = [];
+  } finally {
+    currentGeneratingId.value = null;
+  }
 };
 
 // 清空所有数据
@@ -1199,7 +1237,7 @@ defineExpose({
             size="small"
             @click="clearAll"
             :disabled="importedDataList.length === 0"
-            :icon="Refresh"
+            :icon="Delete"
           >
             清空全部
           </el-button>
@@ -1315,14 +1353,32 @@ defineExpose({
           <!-- 操作列 -->
           <el-table-column
             label="操作"
-            width="100"
+            width="110"
             fixed="right"
             align="center"
           >
-            <template #default="{ $index }">
-              <el-button type="danger" size="small" @click="deleteRow($index)">
-                删除
-              </el-button>
+            <template #default="{ $index, row, $codex }">
+              <el-tooltip
+                effect="dark"
+                content="重新生成"
+                placement="top"
+                :show-after="300"
+              >
+                <el-button
+                  text
+                  type="primary"
+                  size="small"
+                  @click="regenerateRow($index, row)"
+                  :icon="Refresh"
+                />
+              </el-tooltip>
+              <el-button
+                text
+                type="danger"
+                size="small"
+                @click="deleteRow($index)"
+                :icon="Delete"
+              />
             </template>
           </el-table-column>
         </el-table>

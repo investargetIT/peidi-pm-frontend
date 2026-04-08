@@ -145,7 +145,7 @@ const addDrawRecord = async (url: string, imgName: string) => {
           const compressionResult = await processImageCompression(
             base64_original,
             url,
-            0.5
+            0.2
           );
 
           const base64_thumbnail = compressionResult.compressedBase64;

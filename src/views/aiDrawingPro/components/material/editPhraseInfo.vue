@@ -8,7 +8,7 @@ import {
   UploadProps,
   UploadRawFile
 } from "element-plus";
-import { nextTick, reactive, ref } from "vue";
+import { nextTick, reactive, ref, watch } from "vue";
 import {
   updateMaterial,
   transferGemini,
@@ -17,6 +17,7 @@ import {
 } from "@/api/aiDraw";
 import { Pointer } from "@element-plus/icons-vue";
 import { generateID } from "../../utils/general/index";
+import { el } from "element-plus/es/locale/index.mjs";
 // import imageUrl1 from "@/views/debug/assets/绘图1.png";
 // import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 
@@ -42,12 +43,18 @@ const geminiLoading = ref(false);
 
 const materialData = ref(null);
 
+// 编辑词显示模式 详情模式 和 可视化模式
+const editPhraseMode = ref<"details" | "visual">("visual");
 const ruleFormRef = ref<FormInstance>();
 const ruleForm = reactive({
   editPhraseInfo: "",
   imageUrl: "",
-  image: null
+  image: null,
+  editPhraseInfoPrompt: ""
 });
+// 解析后的编辑词数组（用于可视化模式）
+const editPhraseList = ref<any[]>([]);
+
 const rules = reactive<FormRules>({
   image: [{ required: true, message: "请上传模板标记图", trigger: "change" }]
 });
@@ -57,6 +64,7 @@ const initDetailForm = (data: any) => {
   dialogVisible.value = true;
   geminiLoading.value = false;
   ruleForm.image = null;
+  editPhraseList.value = [];
 
   nextTick(() => {
     uploadRef.value?.clearFiles();
@@ -67,6 +75,16 @@ const initDetailForm = (data: any) => {
       Object.keys(editPhraseInfo).forEach(key => {
         ruleForm[key] = editPhraseInfo[key];
       });
+
+      // 解析编辑词数组
+      if (ruleForm.editPhraseInfo) {
+        try {
+          editPhraseList.value = JSON.parse(ruleForm.editPhraseInfo);
+        } catch (error) {
+          console.error("解析编辑词失败:", error);
+          editPhraseList.value = [];
+        }
+      }
 
       if (editPhraseInfo.imageUrl) {
         // 请求回来的图片 填充到ruleForm.imageUrl
@@ -318,6 +336,7 @@ const handleGenerateDescriptorInfo = async () => {
             console.log("解析出的数组:", jsonArray);
 
             ruleForm.editPhraseInfo = JSON.stringify(jsonArray, null, 2);
+            editPhraseList.value = jsonArray;
 
             ElMessage.success("生成编辑词成功");
           } else {
@@ -339,6 +358,29 @@ const handleGenerateDescriptorInfo = async () => {
     });
 };
 //#endregion
+
+// 监听 editPhraseList 变化，同步更新 ruleForm.editPhraseInfo
+watch(
+  editPhraseList,
+  newVal => {
+    ruleForm.editPhraseInfo = JSON.stringify(newVal, null, 2);
+  },
+  { deep: true }
+);
+
+// 监听 ruleForm.editPhraseInfo 变化，同步更新 editPhraseList
+watch(
+  () => ruleForm.editPhraseInfo,
+  newVal => {
+    if (newVal) {
+      try {
+        editPhraseList.value = JSON.parse(newVal);
+      } catch (error) {
+        console.error("解析编辑词失败:", error);
+      }
+    }
+  }
+);
 </script>
 
 <template>
@@ -397,13 +439,115 @@ const handleGenerateDescriptorInfo = async () => {
           <p class="text-xs text-gray-500 mt-2">
             编辑词不需要手动输入，点击AI自动生成即可，若不满意可重复生成
           </p>
+          <p class="text-xs text-red-500 mt-2">
+            *编辑词更改后需要重新导出配置表
+          </p>
+
+          <div class="mt-3 w-full">
+            <el-radio-group v-model="editPhraseMode" text-color="#fff">
+              <el-radio-button label="可视化模式" value="visual" />
+              <el-radio-button label="详情模式" value="details" />
+            </el-radio-group>
+          </div>
+
+          <div v-show="editPhraseMode === 'visual'" class="mt-3 w-full">
+            <div
+              class="max-h-96 overflow-y-auto border border-gray-200 rounded p-4"
+            >
+              <div
+                v-for="(item, index) in editPhraseList"
+                :key="item.id || index"
+                class="mb-4 pb-4 border-b last:border-b-0"
+              >
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-medium text-gray-700">
+                    {{ index + 1 }}. {{ item.name }}
+                  </span>
+                  <el-tag
+                    size="small"
+                    :type="item.type === 'image' ? 'success' : 'primary'"
+                  >
+                    {{ item.type === "image" ? "图片" : "文本" }}
+                  </el-tag>
+                </div>
+
+                <!-- 编辑 name -->
+                <div class="mb-2">
+                  <label class="text-xs text-gray-500 block mb-1">名称</label>
+                  <el-input
+                    v-model="item.name"
+                    placeholder="请输入名称"
+                    size="small"
+                  />
+                </div>
+
+                <!-- 编辑 content 中的 label（仅当 type 为 text 且有 content 时） -->
+                <div
+                  v-if="
+                    item.type === 'text' &&
+                    item.content &&
+                    item.content.length > 0
+                  "
+                >
+                  <label class="text-xs text-gray-500 block mb-1"
+                    >文案标签</label
+                  >
+                  <div
+                    v-for="(contentItem, cIndex) in item.content"
+                    :key="cIndex"
+                    class="mb-2"
+                  >
+                    <el-input
+                      v-model="contentItem.label"
+                      :placeholder="`请输入标签（第${Number(cIndex) + 1}项）`"
+                      size="small"
+                    />
+                    <el-input
+                      v-if="contentItem.text !== undefined"
+                      v-model="contentItem.text"
+                      :placeholder="`请输入文案内容（第${Number(cIndex) + 1}项）`"
+                      size="small"
+                      class="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <!-- 显示位置信息（只读） -->
+                <div v-if="item.rect" class="mt-2 text-xs text-gray-400">
+                  位置: x={{ item.rect.x }}, y={{ item.rect.y }}, 宽={{
+                    item.rect.width
+                  }}, 高={{ item.rect.height }}
+                </div>
+              </div>
+
+              <div
+                v-if="editPhraseList.length === 0"
+                class="text-center text-gray-400 py-8"
+              >
+                暂无编辑词数据，请点击"点击AI自动生成编辑词"
+              </div>
+            </div>
+          </div>
 
           <el-input
+            v-show="editPhraseMode === 'details'"
             class="mt-3"
             type="textarea"
             :rows="16"
             v-model="ruleForm.editPhraseInfo"
             placeholder="编辑词不需要手动输入，点击AI自动生成即可"
+          />
+        </el-form-item>
+
+        <el-form-item label="第一优先级提示词" prop="editPhraseInfoPrompt">
+          <p class="text-xs text-gray-500">
+            该模板全局通用的第一优先级提示词，批量生成时自动带入，不需要手动输入
+          </p>
+          <el-input
+            class="mt-3"
+            type="textarea"
+            :rows="4"
+            v-model="ruleForm.editPhraseInfoPrompt"
           />
         </el-form-item>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, provide, ref, watch } from "vue";
+import { onMounted, onUnmounted, provide, ref, watch, nextTick } from "vue";
 
 import { ElMessage } from "element-plus";
 
@@ -19,6 +19,7 @@ import "./style/reset.scss";
 import "./style/element-plus.scss";
 
 import { useRoute, useRouter } from "vue-router";
+
 const route = useRoute();
 const router = useRouter();
 
@@ -219,7 +220,10 @@ provide("initDrawingPro", initDrawingPro);
 
 const initCreativeStudio = (url: string) => {
   activeTab.value = "Creative";
-  creativeTabRef.value?.initCreativeStudio(url);
+  nextTick(() => {
+    creativeTabRef.value?.initCreativeStudio(url);
+  });
+  // creativeTabRef.value?.initCreativeStudio(url);
 };
 provide("initCreativeStudio", initCreativeStudio);
 //#endregion
@@ -282,7 +286,7 @@ onUnmounted(() => {
       <el-tab-pane label="模板编辑器" name="DrawingPro">
         <DrawingPro ref="drawingProTabRef" />
       </el-tab-pane>
-      <el-tab-pane label="创意工作室" name="Creative">
+      <el-tab-pane label="创意工作室" name="Creative" lazy>
         <Creative ref="creativeTabRef" />
       </el-tab-pane>
     </el-tabs>
