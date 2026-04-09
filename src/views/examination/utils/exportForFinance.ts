@@ -85,7 +85,7 @@ export const processAndExportOBMData = async (
   outputFileName?: string
 ) => {
   try {
-    const fileName = sourceFileName || "考核应用报表导出模板.xlsx";
+    const fileName = sourceFileName || "考核应用报表导出模板202604091108.xlsx";
 
     // 获取 API 数据
     const { tableData: apiTableData } = await fetchOBMPerformanceData();
@@ -109,9 +109,9 @@ export const processAndExportOBMData = async (
       throw new Error("Excel 文件中没有工作表");
     }
 
-    // 先删除第 73 行和第 32 行（从下往上删除，避免行号变化）
+    // 先删除第 72 行和第 32 行（从下往上删除，避免行号变化）
     try {
-      const rowsToDelete = [73, 32].filter(
+      const rowsToDelete = [72, 32].filter(
         rowNum => rowNum <= worksheet.rowCount
       );
 
@@ -131,6 +131,7 @@ export const processAndExportOBMData = async (
 
     // 获取当前月份
     const currentMonth = dayjs().month() + 1; // 当前月份（1-12）
+    // console.log("当前月份：", currentMonth);
     const previousMonth = currentMonth - 1; // 上个月份
 
     let modifiedCount = 0;
@@ -153,6 +154,7 @@ export const processAndExportOBMData = async (
         (item: any) =>
           item.userName === userName && item.examinationType === examinationType
       );
+      // console.log("matchedData", matchedData);
 
       // 未找到匹配数据时，填充提示文字
       if (!matchedData || !matchedData.examination) {
@@ -198,35 +200,44 @@ export const processAndExportOBMData = async (
       // 根据不同行范围使用不同的计算逻辑
       if (rowNumber >= 3 && rowNumber <= 31) {
         // 第 3-31 行：累计值计算（行号不变）
-        // I 列：前 (currentMonth-1) 个月的目标值之和
+        // I 列：前 previousMonth 个月的目标值之和
+        // console.log("累计", findObjectByMonthIndex(targetData, previousMonth));
         valueI = targetData
-          .slice(0, previousMonth)
+          .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
           .reduce((sum: number, item: any) => sum + item.value, 0);
 
-        // K 列：前 (currentMonth-1) 个月的实际值之和
+        // K 列：前 previousMonth 个月的实际值之和
         valueK = actualData
-          .slice(0, previousMonth)
+          .slice(0, findObjectByMonthIndex(actualData, previousMonth) + 1)
           .reduce((sum: number, item: any) => sum + item.value, 0);
 
         // O 列：前 currentMonth 个月的目标值之和
         valueO = targetData
-          .slice(0, currentMonth)
+          .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
           .reduce((sum: number, item: any) => sum + item.value, 0);
       } else if (
-        (rowNumber >= 32 && rowNumber <= 71) ||
-        (rowNumber >= 72 && rowNumber <= 78)
+        (rowNumber >= 32 && rowNumber <= 70) ||
+        (rowNumber >= 71 && rowNumber <= 81)
       ) {
-        // 第 32-71 行和第 72-78 行：当月值计算
-        // 原第 33-72 行 → 现第 32-71 行（删除第 32 行后前移 1 行）
-        // 原第 74-80 行 → 现第 72-78 行（删除第 32 和 73 行后前移 2 行）
-        // I 列：上个月的目标值（索引为 previousMonth-1）
-        valueI = targetData[previousMonth - 1]?.value || 0;
+        // 第 32-70 行和第 71-81 行：当月值计算
+        // 原第 33-71 行 → 现第 32-70 行（删除第 32 行后前移 1 行）
+        // 原第 73-83 行 → 现第 71-81 行（删除第 32 和 72 行后前移 2 行）
 
-        // K 列：上个月的实际值（索引为 previousMonth-1）
-        valueK = actualData[previousMonth - 1]?.value || 0;
+        // I 列：上个月的目标值（索引为 previousMonth）
+        // console.log(
+        //   "指定",
+        //   findObjectByMonthWithFirstDay(targetData, previousMonth )
+        // );
+        valueI =
+          findObjectByMonthWithFirstDay(targetData, previousMonth)?.value || 0;
 
-        // O 列：当月的目标值（索引为 currentMonth-1）
-        valueO = targetData[currentMonth - 1]?.value || 0;
+        // K 列：上个月的实际值（索引为 previousMonth）
+        valueK =
+          findObjectByMonthWithFirstDay(actualData, previousMonth)?.value || 0;
+
+        // O 列：当月的目标值（索引为 currentMonth）
+        valueO =
+          findObjectByMonthWithFirstDay(targetData, currentMonth)?.value || 0;
       }
 
       // 计算 M 列：完成率 (K/I*100)
@@ -267,6 +278,31 @@ export const processAndExportOBMData = async (
     );
   }
 };
+
+//#region 辅助函数
+// 获取指定月份的第一天
+const getFirstDayOfMonth = (year: number, month: number) => {
+  return dayjs(`${year}-${month}`).startOf("month").format("YYYY-MM-DD");
+};
+// 在对象数组里查找month为指定日期的对象
+const findObjectByMonth = (array: any[], month: string) => {
+  return array.find(obj => obj.month === month);
+};
+// 在对象数组里查找month为指定日期的对象 整合 获取指定月份的第一天
+const findObjectByMonthWithFirstDay = (array: any[], month: number) => {
+  return array.find(
+    obj => obj.month === getFirstDayOfMonth(dayjs().year(), month)
+  );
+};
+// 在对象数组里查找month为指定日期的对象 在 数组中的索引
+const findObjectByMonthIndex = (array: any[], month: number) => {
+  const idx = array.findIndex(
+    obj => obj.month === getFirstDayOfMonth(dayjs().year(), month)
+  );
+  if (idx < 0) return -1;
+  return idx;
+};
+//#endregion
 
 /**
  * 获取考核目标或指标数据（无需传参）
