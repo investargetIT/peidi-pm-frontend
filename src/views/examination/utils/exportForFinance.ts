@@ -198,7 +198,7 @@ export const processAndExportOBMData = async (
       let valueO = 0; // O 列值
 
       // 根据不同行范围使用不同的计算逻辑
-      if (rowNumber >= 3 && rowNumber <= 31) {
+      if ((rowNumber >= 3 && rowNumber <= 31) || rowNumber === 60) {
         // 第 3-31 行：累计值计算（行号不变）
         // I 列：前 previousMonth 个月的目标值之和
         // console.log("累计", findObjectByMonthIndex(targetData, previousMonth));
