@@ -925,12 +925,18 @@ const generateCompositeFromRowData = async (
                 console.log(`✓ 从素材库下载并转换成功：${config.name}`);
               } else {
                 const response = await fetch(materialUrl);
+                if (!response.ok) {
+                  throw new Error(`HTTP error: ${response.status}`);
+                }
                 const blob = await response.blob();
                 base64Data = await blobManager.blobToBase64(blob);
                 console.log(`✓ 从 HTTP URL 加载成功：${config.name}`);
               }
             } else if (imageData.startsWith("http")) {
               const response = await fetch(imageData);
+              if (!response.ok) {
+                throw new Error(`HTTP error: ${response.status}`);
+              }
               const blob = await response.blob();
               base64Data = await blobManager.blobToBase64(blob);
               console.log(`✓ 从 HTTP URL 加载成功：${config.name}`);

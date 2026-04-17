@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { onUnmounted, ref, watch } from "vue";
 import { downloadFile } from "@/api/aiDraw";
 import { ElMessage } from "element-plus";
 import { snapdom } from "@zumer/snapdom";
@@ -26,6 +26,11 @@ const exportContainer = ref<HTMLElement | null>(null);
 watch(
   () => props.url,
   async newVal => {
+    // 释放旧的 Blob URL
+    if (imageUrl.value && imageUrl.value.startsWith("blob:")) {
+      URL.revokeObjectURL(imageUrl.value);
+    }
+
     if (!newVal) {
       imageUrl.value = "";
       return;
@@ -50,6 +55,15 @@ watch(
   },
   { immediate: true }
 );
+
+onUnmounted(() => {
+  if (imageUrl.value && imageUrl.value.startsWith("blob:")) {
+    URL.revokeObjectURL(imageUrl.value);
+  }
+  if (previewImageUrl.value && previewImageUrl.value.startsWith("blob:")) {
+    URL.revokeObjectURL(previewImageUrl.value);
+  }
+});
 
 //#region 图片预览
 const previewVisible = ref(false);

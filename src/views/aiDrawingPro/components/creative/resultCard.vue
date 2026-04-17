@@ -81,7 +81,7 @@ const fetchDrawRecordPage = () => {
 };
 
 const fetchAddDrawRecord = ({ path, imgName, imgType, useNumber }) => {
-  getDrawRecordNew({
+  return getDrawRecordNew({
     path,
     type: JSON.stringify({
       // imgType: "Original" | "Thumbnail"

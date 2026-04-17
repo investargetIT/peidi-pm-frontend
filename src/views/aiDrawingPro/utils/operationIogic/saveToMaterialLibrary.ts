@@ -16,6 +16,8 @@ export const saveToMaterialLibrary = async (
   defaultName?: string
 ): Promise<boolean> => {
   try {
+    let saveResult = false;
+
     const result = await ElMessageBox.prompt("请输入素材名称", "保存到素材库", {
       confirmButtonText: "保存",
       cancelButtonText: "取消",
@@ -94,9 +96,10 @@ export const saveToMaterialLibrary = async (
 
               if (newMaterialRes.code === 200) {
                 ElMessage.success(`素材 "${materialName}" 已保存到素材库`);
+                saveResult = true;
                 instance.confirmButtonLoading = false;
                 done();
-                return true;
+                return;
               } else {
                 ElMessage.error("添加素材失败:" + newMaterialRes.msg);
                 instance.confirmButtonLoading = false;
@@ -123,7 +126,7 @@ export const saveToMaterialLibrary = async (
       }
     });
 
-    return true;
+    return saveResult;
   } catch (error: any) {
     console.error("保存到素材库失败:", error);
     if (error === "cancel" || error?.type === "cancel") {
