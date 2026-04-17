@@ -50,9 +50,14 @@ const beforeUpload = (file: File) => {
   return true;
 };
 
-const handleSuccess = () => {
-  ElMessage.success("文件上传成功");
-  props.successCallback();
+const handleSuccess = response => {
+  console.log("上传成功:", response);
+  if (response.code === 200) {
+    ElMessage.success("文件上传成功");
+    props.successCallback();
+  } else {
+    ElMessage.error(`文件上传失败: ${response.msg}`);
+  }
 };
 
 const handleError = (

@@ -3,8 +3,8 @@ import { pingIPUseXHR } from "@/utils/ip";
 import { message } from "@/utils/message";
 import { ElMessage } from "element-plus";
 
-const USERNAME = "夏琰";
-const PASSWORD = "X81y0122";
+const USERNAME = import.meta.env.VITE_CHAOHUI_USERNAME;
+const PASSWORD = import.meta.env.VITE_CHAOHUI_PASSWORD;
 
 const ips = ["192.168.110.252:6001", "12.18.1.16:6001", "192.168.1.252:6001"];
 const ipsName = [
@@ -61,6 +61,8 @@ export const chaohuilogin = () => {
             sid,
             postUrl: `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Upload&method=upload&version=2&_sid=${sid}`
           });
+        } else {
+          reject(new Error("登录失败：未获取到 SID"));
         }
       })
       .catch(err => {
@@ -75,6 +77,8 @@ export const chaohuilogin = () => {
                 sid,
                 postUrl: `${uploadUrl}/webapi/entry.cgi?api=SYNO.FileStation.Upload&method=upload&version=2&_sid=${sid}`
               });
+            } else {
+              reject(new Error("登录失败：未获取到 SID"));
             }
           })
           .catch(err => {
@@ -84,6 +88,7 @@ export const chaohuilogin = () => {
                 type: "error"
               }
             );
+            reject(err);
           });
       });
   });

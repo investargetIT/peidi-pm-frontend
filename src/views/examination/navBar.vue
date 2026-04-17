@@ -3,6 +3,7 @@ import { storageLocal } from "@pureadmin/utils";
 import { ElMessage } from "element-plus";
 import { onMounted, reactive, ref } from "vue";
 import { useNav } from "@/layout/hooks/useNav";
+import { emitter } from "@/utils/mitt"; // 添加mitt导入
 
 const { getLogo } = useNav();
 
@@ -20,13 +21,15 @@ const handleExit = () => {
 };
 
 onMounted(() => {
+  emitter.on("logout", () => {
+    handleExit(); // 使用现有的退出逻辑
+  });
   // 从localStorage中获取用户名 ddUserInfo对象里的name
   const ddUserInfo = JSON.parse(localStorage.getItem("ddUserInfo") || "{}");
   if (ddUserInfo.name) {
     username.value = ddUserInfo.name;
   }
 });
-
 </script>
 
 <template>
@@ -38,7 +41,9 @@ onMounted(() => {
     <div class="mr-[20px]">
       <el-dropdown trigger="click">
         <span class="el-dropdown-link">
-          <div class="peidi-examination-navbar-user text-[16px] h-[50px] flex items-center justify-center px-[20px]">
+          <div
+            class="peidi-examination-navbar-user text-[16px] h-[50px] flex items-center justify-center px-[20px]"
+          >
             {{ username }}
           </div>
         </span>

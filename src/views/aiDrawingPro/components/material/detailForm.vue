@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, nextTick } from "vue";
+import { reactive, ref, nextTick, computed } from "vue";
 import {
   ElMessage,
   FormInstance,
@@ -55,7 +55,8 @@ const ruleForm = reactive({
   name: "",
   type: "",
   imageUrl: "",
-  image: null
+  image: null,
+  folder: ""
 });
 const rules = reactive<FormRules>({
   name: [{ required: true, message: "请输入素材名称", trigger: "blur" }],
@@ -67,8 +68,9 @@ const submitForm = async (formEl: FormInstance | undefined) => {
   if (!formEl) return;
   await formEl.validate((valid, fields) => {
     if (valid) {
-      loading.value = true;
       // console.log("提交!", ruleForm);
+      // return;
+      loading.value = true;
 
       // 首先检查图片名称是否存在
       for (const key in props.materialList) {
@@ -103,9 +105,23 @@ const submitForm = async (formEl: FormInstance | undefined) => {
           if (res.code === 200) {
             ruleForm.imageUrl = res.data;
 
+            let typeTemp = {};
+            if (ruleForm.type === "componentMaterial") {
+              typeTemp = {
+                mtype: ruleForm.type,
+                folder: ruleForm.folder
+              };
+            } else {
+              typeTemp = {
+                mtype: ruleForm.type
+              };
+            }
+
             newMaterial({
               objectName: ruleForm.imageUrl,
-              type: JSON.stringify({ mtype: ruleForm.type })
+              type: JSON.stringify({
+                ...typeTemp
+              })
             })
               .then((res: any) => {
                 if (res.code === 200) {
@@ -149,6 +165,21 @@ const handleChange: UploadProps["onChange"] = (file, fileList) => {
   ruleForm.image = fileinfo.raw;
 };
 
+// 计算属性 获取所有文件夹列表
+const getFolderList = computed(() => {
+  // 去props.materialList遍历所有数据，解析type字段是否有folder属性，有的话就添加到folderList中，要去重
+  const folderList = [];
+  for (const key in props.materialList) {
+    for (let item of props.materialList[key]) {
+      const folder = JSON.parse(item.type)?.folder;
+      if (folder) {
+        folderList.push(folder);
+      }
+    }
+  }
+  return [...new Set(folderList)].map(item => ({ label: item, value: item }));
+});
+
 defineExpose({
   initDetailForm
 });
@@ -178,6 +209,27 @@ defineExpose({
           <el-select v-model="ruleForm.type" placeholder="请选择">
             <el-option
               v-for="item in TYPE_OPTIONS"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item
+          label="所属文件夹"
+          prop="folder"
+          v-show="ruleForm.type === 'componentMaterial'"
+        >
+          <el-select
+            v-model="ruleForm.folder"
+            placeholder="请选择已有文件夹 或 输入新文件夹名称，不选择则为默认文件夹"
+            allow-create
+            filterable
+            clearable
+          >
+            <el-option
+              v-for="item in getFolderList"
               :key="item.value"
               :label="item.label"
               :value="item.value"

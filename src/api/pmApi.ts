@@ -268,3 +268,13 @@ export const downloadFile = (params: { objectName: string }) => {
 export const getUploadExaminationPath = () => {
   return http.request("get", baseUrlApi("/kpi-examination/upload/examination"));
 };
+
+// 获取设计师考核记录结果
+export const getDesignerExaminationRecordResult = (params: {
+  end: string;
+  start: string;
+}) => {
+  return http.request("get", baseUrlApi("/kpi-examination/design/list"), {
+    params
+  });
+};

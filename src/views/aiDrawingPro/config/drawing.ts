@@ -41,5 +41,7 @@ export const EXCEL_TABLE_ITEM_DEFAULT: ExcelTableItem = {
   resultImages: [] as string[], // 生成的图片
   betterTemplateImage: {} as object, // 更好的模板图
   shopLogoImage: [] as string[], // 店铺LOGO
-  brandLogoImage: [] as string[] // 品牌LOGO
+  brandLogoImage: [] as string[], // 品牌LOGO
+  descriptor: "" as string, // 描述词,
+  mapping: "" as string // 参数对照
 };

@@ -182,19 +182,21 @@ class BlobManager {
   public setMaxCacheSize(size: number): void {
     this.maxCacheSize = size;
     while (this.blobMap.size > this.maxCacheSize) {
-      this.cleanupOldest();
+      const evicted = this.cleanupOldest();
+      if (!evicted) break;
     }
   }
 
   /**
    * 清理最旧的缓存项
    */
-  private cleanupOldest(): void {
-    if (this.blobMap.size === 0) return;
+  private cleanupOldest(): boolean {
+    if (this.blobMap.size === 0) return false;
 
     let oldestId: string | null = null;
     let oldestTimestamp = Infinity;
 
+    // 仅查找引用计数为0的项目
     for (const [id, record] of this.blobMap) {
       if (record.refCount === 0 && record.timestamp < oldestTimestamp) {
         oldestId = id;
@@ -202,21 +204,13 @@ class BlobManager {
       }
     }
 
-    // 如果没有引用计数为0的项，清理最旧的
-    if (oldestId === null) {
-      for (const [id, record] of this.blobMap) {
-        if (record.timestamp < oldestTimestamp) {
-          oldestId = id;
-          oldestTimestamp = record.timestamp;
-        }
-      }
-    }
-
     if (oldestId) {
       const record = this.blobMap.get(oldestId)!;
       URL.revokeObjectURL(record.url);
       this.blobMap.delete(oldestId);
+      return true;
     }
+    return false;
   }
 
   /**

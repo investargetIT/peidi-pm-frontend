@@ -9,7 +9,7 @@ import { Check, Close, Delete, Edit } from "@element-plus/icons-vue";
 import { type ExcelTableItem } from "../../type/drawing";
 import { EXCEL_TABLE_ITEM_DEFAULT } from "../../config/drawing";
 import { generateID, getNameFromObjectName } from "../../utils/general";
-import { LoadingIcon, GoodIcon, EditIcon } from "../../assests/svg/index";
+import { LoadingIcon, GoodIcon, EditIcon } from "../../assets/svg/index";
 import OnlineImg from "../../common/onlineImg.vue";
 
 const props = defineProps({
@@ -155,6 +155,24 @@ const handleProductImageChange = () => {
   }
 };
 
+// 处理模板图片选择变化
+const handleTemplateImageChange = () => {
+  const template = props.materialList["template"].find(
+    item => item.objectName === editingRowData.value!.templateImage[0]
+  );
+  if (template) {
+    const descriptorInfo = JSON.parse(template.type)?.descriptorInfo || {};
+    // console.log("descriptorInfo", descriptorInfo);
+
+    editingRowData.value.descriptor = descriptorInfo?.descriptor;
+    editingRowData.value.mapping = descriptorInfo?.mapping;
+  }
+  function formatData(data: string | null | undefined) {
+    if (data) return [data];
+    return [];
+  }
+};
+
 const handleUploadExcel = () => {
   // 创建隐藏的文件输入元素
   const input = document.createElement("input");
@@ -248,31 +266,23 @@ const parseExcelData = (jsonData: any[]): ExcelTableItem[] => {
         imageSize: row["输出分辨率"] || EXCEL_TABLE_ITEM_DEFAULT.imageSize,
 
         productImage: row["产品图片"]
-          ? [findMaterialImage(props.materialList, "product", row["产品图片"])]
+          ? findMaterialImage(props.materialList, "product", row["产品图片"])
           : [],
         templateImage: row["模板图片"]
-          ? [findMaterialImage(props.materialList, "template", row["模板图片"])]
+          ? findMaterialImage(props.materialList, "template", row["模板图片"])
           : [],
         fullGiftImages: row["全场满赠-图片"]
-          ? [
-              findMaterialImage(
-                props.materialList,
-                "gift",
-                row["全场满赠-图片"]
-              )
-            ]
+          ? findMaterialImage(props.materialList, "gift", row["全场满赠-图片"])
           : [],
         campaignLogoImage: row["活动LOGO"]
-          ? [
-              findMaterialImage(
-                props.materialList,
-                "activityLogo",
-                row["活动LOGO"]
-              )
-            ]
+          ? findMaterialImage(
+              props.materialList,
+              "activityLogo",
+              row["活动LOGO"]
+            )
           : [],
         shopLogoImage: row["店铺LOGO"]
-          ? [findMaterialImage(props.materialList, "shopLogo", row["店铺LOGO"])]
+          ? findMaterialImage(props.materialList, "shopLogo", row["店铺LOGO"])
           : []
       };
 
@@ -294,8 +304,14 @@ const findMaterialImage = (
   const material = materialList[imageType]?.find((item: any) =>
     item.objectName.includes("/" + imageUrl + ".")
   );
-  console.log(materialList, imageType, imageUrl, material);
-  return material?.objectName || null;
+  // console.log(
+  //   "在素材库寻找是否有符合要求的图片:",
+  //   materialList,
+  //   imageType,
+  //   imageUrl,
+  //   material
+  // );
+  return material?.objectName ? [material?.objectName] : [];
 };
 //#endregion
 
@@ -647,6 +663,32 @@ const handleDownloadTemplate = () => {
         </template>
       </el-table-column>
 
+      <!-- 参数对照 -->
+      <el-table-column
+        :resizable="false"
+        prop="mapping"
+        label="参数对照"
+        width="150"
+      >
+        <template #default="{ row, $index }">
+          <template v-if="editingRowIndex === $index">
+            <el-input
+              v-model="editingRowData!.mapping"
+              type="textarea"
+              :rows="TABLE_ROW_HEIGHT"
+            />
+          </template>
+          <template v-else>
+            <el-scrollbar
+              height="300px"
+              style="white-space: pre-wrap; word-break: break-all"
+            >
+              {{ row.mapping }}
+            </el-scrollbar>
+          </template>
+        </template>
+      </el-table-column>
+
       <!-- 备注 -->
       <el-table-column
         :resizable="false"
@@ -663,7 +705,12 @@ const handleDownloadTemplate = () => {
             />
           </template>
           <template v-else>
-            {{ row.remark }}
+            <el-scrollbar
+              height="300px"
+              style="white-space: pre-wrap; word-break: break-all"
+            >
+              {{ row.remark }}
+            </el-scrollbar>
           </template>
         </template>
       </el-table-column>
@@ -681,6 +728,7 @@ const handleDownloadTemplate = () => {
               <el-select
                 v-model="editingRowData!.templateImage[0]"
                 placeholder="请选择"
+                @change="handleTemplateImageChange"
               >
                 <el-option
                   v-for="item in materialList['template']"
@@ -904,6 +952,32 @@ const handleDownloadTemplate = () => {
         </template>
       </el-table-column>
 
+      <!-- 描述词 -->
+      <el-table-column
+        :resizable="false"
+        prop="descriptor"
+        label="描述词"
+        width="150"
+      >
+        <template #default="{ row, $index }">
+          <template v-if="editingRowIndex === $index">
+            <el-input
+              v-model="editingRowData!.descriptor"
+              type="textarea"
+              :rows="TABLE_ROW_HEIGHT"
+            />
+          </template>
+          <template v-else>
+            <el-scrollbar
+              height="300px"
+              style="white-space: pre-wrap; word-break: break-all"
+            >
+              {{ row.descriptor }}
+            </el-scrollbar>
+          </template>
+        </template>
+      </el-table-column>
+
       <!-- 结果图片 -->
       <el-table-column
         :resizable="false"
@@ -930,7 +1004,7 @@ const handleDownloadTemplate = () => {
             <p class="text-[12px] text-red-500">生成失败！</p>
           </div>
 
-          <el-scrollbar height="210px">
+          <el-scrollbar height="300px">
             <div v-for="(image, index) in row.resultImages" :key="index">
               <div
                 class="peidi-aiDrawingPro-tableDataCard-resultImages-container flex justify-around items-center mb-[8px]"

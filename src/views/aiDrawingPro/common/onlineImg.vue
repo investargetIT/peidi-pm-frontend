@@ -105,8 +105,10 @@ const handleDownload = async (src: string) => {
 
     if (cachedOriginalImage) {
       // 从缓存下载
-      const blob = blobManager.base64ToBlob(cachedOriginalImage);
-      const url = URL.createObjectURL(blob);
+      // const blob = blobManager.base64ToBlob(cachedOriginalImage);
+      // console.log("从缓存下载:", cachedOriginalImage);
+      // const url = URL.createObjectURL(blob);
+      const url = cachedOriginalImage;
 
       const a = document.createElement("a");
       a.href = url;

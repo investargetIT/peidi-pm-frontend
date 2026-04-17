@@ -107,3 +107,41 @@ export const transferDraw = (data: { urlParam: string }) => {
     timeout: 0
   });
 };
+
+// 中转 阿里云百炼wan2.7-image模型
+export const transferDrawAliyun = (data: { urlParam: string }) => {
+  return http.request("post", baseUrlApi("/ai/draw/transfer/aliyun"), {
+    data,
+    timeout: 0
+  });
+};
+
+// 获取bi_almama_image数据 点击率数据
+export const getClickRateTrend = (params: AiDrawPageRequest) => {
+  return http.request("get", baseUrlApi("/oms/bi/almama-image"), {
+    params
+  });
+};
+
+// 中转gemini模型
+export const transferGemini = (data: { urlParam: string }) => {
+  return http.request("post", baseUrlApi("/ai/draw/transfer/gemini"), {
+    data,
+    timeout: 0
+  });
+};
+
+// 分页图片上传历史结果
+export const getDrawRecordPage = (params: AiDrawPageRequest) => {
+  return http.request("get", baseUrlApi("/ai/draw/record/page"), {
+    params,
+    timeout: 0
+  });
+};
+
+// 图片上传历史
+export const getDrawRecordNew = (data: { path: string; type: string }) => {
+  return http.request("post", baseUrlApi("/ai/draw/record/new"), {
+    data
+  });
+};

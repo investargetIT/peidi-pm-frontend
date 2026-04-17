@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { getExaminationRecordResult } from "@/api/pmApi";
-import { Download } from "@element-plus/icons-vue";
+import { Download, Upload } from "@element-plus/icons-vue";
 import { exportExaminationTable, formatNumber } from "./utils/export";
+import {
+  fetchOBMPerformanceData,
+  processAndExportOBMData,
+  readOBMPerformanceFile
+} from "./utils/exportForFinance";
 import { ElMessage, ElLoading } from "element-plus";
+import dayjs from "dayjs";
 
 const loading = ref(false);
 const monthList = ref([]);
@@ -17,7 +23,16 @@ const searchForm = ref({
 
 // 处理搜索参数
 const handleSearchParams = () => {
-  const searchStr: any = [];
+  const searchStr: any = [
+    {
+      searchName: "month",
+      searchType: "betweenStr",
+      searchValue: [
+        dayjs().startOf("year").format("YYYY-MM-DD"),
+        dayjs().endOf("year").format("YYYY-MM-DD")
+      ].join(",")
+    }
+  ];
   if (searchForm.value.userName) {
     searchStr.push({
       searchName: "userName",
@@ -166,6 +181,23 @@ const last3MonthList = computed(() => {
 onMounted(() => {
   fetchResultList();
 });
+
+const exportForFinanceLoading = ref(false);
+const handleExportForFinance = async () => {
+  exportForFinanceLoading.value = true;
+  processAndExportOBMData()
+    .then(result => {
+      console.log("处理成功:", result);
+      ElMessage.success("导出成功");
+    })
+    .catch(error => {
+      console.error("处理失败:", error);
+      ElMessage.error("导出失败: " + error.message);
+    })
+    .finally(() => {
+      exportForFinanceLoading.value = false;
+    });
+};
 </script>
 
 <template>
@@ -214,7 +246,16 @@ onMounted(() => {
       <div class="flex justify-between items-center mb-[12px]">
         <div class="text-[16px]">绩效数据</div>
         <div>
-          <el-button type="primary" @click="handleExport" :icon="Download">
+          <el-button
+            type="primary"
+            @click="handleExportForFinance"
+            :icon="Upload"
+            color="#217346"
+            :loading="exportForFinanceLoading"
+          >
+            人事导出
+          </el-button>
+          <el-button type="primary" @click="handleExport" :icon="Upload">
             导出
           </el-button>
         </div>
@@ -249,7 +290,7 @@ onMounted(() => {
           min-width="150px"
         />
         <el-table-column prop="dataType" label="数据类型" min-width="100px" />
-        <el-table-column prop="dataSum" label="当前数据合计" min-width="150px">
+        <el-table-column prop="dataSum" label="当年数据合计" min-width="150px">
           <template #default="scope">
             {{ formatNumber(scope.row.dataSum) }}
           </template>

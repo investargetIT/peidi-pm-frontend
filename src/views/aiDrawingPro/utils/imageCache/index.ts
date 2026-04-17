@@ -115,7 +115,8 @@ class ImageCache {
       if (!blob) return null;
 
       // 使用Blob管理器创建URL并管理引用
-      return blobManager.createBlobURL(id, blob);
+      const urlKey = `${id}:${type}`;
+      return blobManager.createBlobURL(urlKey, blob);
     } catch (error) {
       console.error("获取图片URL失败:", error);
       return null;
@@ -172,8 +173,16 @@ class ImageCache {
    * 释放图片URL引用
    * @param id 图片ID
    */
-  public releaseImageURL(id: string): void {
-    blobManager.releaseBlobURL(id);
+  public releaseImageURL(
+    id: string,
+    type?: "originalBlob" | "compressedBlob"
+  ): void {
+    if (type) {
+      blobManager.releaseBlobURL(`${id}:${type}`);
+      return;
+    }
+    blobManager.releaseBlobURL(`${id}:originalBlob`);
+    blobManager.releaseBlobURL(`${id}:compressedBlob`);
   }
 
   /**

@@ -1,20 +1,32 @@
 <script setup lang="ts">
-import { inject, onMounted, ref, watch } from "vue";
+import { inject, onMounted, provide, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import RiAddLine from "@iconify-icons/ri/add-line";
-import { getMaterialPage } from "@/api/aiDraw";
+import { getClickRateTrend, getMaterialPage } from "@/api/aiDraw";
 import { MATERIAL_LIBRARY_TABS } from "../../config/material";
 import PictureCard from "./pictureCard.vue";
+import FolderCard from "./folderCard.vue";
 import DetailForm from "./detailForm.vue";
 import ContactForm from "./contactForm.vue";
+import ClickRateForm from "./clickRateForm.vue";
+import DescriptorInfo from "./descriptorInfo.vue";
+import EditPhraseInfo from "./editPhraseInfo.vue";
+import ChangeFolder from "./changeFolder.vue";
+import dayjs from "dayjs";
+import { type ClickRateTrendItem } from "../../type/material";
 
 const initCreativeStudio = inject<Function>("initCreativeStudio");
+const initDrawingPro = inject<Function>("initDrawingPro");
 
 const radio = ref(null);
 const materialList = ref({});
 const cardData = ref([]);
 const detailFormRef = ref(null);
 const contactFormRef = ref(null);
+const clickRateFormRef = ref(null);
+const descriptorInfoRef = ref(null);
+const editPhraseInfoRef = ref(null);
+const changeFolderRef = ref(null);
 
 const updateCardData = () => {
   cardData.value = materialList.value[radio.value] || [];
@@ -56,7 +68,74 @@ const fetchMaterialPage = () => {
     });
 };
 
-onMounted(() => {
+const clickRateTrend = ref({});
+provide("clickRateTrend", clickRateTrend);
+const fetchClickRateTrend = () => {
+  const searchStrTemp = [
+    {
+      searchName: "date",
+      searchType: "betweenStr",
+      // 近7天（不包含当前天）
+      searchValue: [
+        dayjs().subtract(7, "day").format("YYYY-MM-DD"),
+        dayjs().subtract(1, "day").format("YYYY-MM-DD")
+      ]
+        .map(date => dayjs(date).format("YYYY-MM-DD"))
+        .join(",")
+    }
+  ];
+  return getClickRateTrend({
+    pageNo: 1,
+    pageSize: 10e4,
+    searchStr: JSON.stringify(searchStrTemp)
+  })
+    .then((res: any) => {
+      if (res.code === 200) {
+        const temp = {};
+        const firstDay = dayjs().subtract(7, "day").format("YYYY-MM-DD");
+        // console.log("天数差:", dayjs().diff(firstDay, "day"));
+        // 数据清洗
+        res.data.records.forEach((item: ClickRateTrendItem) => {
+          const dayIndex = dayjs(item.date).diff(firstDay, "day");
+
+          if (temp[item.unitId]) {
+            // 确保索引在有效范围内
+            if (dayIndex >= 0 && dayIndex < 7) {
+              temp[item.unitId].clickCounts[dayIndex] = item.clickCount;
+              temp[item.unitId].conversionRates[dayIndex] = item.conversionRate;
+            }
+          } else {
+            temp[item.unitId] = {
+              channel: item.channel,
+              imageOss: item.imageOss,
+              imageUrl: item.imageUrl,
+              productName: item.productName,
+              shopName: item.shopName,
+              unitId: item.unitId,
+              clickCounts: Array(7).fill(0),
+              conversionRates: Array(7).fill(0)
+            };
+            // 设置当前数据点
+            if (dayIndex >= 0 && dayIndex < 7) {
+              temp[item.unitId].clickCounts[dayIndex] = item.clickCount;
+              temp[item.unitId].conversionRates[dayIndex] = item.conversionRate;
+            }
+          }
+        });
+
+        // console.log("获取点击率趋势:", temp);
+        clickRateTrend.value = temp;
+      } else {
+        ElMessage.error("获取点击率趋势失败:" + res.msg);
+      }
+    })
+    .catch(error => {
+      ElMessage.error("获取点击率趋势失败:" + error.message);
+    });
+};
+
+onMounted(async () => {
+  await fetchClickRateTrend();
   fetchMaterialPage();
 });
 
@@ -78,6 +157,10 @@ const handleContact = (data: any) => {
   contactFormRef.value.initContactForm(data);
 };
 
+const handleClickRate = (data: any) => {
+  clickRateFormRef.value.initClickRateForm(data);
+};
+
 const handleCreate = (data: any) => {
   // console.log("handleCreate:", data);
   if (!data?.objectName) {
@@ -85,6 +168,23 @@ const handleCreate = (data: any) => {
     return;
   }
   initCreativeStudio(data.objectName);
+};
+
+const handleDescriptorInfo = (data: any) => {
+  descriptorInfoRef.value?.initDetailForm(data);
+};
+
+const handleEditPhraseInfo = (data: any) => {
+  console.log("handleClickRate:", data);
+  editPhraseInfoRef.value?.initDetailForm(data);
+};
+
+const handleModuleEdit = (data: any) => {
+  initDrawingPro(data);
+};
+
+const handleChangeChangeFolder = (data: any) => {
+  changeFolderRef.value.initChangeFolderForm(data);
 };
 
 defineExpose({
@@ -117,16 +217,18 @@ defineExpose({
     <el-divider />
 
     <div>
-      <el-space wrap :size="'large'">
-        <PictureCard
-          v-for="item in cardData"
-          :key="item.id"
-          :data="item"
-          :fetchMaterialPage="fetchMaterialPage"
-          :handleContact="handleContact"
-          :handleCreate="handleCreate"
-        />
-      </el-space>
+      <FolderCard
+        :mtype="radio"
+        :cardData="cardData"
+        :fetchMaterialPage="fetchMaterialPage"
+        :handleContact="handleContact"
+        :handleCreate="handleCreate"
+        :handleClickRate="handleClickRate"
+        :handleDescriptorInfo="handleDescriptorInfo"
+        :handleEditPhraseInfo="handleEditPhraseInfo"
+        :handleModuleEdit="handleModuleEdit"
+        :handleChangeChangeFolder="handleChangeChangeFolder"
+      />
     </div>
 
     <div>
@@ -141,6 +243,36 @@ defineExpose({
     <div>
       <ContactForm
         ref="contactFormRef"
+        :materialList="materialList"
+        :fetchMaterialPage="fetchMaterialPage"
+      />
+    </div>
+
+    <div>
+      <ClickRateForm
+        ref="clickRateFormRef"
+        :clickRateTrend="clickRateTrend"
+        :fetchMaterialPage="fetchMaterialPage"
+      />
+    </div>
+
+    <div>
+      <DescriptorInfo
+        ref="descriptorInfoRef"
+        :fetchMaterialPage="fetchMaterialPage"
+      />
+    </div>
+
+    <div>
+      <EditPhraseInfo
+        ref="editPhraseInfoRef"
+        :fetchMaterialPage="fetchMaterialPage"
+      />
+    </div>
+
+    <div>
+      <ChangeFolder
+        ref="changeFolderRef"
         :materialList="materialList"
         :fetchMaterialPage="fetchMaterialPage"
       />

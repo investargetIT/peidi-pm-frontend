@@ -26,4 +26,8 @@ export interface ExcelTableItem {
   shopLogoImage: string[];
   // 品牌LOGO
   brandLogoImage: string[];
+  // 描述词
+  descriptor: string;
+  // 参数对照
+  mapping: string;
 }

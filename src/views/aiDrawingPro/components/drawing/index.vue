@@ -105,7 +105,9 @@ const fetchAiDrawPage = () => {
             const parsedFields = JSON.parse(item.fields || "{}");
             const completedData = compareAndCompleteData({
               ...parsedFields,
-              resultImages: JSON.parse(item.imgs || "[]"),
+              resultImages: JSON.parse(item.imgs || "[]")
+                .slice()
+                .reverse(),
               status: item.status,
               uuid: item.uuid || null
             });
@@ -225,8 +227,7 @@ watch(
       // console.log("分页参数改变:", newCurrentPage, newPageSize);
       fetchAiDrawPage();
     }
-  },
-  { immediate: true }
+  }
 );
 //#endregion
 
