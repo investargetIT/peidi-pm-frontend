@@ -72,7 +72,7 @@ const handleClickBack = () => {
 watch(
   () => [props.cardData, props.mtype],
   ([newCardData, newMtype]: any) => {
-    console.log("cardData", newCardData, newMtype);
+    // console.log("cardData", newCardData, newMtype);
 
     if (newMtype === "componentMaterial") {
       mode.value = "folder";
