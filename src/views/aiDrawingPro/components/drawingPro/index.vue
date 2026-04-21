@@ -606,13 +606,13 @@ defineExpose({
                       width: `${item.rect.width * CANVAS_SIZE}px`,
                       height: `${item.rect.height * CANVAS_SIZE}px`
                     }"
-                    @click.stop="handleSelectItem(item.id)"
                     :class="[
                       'absolute cursor-pointer transition-all duration-200 p-1 text-sm font-medium rounded',
                       selectedId === item.id
                         ? 'bg-blue-500 border-2 border-blue-700 text-white shadow-lg scale-[1.02]'
                         : 'bg-red-500 bg-opacity-60 border border-red-700 text-white hover:bg-opacity-80'
                     ]"
+                    @click.stop="handleSelectItem(item.id)"
                   >
                     {{ item.name }}
                     <span v-if="selectedId === item.id" class="ml-1">✓</span>
@@ -663,8 +663,8 @@ defineExpose({
                                 : ''
                             "
                             :plain="imageSelectMode[item.id] !== 'upload'"
-                            @click="imageSelectMode[item.id] = 'upload'"
                             class="flex-1"
+                            @click="imageSelectMode[item.id] = 'upload'"
                           >
                             📤 本地上传
                           </el-button>
@@ -676,8 +676,8 @@ defineExpose({
                                 : ''
                             "
                             :plain="imageSelectMode[item.id] !== 'material'"
-                            @click="imageSelectMode[item.id] = 'material'"
                             class="flex-1"
+                            @click="imageSelectMode[item.id] = 'material'"
                           >
                             🗂️ 素材库选择
                           </el-button>
@@ -860,7 +860,7 @@ defineExpose({
 
                     <!-- AI 生成面板 -->
                     <div class="mt-6 ai-generate-panel rounded-xl p-5">
-                      <div class="mb-3" v-if="false">
+                      <div v-if="false" class="mb-3">
                         <div class="panel-title mb-2 flex items-center">
                           <span class="mr-2">✨</span>
                           描述你想要的 Banner 内容
@@ -872,17 +872,17 @@ defineExpose({
                       </div>
 
                       <el-input
+                        v-if="true"
                         v-model="prompt"
                         type="textarea"
                         :rows="3"
                         placeholder="效果不好时才输入更详细的描述，否则请保持为空..."
                         class="w-full mb-4"
-                        v-if="true"
                       />
 
                       <div
-                        class="flex items-center justify-between mb-4 p-3 bg-white/60 rounded-lg"
                         v-if="false"
+                        class="flex items-center justify-between mb-4 p-3 bg-white/60 rounded-lg"
                       >
                         <span class="text-sm text-gray-600"
                           >演示模式（使用示例图片测试）</span
@@ -894,11 +894,11 @@ defineExpose({
                         type="primary"
                         size="large"
                         class="w-full generate-button"
-                        @click="generateImage"
                         :loading="loading"
                         :disabled="!fileList[0]?.url"
+                        @click="generateImage"
                       >
-                        <i class="el-icon-star"></i> ✨立即生成
+                        <i class="el-icon-star" /> ✨立即生成
                         <span
                           v-if="loading && timerInterval > 0"
                           class="ml-2 text-sm"
@@ -907,7 +907,7 @@ defineExpose({
                         </span>
                       </el-button>
 
-                      <div class="panel-footer mt-3 text-center" v-if="false">
+                      <div v-if="false" class="panel-footer mt-3 text-center">
                         💡 输入提示词，生成的图片将保留在此处
                       </div>
                     </div>
@@ -919,16 +919,16 @@ defineExpose({
 
           <el-divider />
 
-          <div class="mt-4" v-if="fileList[0]?.url">
+          <div v-if="fileList[0]?.url" class="mt-4">
             <ResultImg ref="resultImgRef" :errorMsg="errorMsg" />
           </div>
         </el-card>
 
-        <div class="mt-4" v-if="fileList[0]?.url">
+        <div v-if="fileList[0]?.url" class="mt-4">
           <TableCard
+            ref="tableCardRef"
             :imageConfig="imageConfig"
             :imageName="imageName"
-            ref="tableCardRef"
             :fileList="fileList"
             :materialList="materialList"
             :imageConfigFirstPrompt="imageConfigFirstPrompt"

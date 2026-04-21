@@ -168,9 +168,7 @@ const handleDownload = async (src: string) => {
         :previewSrcList="[originalImageUrl]"
         :style="{ width: props.size, height: props.size }"
       >
-        <template
-          #toolbar="{ actions, prev, next, reset, activeIndex, setActiveItem }"
-        >
+        <template #toolbar="{ actions, reset }">
           <el-icon @click="actions('zoomOut')">
             <ZoomOut />
           </el-icon>

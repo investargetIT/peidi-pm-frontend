@@ -1203,16 +1203,16 @@ defineExpose({
                 <el-button
                   color="#217346"
                   size="small"
-                  @click="exportConfig"
                   :icon="Download"
+                  @click="exportConfig"
                 >
                   导出配置表
                 </el-button>
                 <el-button
                   color="#427AED"
                   size="small"
-                  @click="importConfig"
                   :icon="Upload"
+                  @click="importConfig"
                 >
                   导入配置表
                 </el-button>
@@ -1233,17 +1233,17 @@ defineExpose({
             color="#CC6600"
             type="primary"
             size="small"
-            @click="exportAllResults"
             :disabled="importedDataList.length === 0 || batchGenerating"
+            @click="exportAllResults"
           >
             📥 导出全部结果图
           </el-button>
           <el-button
             type="danger"
             size="small"
-            @click="clearAll"
             :disabled="importedDataList.length === 0"
             :icon="Delete"
+            @click="clearAll"
           >
             清空全部
           </el-button>
@@ -1251,9 +1251,9 @@ defineExpose({
             color="#534CE7"
             type="primary"
             size="small"
-            @click="handleBatchGenerate"
             :loading="batchGenerating"
             :disabled="importedDataList.length === 0"
+            @click="handleBatchGenerate"
           >
             ✨ 开始绘制
           </el-button>
@@ -1349,10 +1349,7 @@ defineExpose({
                   <OnlineImg :url="row[col.prop]" size="70px" />
                 </div>
               </div>
-              <div
-                v-else
-                v-text="renderCell(row, { property: col.prop })"
-              ></div>
+              <div v-else v-text="renderCell(row, { property: col.prop })" />
             </template>
           </el-table-column>
 
@@ -1363,7 +1360,7 @@ defineExpose({
             fixed="right"
             align="center"
           >
-            <template #default="{ $index, row, $codex }">
+            <template #default="{ $index, row }">
               <el-tooltip
                 effect="dark"
                 content="重新生成"
@@ -1374,16 +1371,16 @@ defineExpose({
                   text
                   type="primary"
                   size="small"
-                  @click="regenerateRow($index, row)"
                   :icon="Refresh"
+                  @click="regenerateRow($index, row)"
                 />
               </el-tooltip>
               <el-button
                 text
                 type="danger"
                 size="small"
-                @click="deleteRow($index)"
                 :icon="Delete"
+                @click="deleteRow($index)"
               />
             </template>
           </el-table-column>

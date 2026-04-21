@@ -174,8 +174,8 @@ onUnmounted(() => {
       v-model="selectedValue"
       :placeholder="placeholder"
       filterable
-      @change="handleSelectChange"
       class="w-full"
+      @change="handleSelectChange"
     >
       <el-option
         v-for="matItem in materialList"

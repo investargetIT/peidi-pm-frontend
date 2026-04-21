@@ -217,9 +217,9 @@ defineExpose({
         </el-form-item>
 
         <el-form-item
+          v-show="ruleForm.type === 'componentMaterial'"
           label="所属文件夹"
           prop="folder"
-          v-show="ruleForm.type === 'componentMaterial'"
         >
           <el-select
             v-model="ruleForm.folder"
@@ -264,8 +264,8 @@ defineExpose({
           <div class="flex justify-end w-full">
             <el-button
               type="primary"
-              @click="submitForm(ruleFormRef)"
               :loading="loading"
+              @click="submitForm(ruleFormRef)"
             >
               保存
             </el-button>

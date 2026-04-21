@@ -126,6 +126,8 @@ export const saveToMaterialLibrary = async (
       }
     });
 
+    if (result) {
+    }
     return saveResult;
   } catch (error: any) {
     console.error("保存到素材库失败:", error);

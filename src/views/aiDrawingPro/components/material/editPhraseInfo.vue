@@ -429,8 +429,8 @@ watch(
             <el-button
               :icon="Pointer"
               type="primary"
-              @click="handleGenerateDescriptorInfo"
               :loading="geminiLoading"
+              @click="handleGenerateDescriptorInfo"
             >
               点击AI自动生成编辑词
             </el-button>
@@ -531,10 +531,10 @@ watch(
 
           <el-input
             v-show="editPhraseMode === 'details'"
+            v-model="ruleForm.editPhraseInfo"
             class="mt-3"
             type="textarea"
             :rows="16"
-            v-model="ruleForm.editPhraseInfo"
             placeholder="编辑词不需要手动输入，点击AI自动生成即可"
           />
         </el-form-item>
@@ -544,10 +544,10 @@ watch(
             该模板全局通用的第一优先级提示词，批量生成时自动带入，不需要手动输入
           </p>
           <el-input
+            v-model="ruleForm.editPhraseInfoPrompt"
             class="mt-3"
             type="textarea"
             :rows="4"
-            v-model="ruleForm.editPhraseInfoPrompt"
           />
         </el-form-item>
 
@@ -555,8 +555,8 @@ watch(
           <div class="flex justify-end w-full">
             <el-button
               type="primary"
-              @click="submitForm(ruleFormRef)"
               :loading="loading"
+              @click="submitForm(ruleFormRef)"
             >
               保存
             </el-button>

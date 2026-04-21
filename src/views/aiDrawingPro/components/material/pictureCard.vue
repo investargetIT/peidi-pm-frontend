@@ -133,19 +133,19 @@ const handleDelete = () => {
         <el-space wrap>
           <!-- <el-button type="danger" @click="handleDelete" text>删除</el-button> -->
           <el-button
-            type="primary"
-            @click="props.handleContact(props.data)"
-            text
             v-if="getMTType === 'product'"
+            type="primary"
+            text
+            @click="props.handleContact(props.data)"
           >
             关联
           </el-button>
           <el-button
-            type="success"
-            @click="props.handleCreate(props.data)"
-            text
             v-if="getMTType === 'template'"
+            type="success"
+            text
             size="small"
+            @click="props.handleCreate(props.data)"
           >
             创意
           </el-button>
@@ -158,11 +158,11 @@ const handleDelete = () => {
             描述词
           </el-button> -->
           <el-button
-            type="primary"
-            @click="props.handleEditPhraseInfo(props.data)"
-            text
             v-if="getMTType === 'template'"
+            type="primary"
+            text
             size="small"
+            @click="props.handleEditPhraseInfo(props.data)"
           >
             编辑词
           </el-button>
@@ -173,31 +173,31 @@ const handleDelete = () => {
             :show-after="200"
           >
             <el-button
-              type="primary"
-              @click="props.handleModuleEdit(props.data)"
-              text
               v-if="getMTType === 'template'"
+              type="primary"
+              text
               :disabled="getEditPhraseInfo"
               size="small"
+              @click="props.handleModuleEdit(props.data)"
             >
               模板编辑
             </el-button>
           </el-tooltip>
           <el-button
-            type="warning"
-            @click="props.handleClickRate(props.data)"
-            text
             v-if="getMTType === 'resultImage'"
+            type="warning"
+            text
             size="small"
+            @click="props.handleClickRate(props.data)"
           >
             点击率
           </el-button>
           <el-button
-            type="primary"
-            @click="props.handleChangeChangeFolder(props.data)"
-            text
             v-if="getMTType === 'componentMaterial'"
+            type="primary"
+            text
             size="small"
+            @click="props.handleChangeChangeFolder(props.data)"
           >
             更换文件夹
           </el-button>
@@ -209,7 +209,7 @@ const handleDelete = () => {
           <OnlineImg :url="props.data.objectName" size="200px" />
         </div>
 
-        <div class="w-full mt-[10px]" v-if="getMTType === 'resultImage'">
+        <div v-if="getMTType === 'resultImage'" class="w-full mt-[10px]">
           <ClickRateCharts :sourceData="props.data" />
         </div>
       </div>

@@ -129,7 +129,7 @@ defineExpose({
 
         <el-form-item>
           <div class="flex justify-end w-full">
-            <el-button type="primary" @click="submitForm" :loading="loading">
+            <el-button type="primary" :loading="loading" @click="submitForm">
               保存
             </el-button>
           </div>

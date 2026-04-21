@@ -113,7 +113,7 @@ watch(
 <template>
   <div>
     <el-scrollbar height="calc(100vh - 180px)">
-      <div class="picture-card-container" v-if="mode === 'picture'">
+      <div v-if="mode === 'picture'" class="picture-card-container">
         <PictureCard
           v-for="item in cardData"
           :key="item.id"
@@ -133,10 +133,10 @@ watch(
         <div class="flex items-center mb-4">
           <!-- <el-button type="primary" :icon="Back" text /> -->
           <el-icon
+            v-show="folderSelectedName"
             color="var(--el-color-primary)"
             class="cursor-pointer"
             @click="handleClickBack"
-            v-show="folderSelectedName"
           >
             <Back />
           </el-icon>

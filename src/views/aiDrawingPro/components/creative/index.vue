@@ -298,22 +298,13 @@ onUnmounted(() => {
                   placeholder="请选择 AI 模型"
                   style="width: 180px"
                 >
-                  <el-option
-                    label="nano-banana-2"
-                    value="nano-banana-2"
-                  ></el-option>
-                  <el-option
-                    label="nano-banana-pro"
-                    value="nano-banana-pro"
-                  ></el-option>
-                  <el-option
-                    label="nano-banana"
-                    value="nano-banana"
-                  ></el-option>
+                  <el-option label="nano-banana-2" value="nano-banana-2" />
+                  <el-option label="nano-banana-pro" value="nano-banana-pro" />
+                  <el-option label="nano-banana" value="nano-banana" />
                   <el-option
                     label="nano-banana-fast"
                     value="nano-banana-fast"
-                  ></el-option>
+                  />
                 </el-select>
               </div>
 
@@ -387,14 +378,14 @@ onUnmounted(() => {
                 <el-form-item>
                   <el-button
                     type="primary"
-                    @click="handleGenerateClick"
                     style="width: 100%; font-size: 16px; padding: 24px 0"
                     :loading="loading"
+                    @click="handleGenerateClick"
                   >
                     <StarIcon
+                      v-show="!loading"
                       color="none"
                       style="width: 16px; height: 16px"
-                      v-show="!loading"
                     />
                     生成图片
                   </el-button>
@@ -419,7 +410,7 @@ onUnmounted(() => {
             >
               <div class="flex items-center justify-between mb-[16px]">
                 <h2 class="text-xl font-semibold text-[#0a0a0a]">预览</h2>
-                <div class="flex" v-show="resultPictures.length > 0">
+                <div v-show="resultPictures.length > 0" class="flex">
                   <el-button
                     color="#F3F5F8"
                     style="font-size: 13px"
@@ -445,8 +436,8 @@ onUnmounted(() => {
               </div>
 
               <div
-                class="relative aspect-square rounded-lg overflow-hidden bg-[#eaeff5]"
                 v-if="resultPictures.length === 0"
+                class="relative aspect-square rounded-lg overflow-hidden bg-[#eaeff5]"
               >
                 <div
                   class="absolute inset-0 flex flex-col items-center justify-center text-[#0a0a0a]"

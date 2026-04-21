@@ -153,10 +153,9 @@ const exportAsPNG = async () => {
           fit="contain"
           preview-teleported
           :style="{ width: props.size, height: props.size }"
-          @click="handlePreview"
           style="cursor: pointer"
-        >
-        </el-image>
+          @click="handlePreview"
+        />
       </div>
     </div>
 
@@ -167,10 +166,10 @@ const exportAsPNG = async () => {
           placeholder="请选择导出尺寸"
           style="width: 160px; margin-right: 10px"
         >
-          <el-option label="800*800" value="800"></el-option>
-          <el-option label="1400*1400" value="1400"></el-option>
-          <el-option label="2048*2048" value="2048"></el-option>
-          <el-option label="4096*4096" value="4096"></el-option>
+          <el-option label="800*800" value="800" />
+          <el-option label="1400*1400" value="1400" />
+          <el-option label="2048*2048" value="2048" />
+          <el-option label="4096*4096" value="4096" />
         </el-select>
         <div>
           <el-button type="primary" @click="exportAsPNG"> 导出 PNG </el-button>
@@ -191,8 +190,7 @@ const exportAsPNG = async () => {
               :src="previewImageUrl"
               alt="图片预览"
               fit="contain"
-            >
-            </el-image>
+            />
           </template>
         </el-skeleton>
       </div>

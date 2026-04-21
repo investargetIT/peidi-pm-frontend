@@ -276,8 +276,8 @@ onUnmounted(() => {
 <template>
   <div>
     <el-tabs
-      type="border-card"
       v-model="activeTab"
+      type="border-card"
       class="peidi-el-tabs-modern-tabs"
     >
       <el-tab-pane label="素材库" name="Material" lazy>

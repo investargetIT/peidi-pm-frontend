@@ -619,15 +619,15 @@ defineExpose({
               placeholder="请选择导出尺寸"
               style="width: 120px; margin-right: 10px"
             >
-              <el-option label="800*800" value="800"></el-option>
-              <el-option label="1400*1400" value="1400"></el-option>
-              <el-option label="2048*2048" value="2048"></el-option>
-              <el-option label="4096*4096" value="4096"></el-option>
+              <el-option label="800*800" value="800" />
+              <el-option label="1400*1400" value="1400" />
+              <el-option label="2048*2048" value="2048" />
+              <el-option label="4096*4096" value="4096" />
             </el-select>
             <el-button
               type="primary"
-              @click="exportAsPNG"
               :loading="exportPNGLoading"
+              @click="exportAsPNG"
             >
               导出 PNG
             </el-button>
@@ -635,11 +635,11 @@ defineExpose({
         </div>
 
         <div
+          ref="exportContainer"
           class="image-container"
           @mouseup="endDrag"
           @mouseleave="endDrag"
           @click="deselectAll"
-          ref="exportContainer"
         >
           <img
             :src="templateImgBase64"
@@ -667,36 +667,36 @@ defineExpose({
               :alt="'图片元素' + element.id"
               class="element-image"
             />
-            <div class="element-controls" v-if="element.selected">
+            <div v-if="element.selected" class="element-controls">
               <el-button
                 size="small"
                 type="danger"
-                @click="e => deleteImageElement(e, element.id)"
                 class="delete-btn"
+                @click="e => deleteImageElement(e, element.id)"
               >
                 删除
               </el-button>
             </div>
             <div
+              v-if="element.selected"
               class="resize-handle se"
-              v-if="element.selected"
               @mousedown="e => resizeImage(e, element, 'se')"
-            ></div>
+            />
             <div
+              v-if="element.selected"
               class="resize-handle sw"
-              v-if="element.selected"
               @mousedown="e => resizeImage(e, element, 'sw')"
-            ></div>
+            />
             <div
+              v-if="element.selected"
               class="resize-handle ne"
-              v-if="element.selected"
               @mousedown="e => resizeImage(e, element, 'ne')"
-            ></div>
+            />
             <div
-              class="resize-handle nw"
               v-if="element.selected"
+              class="resize-handle nw"
               @mousedown="e => resizeImage(e, element, 'nw')"
-            ></div>
+            />
           </div>
         </div>
       </div>

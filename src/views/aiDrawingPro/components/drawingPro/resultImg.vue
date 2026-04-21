@@ -408,11 +408,12 @@ defineExpose({
 <template>
   <div v-if="showStatus && resultImage">
     <div class="text-base font-bold mb-4 text-gray-800">演示生成结果图</div>
-    <div class="text-red-500 text-sm" v-if="props.errorMsg">
+    <div v-if="props.errorMsg" class="text-red-500 text-sm">
       生成失败：{{ props.errorMsg }}
     </div>
     <div class="flex gap-12 flex-wrap">
       <div
+        ref="exportContainer"
         class="relative result-image-container"
         :style="{
           width: `${CANVAS_SIZE}px`,
@@ -422,7 +423,6 @@ defineExpose({
           minWidth: `${CANVAS_SIZE}px`,
           minHeight: `${CANVAS_SIZE}px`
         }"
-        ref="exportContainer"
         @mouseup="handleMouseUp"
         @mouseleave="handleMouseUp"
         @click="deselectAll"
@@ -512,37 +512,37 @@ defineExpose({
           >
             <img :src="item.src" :alt="item.name" class="element-image" />
 
-            <div class="element-controls" v-if="item.selected">
+            <div v-if="item.selected" class="element-controls">
               <el-button
                 size="small"
                 type="danger"
-                @click="e => deleteImageElement(e, item.id)"
                 class="delete-btn"
+                @click="e => deleteImageElement(e, item.id)"
               >
                 删除
               </el-button>
             </div>
 
             <div
+              v-if="item.selected"
               class="resize-handle se"
-              v-if="item.selected"
               @mousedown="e => resizeImage(e, item, 'se')"
-            ></div>
+            />
             <div
+              v-if="item.selected"
               class="resize-handle sw"
-              v-if="item.selected"
               @mousedown="e => resizeImage(e, item, 'sw')"
-            ></div>
+            />
             <div
+              v-if="item.selected"
               class="resize-handle ne"
-              v-if="item.selected"
               @mousedown="e => resizeImage(e, item, 'ne')"
-            ></div>
+            />
             <div
-              class="resize-handle nw"
               v-if="item.selected"
+              class="resize-handle nw"
               @mousedown="e => resizeImage(e, item, 'nw')"
-            ></div>
+            />
           </div>
         </template>
       </div>
@@ -552,8 +552,8 @@ defineExpose({
           <div>
             <el-button
               type="primary"
-              @click="importImage"
               :disabled="!resultImage"
+              @click="importImage"
             >
               导入素材
             </el-button>
@@ -569,10 +569,10 @@ defineExpose({
             placeholder="请选择导出尺寸"
             style="width: 160px; margin-right: 10px"
           >
-            <el-option label="800*800" value="800"></el-option>
-            <el-option label="1400*1400" value="1400"></el-option>
-            <el-option label="2048*2048" value="2048"></el-option>
-            <el-option label="4096*4096" value="4096"></el-option>
+            <el-option label="800*800" value="800" />
+            <el-option label="1400*1400" value="1400" />
+            <el-option label="2048*2048" value="2048" />
+            <el-option label="4096*4096" value="4096" />
           </el-select>
           <div class="mt-2">
             <el-button
@@ -589,8 +589,8 @@ defineExpose({
           <div>
             <el-button
               type="primary"
-              @click="handleSaveToMaterialLibraryClick"
               :disabled="!resultImage"
+              @click="handleSaveToMaterialLibraryClick"
             >
               保存到素材库
             </el-button>

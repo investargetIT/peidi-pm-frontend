@@ -505,10 +505,10 @@ const formatParamsToPromises = async (
       </p>
       <div class="flex items-end">
         <el-button
-          @click="handleGenerateImagesClick()"
           :loading="loading"
           :disabled="isEdit"
           type="primary"
+          @click="handleGenerateImagesClick()"
         >
           <template #icon>
             <IconifyIconOffline :icon="RiImageAddLine" />

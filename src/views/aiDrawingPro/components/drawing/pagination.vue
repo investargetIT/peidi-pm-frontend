@@ -51,9 +51,9 @@ const handleSizeChange = (pageSize: number) => {
       background
       layout="total, sizes, prev, pager, next"
       :total="props.paginationConfig.total"
+      :disabled="props.loadingTableData"
       @current-change="handleCurrentChange"
       @size-change="handleSizeChange"
-      :disabled="props.loadingTableData"
     />
   </div>
 </template>

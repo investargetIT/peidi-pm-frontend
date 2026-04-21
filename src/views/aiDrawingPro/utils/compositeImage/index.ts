@@ -2,7 +2,7 @@
  * Canvas 图片合成工具
  * 负责将背景图和素材元素合成为一张图片
  */
-import { blobManager } from "../blobManager";
+// import { blobManager } from "../blobManager";
 
 export interface CompositeElement {
   src: string;

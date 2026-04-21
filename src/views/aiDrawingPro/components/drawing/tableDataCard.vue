@@ -345,8 +345,8 @@ const handleDownloadTemplate = () => {
       <el-space>
         <el-button
           color="#217346"
-          @click="handleDownloadTemplate"
           :disabled="editingRowIndex !== null || loading"
+          @click="handleDownloadTemplate"
         >
           <template #icon>
             <IconifyIconOffline :icon="RiFileDownloadLine" />
@@ -355,8 +355,8 @@ const handleDownloadTemplate = () => {
         </el-button>
         <el-button
           type="primary"
-          @click="handleUploadExcel"
           :disabled="editingRowIndex !== null || loading"
+          @click="handleUploadExcel"
         >
           <template #icon>
             <IconifyIconOffline :icon="RiFileUploadLine" />
@@ -365,8 +365,8 @@ const handleDownloadTemplate = () => {
         </el-button>
         <el-button
           type="primary"
-          @click="handleAddRow"
           :disabled="editingRowIndex !== null || loading"
+          @click="handleAddRow"
         >
           <template #icon> <IconifyIconOffline :icon="RiAddLine" /> </template>
           添加数据
@@ -375,12 +375,12 @@ const handleDownloadTemplate = () => {
     </div>
 
     <el-table
+      v-loading="loadingTableData"
       :data="tableData"
       style="width: 100%"
       border
       size="small"
       empty-text="点击右上方按钮 添加数据"
-      @selection-change="props.handleSelectionChange"
       :header-cell-style="{
         background: '#f5f7fa',
         color: '#0a0a0a',
@@ -389,8 +389,8 @@ const handleDownloadTemplate = () => {
       }"
       row-key="uiid"
       height="700"
-      v-loading="loadingTableData"
       element-loading-text="数据加载中..."
+      @selection-change="props.handleSelectionChange"
     >
       <el-table-column
         type="selection"
@@ -986,13 +986,13 @@ const handleDownloadTemplate = () => {
         width="150"
         fixed="right"
       >
-        <template #default="{ row, $index }">
+        <template #default="{ row }">
           <div
-            class="flex items-center"
             v-if="
               (loading && props.selectedIds.includes(row.uiid)) ||
               row.status === 0
             "
+            class="flex items-center"
           >
             <div class="w-[24px] h-[24px]">
               <LoadingIcon />
@@ -1022,20 +1022,20 @@ const handleDownloadTemplate = () => {
                   >
                     <el-button
                       text
-                      @click="props.handleGoodsClick(row, index)"
                       size="small"
+                      @click="props.handleGoodsClick(row, index)"
                     >
                       <GoodIcon
-                        class="w-[16px] h-[16px]"
-                        color="#ccc"
                         v-show="
                           !row.betterTemplateImage[`${row.uiid}_${index}`]
                         "
+                        class="w-[16px] h-[16px]"
+                        color="#ccc"
                       />
                       <GoodIcon
+                        v-show="row.betterTemplateImage[`${row.uiid}_${index}`]"
                         class="w-[16px] h-[16px]"
                         color="green"
-                        v-show="row.betterTemplateImage[`${row.uiid}_${index}`]"
                       />
                     </el-button>
                   </el-tooltip>
@@ -1049,8 +1049,8 @@ const handleDownloadTemplate = () => {
                   >
                     <el-button
                       text
-                      @click="handleEditImage(row, index)"
                       size="small"
+                      @click="handleEditImage(row, index)"
                     >
                       <EditIcon class="w-[16px] h-[16px]" color="#000" />
                     </el-button>
@@ -1068,41 +1068,37 @@ const handleDownloadTemplate = () => {
           <template v-if="editingRowIndex === $index">
             <el-button
               type="primary"
-              @click="handleSaveRow($index)"
               text
               :icon="Check"
-            >
-            </el-button>
-            <div class="h-[8px]"></div>
+              @click="handleSaveRow($index)"
+            />
+            <div class="h-[8px]" />
             <el-button
               type="danger"
-              @click="handleCancelEdit"
               text
               :icon="Close"
-            >
-            </el-button>
+              @click="handleCancelEdit"
+            />
           </template>
           <template v-else>
             <el-button
               type="primary"
-              @click="handleEditRow($index)"
               :disabled="
                 editingRowIndex !== null || loading || row.status === 0
               "
               text
               :icon="Edit"
-            >
-            </el-button>
-            <div class="h-[8px]"></div>
+              @click="handleEditRow($index)"
+            />
+            <div class="h-[8px]" />
             <el-button
               v-if="!row.uuid"
               type="danger"
-              @click="handleDeleteRow($index)"
               :disabled="editingRowIndex !== null || loading"
               text
               :icon="Delete"
-            >
-            </el-button>
+              @click="handleDeleteRow($index)"
+            />
           </template>
         </template>
       </el-table-column>
