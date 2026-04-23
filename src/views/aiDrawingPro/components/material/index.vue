@@ -18,7 +18,7 @@ import { type ClickRateTrendItem } from "../../type/material";
 const initCreativeStudio = inject<Function>("initCreativeStudio");
 const initDrawingPro = inject<Function>("initDrawingPro");
 
-const radio = ref(null);
+const radio = ref("");
 const materialList = ref({});
 const cardData = ref([]);
 const detailFormRef = ref(null);

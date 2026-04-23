@@ -8,7 +8,7 @@ import {
   UploadProps,
   UploadRawFile
 } from "element-plus";
-import { nextTick, reactive, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import {
   updateMaterial,
   transferGemini,
@@ -17,9 +17,10 @@ import {
 } from "@/api/aiDraw";
 import { Pointer } from "@element-plus/icons-vue";
 import { generateID } from "../../utils/general/index";
-import { el } from "element-plus/es/locale/index.mjs";
-// import imageUrl1 from "@/views/debug/assets/绘图1.png";
-// import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
+import { imageCache } from "../../utils/imageCache";
+
+import imageUrl1 from "@/views/debug/assets/绘图1.png";
+import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 
 const props = defineProps({
   fetchMaterialPage: {
@@ -55,6 +56,12 @@ const ruleForm = reactive({
 // 解析后的编辑词数组（用于可视化模式）
 const editPhraseList = ref<any[]>([]);
 
+// 模板图
+const templateImageBlob = ref<Blob | null>(null);
+const templateImageUrl = ref<string>("");
+// 测试图的显示尺寸（固定为400px）
+const TEST_IMAGE_SIZE = 400;
+
 const rules = reactive<FormRules>({
   image: [{ required: true, message: "请上传模板标记图", trigger: "change" }]
 });
@@ -65,6 +72,12 @@ const initDetailForm = (data: any) => {
   geminiLoading.value = false;
   ruleForm.image = null;
   editPhraseList.value = [];
+
+  // 清理之前的 URL
+  if (templateImageUrl.value) {
+    URL.revokeObjectURL(templateImageUrl.value);
+    templateImageUrl.value = "";
+  }
 
   nextTick(() => {
     uploadRef.value?.clearFiles();
@@ -107,8 +120,56 @@ const initDetailForm = (data: any) => {
           });
       }
     }
+
+    // 处理模板图（materialData.value.objectName）的缓存加载
+    if (editPhraseInfo && materialData.value.objectName) {
+      const objectName = materialData.value.objectName;
+
+      imageCache
+        .getImageBlob(objectName, "originalBlob")
+        .then(blob => {
+          if (blob) {
+            console.log("从缓存加载模板图:", objectName);
+            templateImageBlob.value = blob;
+            templateImageUrl.value = URL.createObjectURL(blob);
+          } else {
+            console.log("缓存未命中，从服务器下载模板图:", objectName);
+            loadAndCacheTemplateImage(objectName);
+          }
+        })
+        .catch(error => {
+          console.error("检查缓存失败，重新下载:", error);
+          loadAndCacheTemplateImage(objectName);
+        });
+    }
   });
 };
+
+const loadAndCacheTemplateImage = (objectName: string) => {
+  downloadFile({ objectName })
+    .then(async (res: any) => {
+      await imageCache.storeImage(objectName, res, res);
+      templateImageBlob.value = res;
+      // 清理旧的 URL
+      if (templateImageUrl.value) {
+        URL.revokeObjectURL(templateImageUrl.value);
+      }
+      templateImageUrl.value = URL.createObjectURL(res);
+      console.log("模板图已下载并缓存");
+    })
+    .catch(error => {
+      console.error("加载模板图失败:", error);
+      ElMessage.error("加载模板图失败");
+    });
+};
+
+// 组件卸载时清理
+onBeforeUnmount(() => {
+  if (templateImageUrl.value) {
+    URL.revokeObjectURL(templateImageUrl.value);
+    templateImageUrl.value = "";
+  }
+});
 
 defineExpose({ initDetailForm });
 
@@ -381,6 +442,13 @@ watch(
     }
   }
 );
+
+const handleQuickGeneratePrompt = (type: string) => {
+  if (type === "type1") {
+    ruleForm.editPhraseInfoPrompt =
+      "商品图和赠品图（模板中间区域的图片）必须删除，留白要和底图和谐，活动标题_文案字少就变大";
+  }
+};
 </script>
 
 <template>
@@ -417,7 +485,7 @@ watch(
             </template>
 
             <template #tip>
-              <div class="el-upload__tip">
+              <div class="el-upload__tip !text-red-500">
                 限制上传1张图片，新图片会覆盖旧图片，大小不超过50MB
               </div>
             </template>
@@ -440,7 +508,7 @@ watch(
             编辑词不需要手动输入，点击AI自动生成即可，若不满意可重复生成
           </p>
           <p class="text-xs text-red-500 mt-2">
-            *编辑词更改后需要重新导出配置表
+            *编辑词更改后需要重新生成配置表
           </p>
 
           <div class="mt-3 w-full">
@@ -518,6 +586,17 @@ watch(
                     item.rect.width
                   }}, 高={{ item.rect.height }}
                 </div>
+                <div
+                  v-if="item.rect"
+                  class="mt-2 border border-gray-300"
+                  :style="{
+                    width: `${item.rect.width * TEST_IMAGE_SIZE}px`,
+                    height: `${item.rect.height * TEST_IMAGE_SIZE}px`,
+                    backgroundImage: `url(${templateImageUrl})`,
+                    backgroundSize: `${TEST_IMAGE_SIZE}px ${TEST_IMAGE_SIZE}px`,
+                    backgroundPosition: `-${item.rect.x * TEST_IMAGE_SIZE}px -${item.rect.y * TEST_IMAGE_SIZE}px`
+                  }"
+                />
               </div>
 
               <div
@@ -543,11 +622,21 @@ watch(
           <p class="text-xs text-gray-500">
             该模板全局通用的第一优先级提示词，批量生成时自动带入，不需要手动输入
           </p>
+          <!-- 快捷生成 按钮 -->
+          <div class="w-full mt-2">
+            <p class="text-xs text-gray-500 mb-2">
+              点击下方按钮可快速填入默认提示词模板，也可根据需要自行修改
+            </p>
+            <el-button size="small" @click="handleQuickGeneratePrompt('type1')">
+              使用默认提示词
+            </el-button>
+          </div>
           <el-input
             v-model="ruleForm.editPhraseInfoPrompt"
             class="mt-3"
             type="textarea"
             :rows="4"
+            placeholder="请输入第一优先级提示词，或点击“使用默认提示词”快速填充"
           />
         </el-form-item>
 

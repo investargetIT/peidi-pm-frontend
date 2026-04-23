@@ -111,11 +111,22 @@ onUnmounted(() => {
       <el-tab-pane label="素材库" name="Material" lazy>
         <Material ref="materialTabRef" />
       </el-tab-pane>
-      <el-tab-pane label="模板编辑器" name="DrawingPro">
-        <DrawingPro ref="drawingProTabRef" />
-      </el-tab-pane>
       <el-tab-pane label="创意工作室" name="Creative" lazy>
         <Creative ref="creativeTabRef" />
+      </el-tab-pane>
+      <el-tab-pane label="模板编辑器" name="DrawingPro" disabled>
+        <template #label>
+          <span>
+            <el-tooltip
+              effect="dark"
+              content="请从素材库-模板-模板编辑 进入"
+              placement="bottom-start"
+            >
+              <span>模板编辑器</span>
+            </el-tooltip>
+          </span>
+        </template>
+        <DrawingPro ref="drawingProTabRef" />
       </el-tab-pane>
     </el-tabs>
 

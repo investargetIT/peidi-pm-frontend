@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from "vue";
+import { ref, watch, onMounted, onUnmounted, computed, h } from "vue";
 import { Picture } from "@element-plus/icons-vue";
 import { getNameFromObjectName } from "../../utils/general";
 import { imageCache } from "../../utils/imageCache";
@@ -9,6 +9,7 @@ import { downloadFile } from "@/api/aiDraw";
 interface MaterialItem {
   id: string;
   objectName: string;
+  type?: string;
   [key: string]: any;
 }
 
@@ -17,6 +18,7 @@ interface Props {
   materialList?: MaterialItem[];
   placeholder?: string;
   cacheKey?: string;
+  disabled?: boolean;
 }
 
 interface Emits {
@@ -36,6 +38,75 @@ const emit = defineEmits<Emits>();
 const selectedValue = ref<string>(props.modelValue);
 const thumbnailUrls = ref<Record<string, string>>({});
 const loadingThumbnails = ref<Set<string>>(new Set());
+
+interface TreeNode {
+  value: string;
+  label: string;
+  children?: TreeNode[];
+  data?: MaterialItem;
+  isLeaf?: boolean;
+}
+
+const materialTree = computed<TreeNode[]>(() => {
+  const folderMap = new Map<string, TreeNode>();
+
+  props.materialList.forEach(item => {
+    let folderPath = "";
+
+    if (item.type) {
+      try {
+        const typeObj = JSON.parse(item.type);
+        folderPath = typeObj.folder || "";
+      } catch (e) {
+        console.warn("解析type字段失败:", item.type);
+      }
+    }
+
+    const folders = folderPath ? folderPath.split("/").filter(f => f) : [];
+    const rootFolder = folders.length > 0 ? folders[0] : "默认文件夹";
+
+    if (!folderMap.has(rootFolder)) {
+      folderMap.set(rootFolder, {
+        value: `folder_${rootFolder}`,
+        label: rootFolder,
+        children: []
+      });
+    }
+
+    const leafNode: TreeNode = {
+      value: item.objectName,
+      label: getNameFromObjectName(item.objectName),
+      data: item,
+      isLeaf: true
+    };
+
+    folderMap.get(rootFolder)!.children!.push(leafNode);
+  });
+
+  return Array.from(folderMap.values());
+});
+
+const renderContent = (h, { node, data }) => {
+  if (data.isLeaf && data.data?.objectName) {
+    const objectName = data.data.objectName;
+    const thumbnailUrl = thumbnailUrls.value[objectName];
+
+    return h("div", { class: "material-option" }, [
+      h("span", { class: "material-name" }, data.label),
+      thumbnailUrl
+        ? h("img", {
+            src: thumbnailUrl,
+            class: "material-thumbnail",
+            loading: "lazy"
+          })
+        : h("div", { class: "material-thumbnail-placeholder" }, [
+            h("el-icon", {}, [h(Picture)])
+          ])
+    ]);
+  }
+
+  return h("span", { class: "tree-folder-label" }, data.label);
+};
 
 watch(
   () => props.modelValue,
@@ -158,51 +229,34 @@ onMounted(() => {
   });
 });
 
-onUnmounted(() => {
-  Object.keys(thumbnailUrls.value).forEach(key => {
-    const url = thumbnailUrls.value[key];
-    if (url) {
-      URL.revokeObjectURL(url);
-    }
-  });
-});
+// onUnmounted(() => {
+//   Object.keys(thumbnailUrls.value).forEach(key => {
+//     const url = thumbnailUrls.value[key];
+//     if (url) {
+//       URL.revokeObjectURL(url);
+//     }
+//   });
+// });
 </script>
 
 <template>
   <div class="material-selector">
-    <el-select
+    <el-tree-select
       v-model="selectedValue"
+      :data="materialTree"
+      :render-content="renderContent"
       :placeholder="placeholder"
       filterable
       class="w-full"
+      :disabled="disabled"
+      value-key="value"
+      popper-class="material-selector-popper"
       @change="handleSelectChange"
-    >
-      <el-option
-        v-for="matItem in materialList"
-        :key="matItem.id"
-        :label="getNameFromObjectName(matItem.objectName)"
-        :value="matItem.objectName"
-      >
-        <div class="material-option">
-          <span class="material-name">{{
-            getNameFromObjectName(matItem.objectName)
-          }}</span>
-          <img
-            v-if="thumbnailUrls[matItem.objectName]"
-            :src="thumbnailUrls[matItem.objectName]"
-            class="material-thumbnail"
-            loading="lazy"
-          />
-          <div v-else class="material-thumbnail-placeholder">
-            <el-icon><Picture /></el-icon>
-          </div>
-        </div>
-      </el-option>
-    </el-select>
+    />
   </div>
 </template>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .material-selector {
   width: 100%;
 }
@@ -212,6 +266,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
 .material-name {
@@ -221,10 +276,14 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+.tree-folder-label {
+  font-weight: 500;
+}
+
 .material-thumbnail {
   width: 60px;
   height: 60px;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 4px;
   border: 1px solid #e4e7ed;
   flex-shrink: 0;
@@ -244,20 +303,18 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-:deep(.el-select-dropdown__item) {
-  padding: 8px 12px;
-  height: 50px !important;
-  line-height: 50px !important;
-}
+.material-selector-popper {
+  max-height: 400px;
+  overflow-y: auto;
 
-:deep(.el-select-dropdown__item.selected) {
-  font-weight: normal;
-}
-</style>
+  .el-tree-node__content {
+    height: auto !important;
+    padding: 8px 0;
+  }
 
-<style>
-.el-select-dropdown__item {
-  height: auto;
-  line-height: auto;
+  .el-select-dropdown__item {
+    height: auto;
+    line-height: auto;
+  }
 }
 </style>

@@ -253,7 +253,7 @@ defineExpose({
             </template>
 
             <template #tip>
-              <div class="el-upload__tip">
+              <div class="el-upload__tip !text-red-500">
                 限制上传1张图片，新图片会覆盖旧图片，大小不超过50MB
               </div>
             </template>

@@ -5,7 +5,12 @@ import {
   exportConfigToExcel,
   importConfigFromExcel
 } from "./utils/exportConfigExcel";
-import { transferDraw, transferDrawAliyun } from "@/api/aiDraw";
+import { AI_MODEL_OPTIONS } from "./utils/config";
+import {
+  transferDraw,
+  transferDrawAliyun,
+  transferDrawQnaigc
+} from "@/api/aiDraw";
 import imageUrl1 from "@/views/debug/assets/绘图1.png";
 import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 import { blobManager } from "../../utils/blobManager";
@@ -23,13 +28,6 @@ import {
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
-const AI_MODEL_OPTIONS = [
-  { label: "阿里 wan2.7-image", value: "wan2.7-image" },
-  { label: "阿里 wan2.7-image-pro", value: "wan2.7-image-pro" },
-  { label: "谷歌 nano-banana-2", value: "nano-banana-2" },
-  { label: "谷歌 nano-banana-pro", value: "nano-banana-pro" },
-  { label: "谷歌 nano-banana-fast", value: "nano-banana-fast" }
-];
 const aiModel = ref("wan2.7-image");
 
 const props = defineProps({
@@ -72,7 +70,7 @@ const tableColumns = computed(() => {
     prop: string;
     label: string;
     width?: number;
-    type?: "text" | "image" | "aiRef" | "keepRef" | "remark";
+    type?: "text" | "image" | "aiRef" | "eraseRef" | "remark";
   }> = [];
 
   let index = 0;
@@ -93,17 +91,17 @@ const tableColumns = computed(() => {
         width: 200,
         type: "image"
       });
+      // columns.push({
+      //   prop: `${item.id}_aiRef`,
+      //   label: `AI 引用`,
+      //   width: 100,
+      //   type: "aiRef"
+      // });
       columns.push({
-        prop: `${item.id}_aiRef`,
-        label: `AI 引用`,
+        prop: `${item.id}_eraseRef`,
+        label: `是否抹除`,
         width: 100,
-        type: "aiRef"
-      });
-      columns.push({
-        prop: `${item.id}_keepRef`,
-        label: `是否保留`,
-        width: 100,
-        type: "keepRef"
+        type: "eraseRef"
       });
     } else if (item.type === "group" && item.content) {
       item.content.forEach(field => {
@@ -126,6 +124,13 @@ const tableColumns = computed(() => {
   });
 
   return columns;
+});
+
+// 判断是否至少有一个结果
+const hasAnyResult = computed(() => {
+  return Object.keys(generatedResults.value).some(
+    id => generatedResults.value[Number(id)]?.length > 0
+  );
 });
 
 const exportConfig = () => {
@@ -173,7 +178,7 @@ const parseExcelData = (jsonData: any[]) => {
         } else if (item.type === "image") {
           const imageKey = `${item.id}_image`;
           const aiRefKey = `${item.id}_aiRef`;
-          const keepRefKey = `${item.id}_keepRef`;
+          const eraseRefKey = `${item.id}_eraseRef`;
 
           const imageName = row[item.name];
           // console.log("数据解析函数", imageName, props.materialList);
@@ -200,9 +205,9 @@ const parseExcelData = (jsonData: any[]) => {
             row[`${item.name}-AI 引用`] === "是" ||
             row[`${item.name}-AI 引用`] === true ||
             false;
-          parsedRow[keepRefKey] =
-            row[`${item.name}-是否保留`] === "是" ||
-            row[`${item.name}-是否保留`] === true ||
+          parsedRow[eraseRefKey] =
+            row[`${item.name}-是否抹除`] === "是" ||
+            row[`${item.name}-是否抹除`] === true ||
             false;
         } else if (item.type === "group" && item.content) {
           item.content.forEach(field => {
@@ -316,10 +321,10 @@ const importConfig = () => {
               // generatedResults.value[importedDataList.value[0]._id] = [testB4];
 
               // 为每条数据初始化生成结果
-              // const testB4 = await imageToBase64(imageUrl1);
-              // dataWithId.forEach(item => {
-              //   generatedResults.value[item._id] = [testB4];
-              // });
+              const testB4 = await imageToBase64(imageUrl1);
+              dataWithId.forEach(item => {
+                generatedResults.value[item._id] = [testB4];
+              });
 
               console.log("导入数据:", importedDataList.value);
 
@@ -431,7 +436,12 @@ const renderCell = (row: Record<string, any>, column: any) => {
   }
 
   // 是否保留列显示开关状态
-  if (prop.endsWith("_keepRef")) {
+  // if (prop.endsWith("_keepRef")) {
+  //   return value ? "是" : "否";
+  // }
+
+  // 是否抹除列显示开关状态
+  if (prop.endsWith("_eraseRef")) {
     return value ? "是" : "否";
   }
 
@@ -550,7 +560,7 @@ const buildPrompt = (rowData: Record<string, any>) => {
       // return { ...baseItem };
       const imageData = rowData[`${item.id}_image`];
       const aiRef = rowData[`${item.id}_aiRef`];
-      const keepRef = rowData[`${item.id}_keepRef`];
+      const eraseRef = rowData[`${item.id}_eraseRef`];
 
       if (aiRef && imageData) {
         imageCount++;
@@ -559,7 +569,7 @@ const buildPrompt = (rowData: Record<string, any>) => {
           image: `第 ${imageCount + 1} 张图`
         };
       }
-      if (!imageData && keepRef) {
+      if (!imageData && !eraseRef) {
         return {
           ...baseItem,
           image: null,
@@ -732,49 +742,88 @@ const generateSingleImage = async (
         throw new Error(response?.msg || "生成失败");
       }
     } else {
+      // 切换接口为 qnaigc模型
+      const processedImageList = [base64Url1_, ...base64MaterialUrls].map(
+        url => {
+          return url.replace(
+            "data:application/json;base64,",
+            "data:image/png;base64,"
+          );
+        }
+      );
+
       params = {
         model: aiModel.value,
         prompt: buildPrompt(row),
-        aspectRatio: "auto",
-        imageSize: "4K",
-        shutProgress: false,
-        urls: [base64Url1_, ...base64MaterialUrls]
-        // urls: [base64Url1_]
+        image: processedImageList
       };
-      console.log("params:", params);
-      // return;
-      response = await transferDraw({
+      console.log("通用模型请求参数：", params);
+
+      response = await transferDrawQnaigc({
         urlParam: JSON.stringify(params)
       });
-      console.log("response:", response);
-      if (response.code === 200 && response.data?.[0]) {
-        // 将结果图片转为 base64
-        const resultImg = new Image();
-        resultImg.crossOrigin = "anonymous";
+      console.log("通用模型响应：", response);
 
-        return new Promise<string>((resolve, reject) => {
-          resultImg.onload = () => {
-            const canvas = document.createElement("canvas");
-            canvas.width = resultImg.width;
-            canvas.height = resultImg.height;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) {
-              reject(new Error("无法获取 canvas 上下文"));
-              return;
-            }
-            ctx.drawImage(resultImg, 0, 0);
-            const base64 = canvas.toDataURL("image/png");
-            resolve(base64);
-          };
-          resultImg.onerror = () => {
-            reject(new Error("结果图片加载失败"));
-          };
-          resultImg.src = response.data[0];
-        });
+      if (response.code === 200 && response.data) {
+        const dataArray =
+          typeof response.data === "string"
+            ? JSON.parse(response.data)
+            : response.data;
+
+        if (dataArray?.[0]?.b64_json) {
+          const resultBase64 = "data:image/png;base64," + dataArray[0].b64_json;
+          return resultBase64;
+        } else {
+          throw new Error("生成失败: 未获取到图片数据");
+        }
       } else {
         throw new Error(response?.msg || "生成失败");
       }
     }
+    // {
+    //   params = {
+    //     model: aiModel.value,
+    //     prompt: buildPrompt(row),
+    //     aspectRatio: "auto",
+    //     imageSize: "4K",
+    //     shutProgress: false,
+    //     urls: [base64Url1_, ...base64MaterialUrls]
+    //     // urls: [base64Url1_]
+    //   };
+    //   console.log("params:", params);
+    //   // return;
+    //   response = await transferDraw({
+    //     urlParam: JSON.stringify(params)
+    //   });
+    //   console.log("response:", response);
+    //   if (response.code === 200 && response.data?.[0]) {
+    //     // 将结果图片转为 base64
+    //     const resultImg = new Image();
+    //     resultImg.crossOrigin = "anonymous";
+
+    //     return new Promise<string>((resolve, reject) => {
+    //       resultImg.onload = () => {
+    //         const canvas = document.createElement("canvas");
+    //         canvas.width = resultImg.width;
+    //         canvas.height = resultImg.height;
+    //         const ctx = canvas.getContext("2d");
+    //         if (!ctx) {
+    //           reject(new Error("无法获取 canvas 上下文"));
+    //           return;
+    //         }
+    //         ctx.drawImage(resultImg, 0, 0);
+    //         const base64 = canvas.toDataURL("image/png");
+    //         resolve(base64);
+    //       };
+    //       resultImg.onerror = () => {
+    //         reject(new Error("结果图片加载失败"));
+    //       };
+    //       resultImg.src = response.data[0];
+    //     });
+    //   } else {
+    //     throw new Error(response?.msg || "生成失败");
+    //   }
+    // }
     //#endregion
   } catch (error: any) {
     console.error("生成图片失败:", error);
@@ -1039,6 +1088,32 @@ const generateCompositeFromRowData = async (
     console.log(`\n最终加载的元素数量：${elements.length}`);
     console.log("元素列表:", elements);
 
+    const hasGiftElement = loadImageTasks.some(
+      task => task.config.name === "赠品"
+    );
+
+    if (!hasGiftElement) {
+      const productImageTask = loadImageTasks.find(
+        task => task.config.name === "商品图"
+      );
+
+      if (productImageTask) {
+        const productElementIndex = elements.findIndex(
+          (_, index) => loadImageTasks[index].config.name === "商品图"
+        );
+
+        if (productElementIndex !== -1) {
+          const containerWidth = 700;
+          const productElement = elements[productElementIndex];
+          productElement.x = (containerWidth - productElement.width) / 2;
+
+          console.log(
+            `✓ 赠品不存在，商品图已居中，新X坐标: ${productElement.x.toFixed(2)}`
+          );
+        }
+      }
+    }
+
     console.log("开始 Canvas 合成...");
     const compositeBase64 = await compositeImage(imageUrl, elements, size);
     console.log("✓ Canvas 合成成功");
@@ -1206,7 +1281,7 @@ defineExpose({
                   :icon="Download"
                   @click="exportConfig"
                 >
-                  导出配置表
+                  生成配置表
                 </el-button>
                 <el-button
                   color="#427AED"
@@ -1225,7 +1300,7 @@ defineExpose({
         <div class="text-base font-bold text-gray-800">
           配置表
           <span class="text-sm text-gray-500 font-normal">
-            (点击右侧导出配置表，支持多次导入配置表)
+            (点击右侧生成配置表，支持多次导入配置表)
           </span>
         </div>
         <div class="flex items-center">
@@ -1233,7 +1308,7 @@ defineExpose({
             color="#CC6600"
             type="primary"
             size="small"
-            :disabled="importedDataList.length === 0 || batchGenerating"
+            :disabled="!hasAnyResult || batchGenerating"
             @click="exportAllResults"
           >
             📥 导出全部结果图
@@ -1339,7 +1414,6 @@ defineExpose({
             :key="col.prop"
             :prop="col.prop"
             :label="col.label"
-            :width="col.width"
             align="center"
           >
             <template #default="{ row }">

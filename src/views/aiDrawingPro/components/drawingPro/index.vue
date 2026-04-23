@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { IMG_CONFIG } from "./utils/config";
+import { IMG_CONFIG, AI_MODEL_OPTIONS } from "./utils/config";
 import imageUrl1 from "@/views/debug/assets/绘图1.png";
 import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 import { ElMessage } from "element-plus";
-import { downloadFile, getMaterialPage, transferDraw } from "@/api/aiDraw";
+import {
+  downloadFile,
+  getMaterialPage,
+  transferDraw,
+  transferDrawAliyun,
+  transferDrawQnaigc
+} from "@/api/aiDraw";
 import { imageCache } from "../../utils/imageCache";
 import { blobManager } from "../../utils/blobManager";
 import ResultImg from "./resultImg.vue";
@@ -12,6 +18,8 @@ import TableCard from "./tableCard.vue";
 import { getNameFromObjectName } from "../../utils/general";
 import MaterialSelectorWithThumb from "./materialSelectorWithThumb.vue";
 import { FORMAT_PROMPT } from "./utils/prompt";
+
+const aiModel = ref("wan2.7-image");
 
 const resultImgRef = ref(null);
 
@@ -57,6 +65,13 @@ const aiReferenceStatus = ref<Record<string, boolean>>({});
  * value: 是否填充状态
  */
 const isKeepStatus = ref<Record<string, boolean>>({});
+
+/**
+ * 是否抹除状态存储
+ * key: 元素 ID
+ * value: 是否抹除状态
+ */
+const isEraseStatus = ref<Record<string, boolean>>({});
 
 /**
  * 临时图片数据存储（预览用，未确认）
@@ -107,7 +122,8 @@ const initFormData = () => {
       formData.value[item.id] = null;
       tempImageData.value[item.id] = "";
       aiReferenceStatus.value[item.id] = false;
-      isKeepStatus.value[item.id] = false;
+      // isKeepStatus.value[item.id] = false;
+      isEraseStatus.value[item.id] = true;
       imageSelectMode.value[item.id] = "upload";
       tempMaterialSelect.value[item.id] = "";
     }
@@ -227,7 +243,8 @@ const handleDeleteImage = (itemId: string) => {
   formData.value[itemId] = null;
   tempMaterialSelect.value[itemId] = "";
   aiReferenceStatus.value[itemId] = false;
-  isKeepStatus.value[itemId] = false;
+  // isKeepStatus.value[itemId] = false;
+  isEraseStatus.value[itemId] = true;
   // ElMessage.success("图片已删除");
 };
 
@@ -261,7 +278,8 @@ const handleGenerateImage = () => {
     prompt.value,
     formData.value,
     aiReferenceStatus.value,
-    isKeepStatus.value
+    // isKeepStatus.value
+    isEraseStatus.value
   );
 
   // return;
@@ -294,7 +312,11 @@ const handleGenerateImage = () => {
           image: `第${urls_.length + 1}张图`
         };
       }
-      if (!formData.value[item.id] && isKeepStatus.value[item.id]) {
+      if (
+        !formData.value[item.id] &&
+        // isKeepStatus.value[item.id]
+        !isEraseStatus.value[item.id]
+      ) {
         return {
           ...baseItem,
           image: null,
@@ -374,16 +396,16 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
   // 转换blob为base64
   const base64Url1_ = await blobManager.blobToBase64(fileList.value[0].raw);
 
-  const params = {
-    model: "nano-banana-2",
-    prompt: prompt,
-    aspectRatio: "auto",
-    imageSize: "4K",
-    shutProgress: false,
-    urls: [base64Url1_, ...urlList]
-  };
+  // const params = {
+  //   model: "nano-banana-2",
+  //   prompt: prompt,
+  //   aspectRatio: "auto",
+  //   imageSize: "4K",
+  //   shutProgress: false,
+  //   urls: [base64Url1_, ...urlList]
+  // };
 
-  console.log("请求参数：", params);
+  // console.log("请求参数：", params);
   // await loadTestResultImage();
   // return;
   loading.value = true;
@@ -399,21 +421,141 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
     timerInterval.value += 1;
   }, 1000);
 
-  transferDraw({
-    urlParam: JSON.stringify(params)
-  })
-    .then(async (res: any) => {
-      console.log("中转gemini模型:", res);
-      if (res.code === 200) {
-        if (!res.data?.[0]) {
-          ElMessage.error("生成失败: 图片URL为空");
-          return;
+  // transferDraw({
+  //   urlParam: JSON.stringify(params)
+  // })
+  //   .then(async (res: any) => {
+  //     console.log("中转gemini模型:", res);
+  //     if (res.code === 200) {
+  //       if (!res.data?.[0]) {
+  //         ElMessage.error("生成失败: 图片URL为空");
+  //         return;
+  //       }
+
+  //       const resultUrl = res.data?.[0]; // 绝对路径
+
+  //       try {
+  //         const base64String = await imageToBase64(resultUrl);
+
+  //         const processedFormData = { ...formData.value };
+  //         Object.keys(aiReferenceStatus.value).forEach(key => {
+  //           if (aiReferenceStatus.value[key]) {
+  //             processedFormData[key] = null;
+  //           }
+  //         });
+
+  //         resultImgRef.value?.initResultImg(
+  //           imageConfig.value,
+  //           processedFormData,
+  //           base64String, // 使用 base64 而不是绝对路径
+  //           aiReferenceStatus.value
+  //         );
+  //       } catch (error) {
+  //         console.error("图片转 base64 失败:", error);
+  //         ElMessage.error("图片处理失败:" + error.message);
+  //       }
+  //     } else {
+  //       errorMsg.value = res?.msg || "生成失败";
+  //     }
+  //   })
+  //   .finally(() => {
+  //     loading.value = false;
+  //     if (timerId) {
+  //       clearInterval(timerId);
+  //       timerId = null;
+  //     }
+  //   });
+
+  try {
+    let params = {};
+    let response = null;
+
+    if (
+      aiModel.value === "wan2.7-image" ||
+      aiModel.value === "wan2.7-image-pro"
+    ) {
+      params = {
+        model: aiModel.value,
+        input: {
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  text: prompt
+                },
+                {
+                  image: base64Url1_
+                },
+                ...urlList.map(url => ({ image: url }))
+              ]
+            }
+          ]
+        },
+        parameters: {
+          size: "2K",
+          n: 1,
+          watermark: false,
+          thinking_mode: true
         }
+      };
 
-        const resultUrl = res.data?.[0]; // 绝对路径
+      console.log("阿里云模型请求参数：", params);
 
-        try {
-          const base64String = await imageToBase64(resultUrl);
+      response = await transferDrawAliyun({
+        urlParam: JSON.stringify(params)
+      });
+
+      console.log("阿里云模型响应：", response);
+
+      if (response.code === 200 && response.data) {
+        const resultUrl = response.data;
+
+        const processedFormData = { ...formData.value };
+        Object.keys(aiReferenceStatus.value).forEach(key => {
+          if (aiReferenceStatus.value[key]) {
+            processedFormData[key] = null;
+          }
+        });
+
+        resultImgRef.value?.initResultImg(
+          imageConfig.value,
+          processedFormData,
+          resultUrl,
+          aiReferenceStatus.value
+        );
+      } else {
+        throw new Error(response?.msg || "生成失败");
+      }
+    } else {
+      // 切换 接口为 qnaigc模型
+      const processedImageList = [base64Url1_, ...urlList].map(url => {
+        return url.replace(
+          "data:application/json;base64,",
+          "data:image/png;base64,"
+        );
+      });
+
+      params = {
+        model: aiModel.value,
+        prompt: prompt,
+        image: processedImageList
+      };
+      console.log("通用模型请求参数：", params);
+
+      response = await transferDrawQnaigc({
+        urlParam: JSON.stringify(params)
+      });
+      console.log("通用模型响应：", response);
+
+      if (response.code === 200 && response.data) {
+        const dataArray =
+          typeof response.data === "string"
+            ? JSON.parse(response.data)
+            : response.data;
+
+        if (dataArray?.[0]?.b64_json) {
+          const resultUrl = "data:image/png;base64," + dataArray[0].b64_json;
 
           const processedFormData = { ...formData.value };
           Object.keys(aiReferenceStatus.value).forEach(key => {
@@ -425,24 +567,65 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
           resultImgRef.value?.initResultImg(
             imageConfig.value,
             processedFormData,
-            base64String, // 使用 base64 而不是绝对路径
+            resultUrl,
             aiReferenceStatus.value
           );
-        } catch (error) {
-          console.error("图片转 base64 失败:", error);
-          ElMessage.error("图片处理失败:" + error.message);
+        } else {
+          throw new Error("生成失败: 未获取到图片数据");
         }
       } else {
-        errorMsg.value = res?.msg || "生成失败";
+        throw new Error(response?.msg || "生成失败");
       }
-    })
-    .finally(() => {
-      loading.value = false;
-      if (timerId) {
-        clearInterval(timerId);
-        timerId = null;
-      }
-    });
+    }
+    // {
+    //   params = {
+    //     model: aiModel.value,
+    //     prompt: prompt,
+    //     aspectRatio: "auto",
+    //     imageSize: "4K",
+    //     shutProgress: false,
+    //     urls: [base64Url1_, ...urlList]
+    //   };
+
+    //   console.log("通用模型请求参数：", params);
+
+    //   response = await transferDraw({
+    //     urlParam: JSON.stringify(params)
+    //   });
+
+    //   console.log("通用模型响应：", response);
+
+    //   if (response.code === 200 && response.data?.[0]) {
+    //     const resultUrl = response.data[0];
+
+    //     const processedFormData = { ...formData.value };
+    //     Object.keys(aiReferenceStatus.value).forEach(key => {
+    //       if (aiReferenceStatus.value[key]) {
+    //         processedFormData[key] = null;
+    //       }
+    //     });
+
+    //     resultImgRef.value?.initResultImg(
+    //       imageConfig.value,
+    //       processedFormData,
+    //       resultUrl,
+    //       aiReferenceStatus.value
+    //     );
+    //   } else {
+    //     throw new Error(response?.msg || "生成失败");
+    //   }
+    // }
+  } catch (error: any) {
+    console.error("生成图片失败:", error);
+    errorMsg.value = error.message || "生成失败";
+    ElMessage.error(errorMsg.value);
+  } finally {
+    loading.value = false;
+    if (timerId) {
+      clearInterval(timerId);
+      timerId = null;
+    }
+  }
 };
 
 // 测试加载结果图片
@@ -554,12 +737,33 @@ defineExpose({
         >
           <template #header>
             <div class="card-header">
-              <span>
-                <span>演示模式</span>
-                <span class="text-sm text-gray-500">
-                  (实时编辑预览单张模板图，可调整模板图价格、活动时间等元素，确认效果后可批量生成)
-                </span>
-              </span>
+              <div class="flex justify-between items-center flex-wrap">
+                <div>
+                  <span>
+                    <span>演示模式</span>
+                    <span class="text-sm text-gray-500">
+                      (实时编辑预览单张模板图，可调整模板图价格、活动时间等元素，确认效果后可批量生成)
+                    </span>
+                  </span>
+                </div>
+                <div>
+                  <div>
+                    <el-select
+                      v-model="aiModel"
+                      placeholder="请选择 AI 模型"
+                      style="width: 180px; margin-right: 10px"
+                      size="small"
+                    >
+                      <el-option
+                        v-for="item in AI_MODEL_OPTIONS"
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value"
+                      />
+                    </el-select>
+                  </div>
+                </div>
+              </div>
             </div>
           </template>
           <div class="text-base font-bold text-gray-800">
@@ -664,6 +868,7 @@ defineExpose({
                             "
                             :plain="imageSelectMode[item.id] !== 'upload'"
                             class="flex-1"
+                            :disabled="!isEraseStatus[item.id]"
                             @click="imageSelectMode[item.id] = 'upload'"
                           >
                             📤 本地上传
@@ -677,6 +882,7 @@ defineExpose({
                             "
                             :plain="imageSelectMode[item.id] !== 'material'"
                             class="flex-1"
+                            :disabled="!isEraseStatus[item.id]"
                             @click="imageSelectMode[item.id] = 'material'"
                           >
                             🗂️ 素材库选择
@@ -695,9 +901,14 @@ defineExpose({
                             "
                             accept="image/*"
                             class="w-full"
+                            :disabled="!isEraseStatus[item.id]"
                           >
                             <div
                               class="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-500 transition-colors cursor-pointer hover:bg-gray-50"
+                              :class="{
+                                'opacity-50 cursor-not-allowed':
+                                  !isEraseStatus[item.id]
+                              }"
                             >
                               <div
                                 v-if="tempImageData[item.id]"
@@ -711,12 +922,14 @@ defineExpose({
                                   <el-button
                                     type="primary"
                                     size="small"
+                                    :disabled="!isEraseStatus[item.id]"
                                     @click.stop="handleConfirmUpload(item.id)"
                                     >确认</el-button
                                   >
                                   <el-button
                                     type="danger"
                                     size="small"
+                                    :disabled="!isEraseStatus[item.id]"
                                     @click.stop="handleCancelUpload(item.id)"
                                     >取消</el-button
                                   >
@@ -735,6 +948,7 @@ defineExpose({
                                     type="danger"
                                     size="small"
                                     circle
+                                    :disabled="!isEraseStatus[item.id]"
                                     @click.stop="handleDeleteImage(item.id)"
                                   >
                                     <el-icon><Delete /></el-icon>
@@ -765,6 +979,7 @@ defineExpose({
                             "
                             placeholder="请选择素材"
                             :cache-key="`material_thumb:${item.id}`"
+                            :disabled="!isEraseStatus[item.id]"
                             @change="
                               value => handleSelectFromMaterial(item.id, value)
                             "
@@ -784,6 +999,7 @@ defineExpose({
                                   type="danger"
                                   size="small"
                                   circle
+                                  :disabled="!isEraseStatus[item.id]"
                                   @click.stop="handleDeleteImage(item.id)"
                                 >
                                   <el-icon><Delete /></el-icon>
@@ -794,7 +1010,7 @@ defineExpose({
                         </div>
 
                         <div
-                          v-if="formData[item.id]"
+                          v-if="false && formData[item.id]"
                           class="text-sm text-gray-500 mt-3 flex items-center"
                         >
                           <span>AI 引用</span>
@@ -813,13 +1029,13 @@ defineExpose({
                         </div>
 
                         <div
-                          v-else
+                          v-if="!formData[item.id]"
                           class="text-sm text-gray-500 mt-3 flex items-center"
                         >
-                          <span>是否保留</span>
+                          <span>是否抹除</span>
                           <el-tooltip
                             effect="dark"
-                            content="开启后会自动保留图片，不被 AI 擦除"
+                            content="开启后该区域会被 AI 抹除并重新生成"
                             placement="top-start"
                             :show-after="250"
                           >
@@ -828,7 +1044,7 @@ defineExpose({
                             /></el-icon>
                           </el-tooltip>
 
-                          <el-switch v-model="isKeepStatus[item.id]" />
+                          <el-switch v-model="isEraseStatus[item.id]" />
                         </div>
                       </div>
 

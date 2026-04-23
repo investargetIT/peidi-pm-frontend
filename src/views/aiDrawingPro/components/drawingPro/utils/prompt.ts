@@ -85,7 +85,7 @@ export const FORMAT_PROMPT = (
   }
   //#endregion
 
-  //#region 自定义是否保留 -Custom
+  //#region 自定义是否保留/是否抹除  -Custom
   if (type === PromptType.SelectiveCustom) {
     return `
   第一张图是模板图，已经对模板图做了标记，参数是${imageConfig}
@@ -98,7 +98,7 @@ export const FORMAT_PROMPT = (
   }
   //#endregion
 
-  //#region 自定义是否保留 -AI
+  //#region 自定义是否保留/是否抹除  -AI
   if (type === PromptType.SelectiveAI) {
     return `
   Role

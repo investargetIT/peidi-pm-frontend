@@ -31,7 +31,8 @@ export const exportConfigToExcel = async (
       key: string;
       width: number;
       isAIRef?: boolean;
-      isKeepRef?: boolean;
+      // isKeepRef?: boolean;
+      isEraseRef?: boolean;
       isImage?: boolean;
       isRemark?: boolean;
     }> = [];
@@ -55,17 +56,17 @@ export const exportConfigToExcel = async (
           width: 25,
           isImage: true
         });
+        // headers.push({
+        //   header: `${item.name}-AI 引用`,
+        //   key: `col_${colIndex++}`,
+        //   width: 15,
+        //   isAIRef: true
+        // });
         headers.push({
-          header: `${item.name}-AI 引用`,
+          header: `${item.name}-是否抹除`,
           key: `col_${colIndex++}`,
           width: 15,
-          isAIRef: true
-        });
-        headers.push({
-          header: `${item.name}-是否保留`,
-          key: `col_${colIndex++}`,
-          width: 15,
-          isKeepRef: true
+          isEraseRef: true
         });
       } else if (item.type === "group" && item.content) {
         // 组合类型：每个子字段占一列
@@ -121,7 +122,7 @@ export const exportConfigToExcel = async (
           pattern: "solid",
           fgColor: { argb: "FF70AD47" }
         };
-      } else if (colConfig?.isKeepRef) {
+      } else if (colConfig?.isEraseRef) {
         cell.fill = {
           type: "pattern",
           pattern: "solid",
@@ -139,8 +140,8 @@ export const exportConfigToExcel = async (
     // 添加一行示例数据（可选，方便用户理解格式）
     const dataRow: any = {};
     headers.forEach((header, index) => {
-      if (header.isAIRef || header.isKeepRef) {
-        dataRow[`col_${index}`] = "否";
+      if (header.isAIRef || header.isEraseRef) {
+        dataRow[`col_${index}`] = "是";
       } else {
         dataRow[`col_${index}`] = "";
       }
@@ -236,9 +237,9 @@ export const importConfigFromExcel = async (
             if (header && header.includes("-AI 引用")) {
               const baseName = header.replace("-AI 引用", "");
               rowData[`${baseName}_aiRef`] = value === "是" ? true : false;
-            } else if (header && header.includes("-是否保留")) {
-              const baseName = header.replace("-是否保留", "");
-              rowData[`${baseName}_keepRef`] = value === "是" ? true : false;
+            } else if (header && header.includes("-是否抹除")) {
+              const baseName = header.replace("-是否抹除", "");
+              rowData[`${baseName}_eraseRef`] = value === "是" ? true : false;
             } else if (header === "第一优先级提示词") {
               // 解析备注列
               rowData["remark"] = value;

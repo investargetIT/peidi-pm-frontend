@@ -338,3 +338,12 @@ export const IMG_CONFIG = [
     }
   }
 ];
+
+export const AI_MODEL_OPTIONS = [
+  { label: "阿里 wan2.7-image", value: "wan2.7-image" },
+  { label: "阿里 wan2.7-image-pro", value: "wan2.7-image-pro" },
+  // { label: "谷歌 nano-banana-2", value: "nano-banana-2" },
+  // { label: "谷歌 nano-banana-pro", value: "nano-banana-pro" },
+  // { label: "谷歌 nano-banana-fast", value: "nano-banana-fast" }
+  { label: "七牛云 nano-banana-2", value: "gemini-3.1-flash-image-preview" }
+];

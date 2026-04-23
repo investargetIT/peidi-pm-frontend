@@ -84,12 +84,12 @@ const importMaterialElements = async () => {
     const imageData = rowData[imageKey];
     const isAiReferenced = rowData[aiRefKey] === true;
 
-    // console.log(`处理图片配置：${config.name}`, {
-    //   imageKey,
-    //   imageData,
-    //   isAiReferenced,
-    //   aiRefValue: rowData[aiRefKey]
-    // });
+    console.log(`处理图片配置：${config.name}`, {
+      imageKey,
+      imageData,
+      isAiReferenced,
+      aiRefValue: rowData[aiRefKey]
+    });
 
     if (imageData && !isAiReferenced) {
       const promise = (async () => {
@@ -177,6 +177,22 @@ const importMaterialElements = async () => {
 
     if (successfulLoads > 0) {
       ElMessage.success(`成功导入 ${successfulLoads} 个素材`);
+
+      await nextTick();
+
+      const hasGiftItem = imageElements.some(el => el.name === "赠品");
+
+      if (!hasGiftItem) {
+        const productImageElement = imageElements.find(
+          el => el.name === "商品图"
+        );
+
+        if (productImageElement) {
+          const containerWidth = 700;
+          productImageElement.x =
+            (containerWidth - productImageElement.width) / 2;
+        }
+      }
     } else if (failedLoads > 0) {
       ElMessage.warning(`所有素材加载失败`);
     }
