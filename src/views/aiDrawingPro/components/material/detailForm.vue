@@ -203,7 +203,10 @@ defineExpose({
         :disabled="loading"
       >
         <el-form-item label="名称" prop="name">
-          <el-input v-model="ruleForm.name" />
+          <el-input
+            v-model="ruleForm.name"
+            placeholder="素材名称必须全局唯一"
+          />
         </el-form-item>
         <el-form-item label="类型" prop="type">
           <el-select v-model="ruleForm.type" placeholder="请选择">

@@ -28,7 +28,7 @@ import {
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
-const aiModel = ref("wan2.7-image");
+const aiModel = ref(AI_MODEL_OPTIONS[0].value);
 
 const props = defineProps({
   imageConfig: {
@@ -118,7 +118,7 @@ const tableColumns = computed(() => {
   // 添加备注列
   columns.push({
     prop: "remark",
-    label: "第一优先级提示词",
+    label: "必做事项",
     width: 200,
     type: "remark"
   });
@@ -218,17 +218,8 @@ const parseExcelData = (jsonData: any[]) => {
       });
 
       // 解析备注字段
-      if (
-        row["第一优先级提示词"] ||
-        row["备注 Remark"] ||
-        row["Remark"] ||
-        row["备注"]
-      ) {
-        parsedRow["remark"] =
-          row["第一优先级提示词"] ||
-          row["备注 Remark"] ||
-          row["Remark"] ||
-          row["备注"];
+      if (row["第一优先级提示词"] || row["必做事项"]) {
+        parsedRow["remark"] = row["第一优先级提示词"] || row["必做事项"];
       }
 
       // 如果存在全局的第一优先级提示词，则添加到 remark 字段
@@ -321,10 +312,10 @@ const importConfig = () => {
               // generatedResults.value[importedDataList.value[0]._id] = [testB4];
 
               // 为每条数据初始化生成结果
-              const testB4 = await imageToBase64(imageUrl1);
-              dataWithId.forEach(item => {
-                generatedResults.value[item._id] = [testB4];
-              });
+              // const testB4 = await imageToBase64(imageUrl1);
+              // dataWithId.forEach(item => {
+              //   generatedResults.value[item._id] = [testB4];
+              // });
 
               console.log("导入数据:", importedDataList.value);
 
@@ -865,15 +856,20 @@ const handleBatchGenerate = async () => {
   for (let i = 0; i < importedDataList.value.length; i++) {
     const row = importedDataList.value[i];
     currentGeneratingId.value = row._id;
-    generatingProgress.value = Math.round(((i + 1) / total) * 100);
+
+    if (i === 0) {
+      generatingProgress.value = Math.round((1 / total) * 50);
+    }
 
     try {
       const resultBase64 = await generateSingleImage(row);
       generatedResults.value[row._id] = [resultBase64];
       successCount.value++;
+      generatingProgress.value = Math.round(((i + 1) / total) * 100);
       ElMessage.success(`第 ${i + 1} 张图片生成成功`);
     } catch (error: any) {
       failCount.value++;
+      generatingProgress.value = Math.round(((i + 1) / total) * 100);
       ElMessage.error(`第 ${i + 1} 张图片生成失败：${error.message}`);
       generatedResults.value[row._id] = [];
     }
@@ -1364,6 +1360,7 @@ defineExpose({
                     :percentage="generatingProgress"
                     :stroke-width="10"
                     color="#534CE7"
+                    class="rotating-progress-circle"
                   />
                   <span class="ml-4 text-gray-600">正在生成...</span>
                 </div>
@@ -1481,5 +1478,20 @@ defineExpose({
 <style scoped>
 .empty-data-tip {
   color: #909399;
+}
+
+.rotating-progress-circle :deep(.el-progress-circle__track),
+.rotating-progress-circle :deep(.el-progress-circle__path) {
+  animation: rotate 2s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

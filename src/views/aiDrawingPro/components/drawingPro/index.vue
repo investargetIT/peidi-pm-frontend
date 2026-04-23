@@ -19,7 +19,7 @@ import { getNameFromObjectName } from "../../utils/general";
 import MaterialSelectorWithThumb from "./materialSelectorWithThumb.vue";
 import { FORMAT_PROMPT } from "./utils/prompt";
 
-const aiModel = ref("wan2.7-image");
+const aiModel = ref(AI_MODEL_OPTIONS[0].value);
 
 const resultImgRef = ref(null);
 
@@ -493,7 +493,7 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
           ]
         },
         parameters: {
-          size: "2K",
+          size: "4K",
           n: 1,
           watermark: false,
           thinking_mode: true
@@ -539,7 +539,11 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
       params = {
         model: aiModel.value,
         prompt: prompt,
-        image: processedImageList
+        image: processedImageList,
+        image_config: {
+          aspect_ratio: "auto",
+          image_size: "4K"
+        }
       };
       console.log("通用模型请求参数：", params);
 

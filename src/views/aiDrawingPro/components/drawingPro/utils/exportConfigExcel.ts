@@ -82,7 +82,7 @@ export const exportConfigToExcel = async (
 
     // 添加备注列
     headers.push({
-      header: `第一优先级提示词`,
+      header: `必做事项`,
       key: `col_${colIndex++}`,
       width: 30,
       isRemark: true

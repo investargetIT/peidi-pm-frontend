@@ -172,16 +172,18 @@ const handleDelete = () => {
             :disabled="!getEditPhraseInfo"
             :show-after="200"
           >
-            <el-button
-              v-if="getMTType === 'template'"
-              type="primary"
-              text
-              :disabled="getEditPhraseInfo"
-              size="small"
-              @click="props.handleModuleEdit(props.data)"
-            >
-              模板编辑
-            </el-button>
+            <div>
+              <el-button
+                v-if="getMTType === 'template'"
+                type="primary"
+                text
+                :disabled="getEditPhraseInfo"
+                size="small"
+                @click="props.handleModuleEdit(props.data)"
+              >
+                模板编辑
+              </el-button>
+            </div>
           </el-tooltip>
           <el-button
             v-if="getMTType === 'resultImage'"

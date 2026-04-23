@@ -504,12 +504,21 @@ const handleQuickGeneratePrompt = (type: string) => {
             </el-button>
           </div>
 
-          <p class="text-xs text-gray-500 mt-2">
+          <p class="text-xs text-gray-500 mt-2 w-full">
             编辑词不需要手动输入，点击AI自动生成即可，若不满意可重复生成
           </p>
-          <p class="text-xs text-red-500 mt-2">
+          <p class="text-xs text-red-500 mt-2 w-full">
             *编辑词更改后需要重新生成配置表
           </p>
+          <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p class="text-xs text-blue-800 font-medium mb-1">
+              💡 布局规则提示
+            </p>
+            <p class="text-xs text-blue-700 leading-relaxed">
+              <span class="font-semibold">批量生成模式下</span
+              >，当"赠品"图片不存在时，"商品图"会自动水平居中（演示模式不生效）。请确保元素正确命名，后续将支持自定义布局规则。
+            </p>
+          </div>
 
           <div class="mt-3 w-full">
             <el-radio-group v-model="editPhraseMode" text-color="#fff">
@@ -618,17 +627,17 @@ const handleQuickGeneratePrompt = (type: string) => {
           />
         </el-form-item>
 
-        <el-form-item label="第一优先级提示词" prop="editPhraseInfoPrompt">
+        <el-form-item label="必做事项" prop="editPhraseInfoPrompt">
           <p class="text-xs text-gray-500">
-            该模板全局通用的第一优先级提示词，批量生成时自动带入，不需要手动输入
+            这些规则会应用到所有使用该模板生成的图片中，设置一次即可，无需重复输入
           </p>
           <!-- 快捷生成 按钮 -->
           <div class="w-full mt-2">
             <p class="text-xs text-gray-500 mb-2">
-              点击下方按钮可快速填入默认提示词模板，也可根据需要自行修改
+              点击按钮可快速填入常用规则，也可以手动修改
             </p>
             <el-button size="small" @click="handleQuickGeneratePrompt('type1')">
-              使用默认提示词
+              使用默认规则
             </el-button>
           </div>
           <el-input
@@ -636,7 +645,7 @@ const handleQuickGeneratePrompt = (type: string) => {
             class="mt-3"
             type="textarea"
             :rows="4"
-            placeholder="请输入第一优先级提示词，或点击“使用默认提示词”快速填充"
+            placeholder="如有需要，请自行输入必做事项，或点击“使用默认规则”快速填充"
           />
         </el-form-item>
 

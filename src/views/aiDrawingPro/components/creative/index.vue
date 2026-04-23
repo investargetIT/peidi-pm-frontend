@@ -18,7 +18,9 @@ import {
   getMaterialPage,
   newMaterial,
   uploadDraw,
-  transferDraw
+  transferDraw,
+  transferDrawAliyun,
+  transferDrawQnaigc
 } from "@/api/aiDraw";
 
 import {
@@ -33,11 +35,13 @@ import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterial
 import PictureSizeDailog from "./pictureSizeDailog.vue";
 import ResultCard from "./resultCard.vue";
 
+import { AI_MODEL_OPTIONS } from "../drawingPro/utils/config";
+
 const pictureSizeDailogRef = ref(null);
 const resultCardRef = ref(null);
 
 const loading = ref(false);
-const aiModel = ref("nano-banana-2");
+const aiModel = ref(AI_MODEL_OPTIONS[0].value);
 const configForm = reactive({
   size: "4K",
   ratio: "auto",
@@ -113,20 +117,51 @@ const handleGenerateClick = async () => {
 
   const promises = [];
   for (let i = 0; i < 4; i++) {
-    promises.push(transferDraw({ urlParam: JSON.stringify(paramsContent) }));
+    if (
+      aiModel.value === "wan2.7-image" ||
+      aiModel.value === "wan2.7-image-pro"
+    ) {
+      promises.push(
+        transferDrawAliyun({ urlParam: JSON.stringify(paramsContent) })
+      );
+    } else {
+      promises.push(
+        transferDrawQnaigc({ urlParam: JSON.stringify(paramsContent) })
+      );
+    }
   }
 
   Promise.all(promises)
     .then((results: any[]) => {
-      const successCount = results.filter(
-        res => res.code === 200 && res.data?.[0]
-      ).length;
+      const validImages: string[] = [];
+
+      results.forEach(res => {
+        if (res.code === 200 && res.data) {
+          let imageUrl = null;
+
+          if (
+            aiModel.value === "wan2.7-image" ||
+            aiModel.value === "wan2.7-image-pro"
+          ) {
+            imageUrl = res.data;
+          } else {
+            const dataArray =
+              typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+
+            if (dataArray?.[0]?.b64_json) {
+              imageUrl = "data:image/png;base64," + dataArray[0].b64_json;
+            }
+          }
+
+          if (imageUrl) {
+            validImages.push(imageUrl);
+          }
+        }
+      });
+
+      const successCount = validImages.length;
 
       if (successCount > 0) {
-        const validImages = results
-          .filter(res => res.code === 200 && res.data?.[0])
-          .map(res => res.data[0]);
-
         resultPictures.value = validImages;
         selectedPictureIndex.value = 0;
 
@@ -138,7 +173,6 @@ const handleGenerateClick = async () => {
           ElMessage.warning(resultInfo.value);
         }
 
-        // 生成成功几个 就调用几次 addDrawRecord
         const addRecordPromises = resultPictures.value.map((pic, index) => {
           return (
             resultCardRef.value?.addDrawRecord(pic, generateID()) ||
@@ -184,14 +218,54 @@ const formatParams = async () => {
     }
   }
 
-  return {
-    model: aiModel.value,
-    prompt: configForm.prompt,
-    aspectRatio: configForm.ratio,
-    imageSize: configForm.size,
-    urls: base64Urls,
-    shutProgress: false
-  };
+  // 图片配置
+  // const PictureConfigPrompt =
+  //   "图片尺寸: " + configForm.size + " 图片比例: " + configForm.ratio;
+
+  if (
+    aiModel.value === "wan2.7-image" ||
+    aiModel.value === "wan2.7-image-pro"
+  ) {
+    return {
+      model: aiModel.value,
+      input: {
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                text: configForm.prompt
+              },
+              ...base64Urls.map(url => ({ image: url }))
+            ]
+          }
+        ]
+      },
+      parameters: {
+        size: configForm.size,
+        n: 1,
+        watermark: false,
+        thinking_mode: true
+      }
+    };
+  } else {
+    const processedImageList = base64Urls.map(url => {
+      return url.replace(
+        "data:application/json;base64,",
+        "data:image/png;base64,"
+      );
+    });
+
+    return {
+      model: aiModel.value,
+      prompt: configForm.prompt,
+      image: processedImageList,
+      image_config: {
+        aspect_ratio: configForm.ratio,
+        image_size: configForm.size
+      }
+    };
+  }
 };
 //#endregion
 
@@ -298,12 +372,18 @@ onUnmounted(() => {
                   placeholder="请选择 AI 模型"
                   style="width: 180px"
                 >
-                  <el-option label="nano-banana-2" value="nano-banana-2" />
+                  <!-- <el-option label="nano-banana-2" value="nano-banana-2" />
                   <el-option label="nano-banana-pro" value="nano-banana-pro" />
                   <el-option label="nano-banana" value="nano-banana" />
                   <el-option
                     label="nano-banana-fast"
                     value="nano-banana-fast"
+                  /> -->
+                  <el-option
+                    v-for="item in AI_MODEL_OPTIONS"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
                   />
                 </el-select>
               </div>
