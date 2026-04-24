@@ -242,7 +242,7 @@ const formatParams = async () => {
         ]
       },
       parameters: {
-        size: configForm.size,
+        size: "2K",
         n: 1,
         watermark: false,
         thinking_mode: true

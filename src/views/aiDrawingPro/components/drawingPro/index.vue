@@ -493,7 +493,7 @@ const testTransferDraw = async (prompt: string, urlList: string[]) => {
           ]
         },
         parameters: {
-          size: "4K",
+          size: "2K",
           n: 1,
           watermark: false,
           thinking_mode: true

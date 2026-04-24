@@ -746,7 +746,11 @@ const generateSingleImage = async (
       params = {
         model: aiModel.value,
         prompt: buildPrompt(row),
-        image: processedImageList
+        image: processedImageList,
+        image_config: {
+          aspect_ratio: "auto",
+          image_size: "4K"
+        }
       };
       console.log("通用模型请求参数：", params);
 
@@ -1183,7 +1187,11 @@ const exportAllResults = async () => {
         console.log("批量导出合成结果图:", compositeBase64);
 
         if (compositeBase64) {
-          const fileName = `${rowData.productName || `AI_Image_${i + 1}`}.png`;
+          // 查找rowData对象里是否有属性名带有产品名称的属性
+          const productName = Object.keys(rowData).find(key =>
+            key.includes("产品名称")
+          );
+          const fileName = `${rowData[productName] || `AI_Image_${i + 1}`}.jpg`;
 
           const base64Data = compositeBase64.split(",")[1];
           const binaryString = atob(base64Data);
@@ -1296,7 +1304,7 @@ defineExpose({
         <div class="text-base font-bold text-gray-800">
           配置表
           <span class="text-sm text-gray-500 font-normal">
-            (点击右侧生成配置表，支持多次导入配置表)
+            (点击右侧生成配置表，支持多次导入配置表，导出名称默认取带有产品名称的属性值)
           </span>
         </div>
         <div class="flex items-center">
