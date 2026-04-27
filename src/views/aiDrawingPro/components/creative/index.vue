@@ -26,7 +26,8 @@ import {
 import {
   fileToBase64,
   downloadImageFromUrl,
-  generateID
+  generateID,
+  resizeImageIfNeeded
 } from "../../utils/general";
 import { imageCache } from "../../utils/imageCache";
 import { blobManager } from "../../utils/blobManager";
@@ -205,9 +206,13 @@ const formatParams = async () => {
   let base64Urls = [];
   if (fileList.value && fileList.value.length > 0) {
     try {
-      const promises = fileList.value.map(file => {
+      const promises = fileList.value.map(async file => {
         if (file.raw) {
-          return fileToBase64(file as any);
+          const resizedFile = await resizeImageIfNeeded(file.raw);
+          if (resizedFile !== file.raw) {
+            // ElMessage.success(`图片 "${file.name}" 已自动调整为合适尺寸`);
+          }
+          return fileToBase64({ raw: resizedFile } as any);
         }
         return Promise.resolve(file.url || "");
       });
