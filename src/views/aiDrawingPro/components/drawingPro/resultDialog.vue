@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive, nextTick, onUnmounted, inject } from "vue";
+import {
+  onMounted,
+  ref,
+  reactive,
+  nextTick,
+  onUnmounted,
+  inject,
+  computed
+} from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import DEFAULT_IMG from "../../assets/images/default.png";
 import { snapdom } from "@zumer/snapdom";
@@ -53,6 +61,27 @@ const imageElements = reactive<ResultImageItem[]>([]);
 
 let animationFrameId = null;
 
+const CONTAINER_WIDTH = 700;
+const containerHeight = ref<number>(CONTAINER_WIDTH);
+
+const actualExportHeight = computed(() => {
+  const ratio = containerHeight.value / CONTAINER_WIDTH;
+  return Math.round(Number(exportSize.value) * ratio);
+});
+
+const calculateContainerHeight = (imageUrl: string) => {
+  const img = new Image();
+  img.onload = () => {
+    const aspectRatio = img.height / img.width;
+    containerHeight.value = Math.round(CONTAINER_WIDTH * aspectRatio);
+  };
+  img.onerror = () => {
+    console.warn("图片加载失败，使用默认正方形容器");
+    containerHeight.value = CONTAINER_WIDTH;
+  };
+  img.src = imageUrl;
+};
+
 const isBase64Image = (str: string): boolean => {
   if (!str || typeof str !== "string") return false;
   return str.startsWith("data:image/") || /^[A-Za-z0-9+/=]+$/.test(str);
@@ -65,8 +94,6 @@ const importMaterialElements = async () => {
 
   const rowData = selectedRowData.value;
   const imageConfig = selectedImageConfig.value;
-
-  // console.log("importMaterialElements", { rowData, imageConfig });
 
   if (!rowData || !imageConfig || imageConfig.length === 0) {
     ElMessage.info("没有找到配置信息");
@@ -104,7 +131,6 @@ const importMaterialElements = async () => {
             materialLoadRequests.value.push({ cancel: () => {} });
 
             const blob = await loadRequest;
-            // console.log(`加载 ${config.name} 成功:`, blob);
             base64Data = await blobManager.blobToBase64(blob?.originalBlob);
           } catch (error) {
             if (error.message !== "请求已取消") {
@@ -125,10 +151,18 @@ const importMaterialElements = async () => {
             img.onload = () => {
               const newImageElement: ResultImageItem = {
                 id: Date.now() + Math.random(),
-                x: config.rect?.x * 700 || 50 + imageElements.length * 20,
-                y: config.rect?.y * 700 || 50 + imageElements.length * 20,
-                width: config.rect?.width * 700 || Math.min(img.width, 200),
-                height: config.rect?.height * 700 || Math.min(img.height, 200),
+                x:
+                  config.rect?.x * CONTAINER_WIDTH ||
+                  50 + imageElements.length * 20,
+                y:
+                  config.rect?.y * containerHeight.value ||
+                  50 + imageElements.length * 20,
+                width:
+                  config.rect?.width * CONTAINER_WIDTH ||
+                  Math.min(img.width, 200),
+                height:
+                  config.rect?.height * containerHeight.value ||
+                  Math.min(img.height, 200),
                 src: base64Data!,
                 dragging: false,
                 originalWidth: img.width,
@@ -188,9 +222,8 @@ const importMaterialElements = async () => {
         );
 
         if (productImageElement) {
-          const containerWidth = 700;
           productImageElement.x =
-            (containerWidth - productImageElement.width) / 2;
+            (CONTAINER_WIDTH - productImageElement.width) / 2;
         }
       }
     } else if (failedLoads > 0) {
@@ -203,6 +236,7 @@ const importMaterialElements = async () => {
     }
   }
 };
+
 const importImage = () => {
   const input = document.createElement("input");
   input.type = "file";
@@ -400,7 +434,6 @@ const exportAsPNG = () => {
   deselectAll();
 
   nextTick(async () => {
-    // 等待一秒
     await new Promise(resolve => setTimeout(resolve, 1000));
     handleCapture();
   });
@@ -419,25 +452,13 @@ const handleCapture = async () => {
   }
 
   try {
+    const scale = Number(exportSize.value) / CONTAINER_WIDTH;
+
     const capture = await snapdom(exportContainer.value, {
-      scale: Number(exportSize.value) / 668,
+      scale: scale,
       dpr: window.devicePixelRatio,
       backgroundColor: "#ffffff"
     });
-
-    // const img = await capture.toPng();
-
-    // ElMessageBox.confirm("是否保存结果至素材库？", "提示", {
-    //   confirmButtonText: "是",
-    //   cancelButtonText: "否",
-    //   type: "warning"
-    // })
-    //   .then(() => {
-    //     saveToMaterialLibrary(img.src, "resultImage", {
-    //       fromProduct: selectedRowData.value?.productName || "未知产品"
-    //     });
-    //   })
-    //   .catch(() => {});
 
     await capture.download({
       type: "png",
@@ -471,11 +492,12 @@ const handleSaveToMaterialLibrary = async () => {
     deselectAll();
 
     await nextTick();
-    // 等待一秒
     await new Promise(resolve => setTimeout(resolve, 1000));
 
+    const scale = Number(exportSize.value) / CONTAINER_WIDTH;
+
     const capture = await snapdom(exportContainer.value, {
-      scale: Number(exportSize.value) / 668,
+      scale: scale,
       dpr: window.devicePixelRatio,
       backgroundColor: "#ffffff"
     });
@@ -518,50 +540,10 @@ const handleOpen = (imageUrl: string, rowData?: any, imageConfig?: any[]) => {
 
     templateImgBase64.value = imageUrl;
 
+    calculateContainerHeight(imageUrl);
+
     updateContainerRect();
 
-    // setTimeout(async () => {
-    //   await importMaterialElements();
-
-    //   await nextTick();
-
-    //   if (imageElements.length > 0) {
-    //     const elements = generateCompositeElements(
-    //       imageElements,
-    //       700,
-    //       Number(exportSize.value)
-    //     );
-
-    //     try {
-    //       const compositeBase64 = await compositeImage(
-    //         imageUrl,
-    //         elements,
-    //         Number(exportSize.value)
-    //       );
-
-    //       console.log("Canvas 合成图片成功:", {
-    //         base64Length: compositeBase64.length,
-    //         outputSize: exportSize.value,
-    //         elementsCount: imageElements.length
-    //       });
-
-    //       downloadCompositeImage(
-    //         compositeBase64,
-    //         `${selectedRowData.value?.productName || "AI_Generated_Image"}.png`
-    //       );
-
-    //       ElMessage.success("图片合成并导出成功");
-
-    //       return compositeBase64;
-    //     } catch (error) {
-    //       console.error("Canvas 合成失败:", error);
-    //       throw error;
-    //     }
-    //   } else {
-    //     console.warn("没有可合成的素材元素");
-    //     return null;
-    //   }
-    // }, 100);
     setTimeout(() => {
       importMaterialElements();
     }, 100);
@@ -614,7 +596,7 @@ defineExpose({
     <el-dialog
       v-model="dialogVisible"
       title="编辑结果图片"
-      width="700"
+      width="800"
       :before-close="handleClose"
       append-to-body
       :close-on-click-modal="false"
@@ -635,11 +617,14 @@ defineExpose({
               placeholder="请选择导出尺寸"
               style="width: 120px; margin-right: 10px"
             >
-              <el-option label="800*800" value="800" />
-              <el-option label="1400*1400" value="1400" />
-              <el-option label="2048*2048" value="2048" />
-              <el-option label="4096*4096" value="4096" />
+              <el-option label="800px 宽" value="800" />
+              <el-option label="1400px 宽" value="1400" />
+              <el-option label="2048px 宽" value="2048" />
+              <el-option label="4096px 宽" value="4096" />
             </el-select>
+            <span class="text-xs text-gray-500 ml-2">
+              实际尺寸：{{ exportSize }} × {{ actualExportHeight }} px
+            </span>
             <el-button
               type="primary"
               :loading="exportPNGLoading"
@@ -653,6 +638,10 @@ defineExpose({
         <div
           ref="exportContainer"
           class="image-container"
+          :style="{
+            width: `${CONTAINER_WIDTH}px`,
+            height: `${containerHeight}px`
+          }"
           @mouseup="endDrag"
           @mouseleave="endDrag"
           @click="deselectAll"
@@ -661,6 +650,10 @@ defineExpose({
             :src="templateImgBase64"
             alt="编辑图片"
             class="background-image"
+            :style="{
+              width: `${CONTAINER_WIDTH}px`,
+              height: `${containerHeight}px`
+            }"
           />
 
           <div
@@ -743,17 +736,17 @@ defineExpose({
 
 .image-container {
   position: relative;
-  flex: 1;
   overflow: hidden;
   background-color: transparent;
   cursor: default;
   display: flex;
   align-items: flex-start;
+  margin: 0 auto;
 }
 
 .background-image {
-  width: 100%;
   object-fit: contain;
+  display: block;
 }
 
 .image-element {

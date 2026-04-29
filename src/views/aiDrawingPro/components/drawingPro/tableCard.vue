@@ -918,6 +918,16 @@ const generateCompositeFromRowData = async (
     console.log("行数据:", rowData);
     console.log("图片配置:", imageConfig);
 
+    const bgImg = new Image();
+    await new Promise<void>((resolve, reject) => {
+      bgImg.onload = () => resolve();
+      bgImg.onerror = () => reject(new Error("背景图加载失败"));
+      bgImg.src = imageUrl;
+    });
+    const canvasWidth = size;
+    const canvasHeight = Math.round(size * (bgImg.height / bgImg.width));
+    console.log(`画布尺寸: ${canvasWidth} × ${canvasHeight}`);
+
     const imageConfigs = imageConfig.filter(item => item.type === "image");
     console.log("图片类型配置数量:", imageConfigs.length);
 
@@ -1048,8 +1058,8 @@ const generateCompositeFromRowData = async (
       let offsetY = 0;
 
       if (config.rect?.width && config.rect?.height) {
-        const targetWidth = config.rect.width * 700;
-        const targetHeight = config.rect.height * 700;
+        const targetWidth = config.rect.width * canvasWidth;
+        const targetHeight = config.rect.height * canvasHeight;
 
         imgRatio = imgElement.width / imgElement.height;
         const targetRatio = targetWidth / targetHeight;
@@ -1071,8 +1081,11 @@ const generateCompositeFromRowData = async (
 
       const element = {
         src: task.base64Data,
-        x: (config.rect?.x * 700 || 50 + elements.length * 20) + offsetX,
-        y: (config.rect?.y * 700 || 50 + elements.length * 20) + offsetY,
+        x:
+          (config.rect?.x * canvasWidth || 50 + elements.length * 20) + offsetX,
+        y:
+          (config.rect?.y * canvasHeight || 50 + elements.length * 20) +
+          offsetY,
         width: elementWidth,
         height: elementHeight
       };
@@ -1103,9 +1116,9 @@ const generateCompositeFromRowData = async (
         );
 
         if (productElementIndex !== -1) {
-          const containerWidth = 700;
+          // const containerWidth = 700;
           const productElement = elements[productElementIndex];
-          productElement.x = (containerWidth - productElement.width) / 2;
+          productElement.x = (canvasWidth - productElement.width) / 2;
 
           console.log(
             `✓ 赠品不存在，商品图已居中，新X坐标: ${productElement.x.toFixed(2)}`
@@ -1115,7 +1128,12 @@ const generateCompositeFromRowData = async (
     }
 
     console.log("开始 Canvas 合成...");
-    const compositeBase64 = await compositeImage(imageUrl, elements, size);
+    const compositeBase64 = await compositeImage(
+      imageUrl,
+      elements,
+      canvasWidth,
+      canvasHeight
+    );
     console.log("✓ Canvas 合成成功");
     return compositeBase64;
   } catch (error) {

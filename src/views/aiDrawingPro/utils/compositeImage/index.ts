@@ -29,14 +29,16 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
 /**
  * 使用 Canvas 合成图片
  * @param backgroundImage 背景图（base64 或 blob URL）
- * @param elements 素材元素数组
- * @param outputSize 输出尺寸（如 800）
+ * @param elements 素材元素数组（像素坐标，基于 containerWidth/containerHeight）
+ * @param outputWidth 输出宽度
+ * @param outputHeight 输出高度
  * @returns PNG 的 base64 数据
  */
 export const compositeImage = async (
   backgroundImage: string,
   elements: CompositeElement[],
-  outputSize: number = 800
+  outputWidth: number = 800,
+  outputHeight: number = 800
 ): Promise<string> => {
   try {
     const canvas = document.createElement("canvas");
@@ -46,34 +48,39 @@ export const compositeImage = async (
       throw new Error("无法获取 canvas 上下文");
     }
 
-    canvas.width = outputSize;
-    canvas.height = outputSize;
+    canvas.width = outputWidth;
+    canvas.height = outputHeight;
 
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, outputSize, outputSize);
-
+    ctx.fillRect(0, 0, outputWidth, outputHeight);
     const bgImg = await loadImage(backgroundImage);
 
     const bgRatio = bgImg.width / bgImg.height;
-    const canvasRatio = outputSize / outputSize;
+    const canvasRatio = outputWidth / outputHeight;
 
     let bgDrawX = 0;
     let bgDrawY = 0;
-    let bgDrawWidth = outputSize;
-    let bgDrawHeight = outputSize;
+    let bgDrawWidth = outputWidth;
+    let bgDrawHeight = outputHeight;
 
     if (bgRatio > canvasRatio) {
-      bgDrawWidth = outputSize * bgRatio;
-      bgDrawX = (outputSize - bgDrawWidth) / 2;
+      // 背景图比画布更“宽”，为了覆盖画布，高度必须填满，宽度会溢出
+      bgDrawHeight = outputHeight;
+      bgDrawWidth = outputHeight * bgRatio;
+      bgDrawX = (outputWidth - bgDrawWidth) / 2; // 水平居中，左右溢出被裁剪
+      bgDrawY = 0;
     } else {
-      bgDrawHeight = outputSize / bgRatio;
-      bgDrawY = (outputSize - bgDrawHeight) / 2;
+      // 背景图比画布更“高”，为了覆盖画布，宽度必须填满，高度会溢出
+      bgDrawWidth = outputWidth;
+      bgDrawHeight = outputWidth / bgRatio;
+      bgDrawX = 0;
+      bgDrawY = (outputHeight - bgDrawHeight) / 2; // 垂直居中，上下溢出被裁剪
     }
 
     ctx.drawImage(bgImg, bgDrawX, bgDrawY, bgDrawWidth, bgDrawHeight);
 
-    const contentScaleX = bgDrawWidth / 700;
-    const contentScaleY = bgDrawHeight / 700;
+    const contentScaleX = bgDrawWidth / outputWidth;
+    const contentScaleY = bgDrawHeight / outputHeight;
 
     for (const element of elements) {
       try {
@@ -107,7 +114,8 @@ export const batchCompositeImages = async (
   tasks: Array<{
     background: string;
     elements: CompositeElement[];
-    outputSize: number;
+    outputWidth: number;
+    outputHeight: number;
   }>,
   concurrentLimit: number = 3
 ): Promise<Array<{ success: boolean; data?: string; error?: string }>> => {
@@ -120,7 +128,8 @@ export const batchCompositeImages = async (
       const result = await compositeImage(
         task.background,
         task.elements,
-        task.outputSize
+        task.outputWidth,
+        task.outputHeight
       );
       results[taskIndex] = {
         success: true,

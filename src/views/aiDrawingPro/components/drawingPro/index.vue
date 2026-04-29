@@ -36,9 +36,14 @@ const imageConfigFirstPrompt = ref("");
 const materialList = ref<any>({});
 
 /**
- * 画布尺寸配置（单位：px）
+ * 画布宽度配置（单位：px）
  */
-const CANVAS_SIZE = 500;
+const CANVAS_WIDTH = 500;
+
+/**
+ * 画布高度（根据图片比例动态计算）
+ */
+const canvasHeight = ref<number>(CANVAS_WIDTH);
 
 /**
  * 当前选中的元素 ID
@@ -106,6 +111,22 @@ const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+};
+
+/**
+ * 通过创建 Image 对象获取图片真实尺寸并计算画布高度
+ */
+const calculateImageDimensions = (imageUrl: string) => {
+  const img = new Image();
+  img.onload = () => {
+    const aspectRatio = img.height / img.width;
+    canvasHeight.value = Math.round(CANVAS_WIDTH * aspectRatio);
+  };
+  img.onerror = () => {
+    console.warn("图片加载失败，使用默认正方形画布");
+    canvasHeight.value = CANVAS_WIDTH;
+  };
+  img.src = imageUrl;
 };
 
 /**
@@ -684,6 +705,9 @@ const initDrawingPro = async (data: any) => {
           raw: cachedImageBlob
         }
       ];
+
+      // 计算图片尺寸
+      calculateImageDimensions(blobUrl);
     } else {
       // 3. 如果缓存中没有图片，则通过 API 获取
       // console.log("缓存中未找到图片，正在从服务器获取:", url);
@@ -700,6 +724,9 @@ const initDrawingPro = async (data: any) => {
           raw: response
         }
       ];
+
+      // 计算图片尺寸
+      calculateImageDimensions(blobUrl);
     }
   } catch (error) {
     console.error("初始化失败:", error);
@@ -778,7 +805,7 @@ defineExpose({
             <el-col :xs="24" :sm="24" :md="16">
               <div
                 class="w-full h-full flex flex-col items-center justify-center"
-                :style="{ flexShrink: 0, minWidth: `${CANVAS_SIZE}px` }"
+                :style="{ flexShrink: 0, minWidth: `${CANVAS_WIDTH}px` }"
               >
                 <div class="text-center text-gray-500 text-sm mb-4">
                   点击画布中的元素区域即可在右侧编辑
@@ -786,11 +813,11 @@ defineExpose({
                 <div
                   class="relative"
                   :style="{
-                    width: `${CANVAS_SIZE}px`,
-                    height: `${CANVAS_SIZE}px`,
+                    width: `${CANVAS_WIDTH}px`,
+                    height: `${canvasHeight}px`,
                     flexShrink: 0,
-                    minWidth: `${CANVAS_SIZE}px`,
-                    minHeight: `${CANVAS_SIZE}px`
+                    minWidth: `${CANVAS_WIDTH}px`,
+                    minHeight: `${canvasHeight}px`
                   }"
                 >
                   <img
@@ -798,8 +825,8 @@ defineExpose({
                     :src="fileList[0]?.url || ''"
                     alt="图片"
                     :style="{
-                      width: `${CANVAS_SIZE}px`,
-                      height: `${CANVAS_SIZE}px`
+                      width: `${CANVAS_WIDTH}px`,
+                      height: `${canvasHeight}px`
                     }"
                     class="rounded-lg shadow-md"
                   />
@@ -809,10 +836,10 @@ defineExpose({
                     v-for="item in imageConfig"
                     :key="item.id"
                     :style="{
-                      left: `${item.rect.x * CANVAS_SIZE}px`,
-                      top: `${item.rect.y * CANVAS_SIZE}px`,
-                      width: `${item.rect.width * CANVAS_SIZE}px`,
-                      height: `${item.rect.height * CANVAS_SIZE}px`
+                      left: `${item.rect.x * CANVAS_WIDTH}px`,
+                      top: `${item.rect.y * canvasHeight}px`,
+                      width: `${item.rect.width * CANVAS_WIDTH}px`,
+                      height: `${item.rect.height * canvasHeight}px`
                     }"
                     :class="[
                       'absolute cursor-pointer transition-all duration-200 p-1 text-sm font-medium rounded',
