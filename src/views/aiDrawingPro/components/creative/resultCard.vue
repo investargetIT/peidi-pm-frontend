@@ -254,7 +254,7 @@ defineExpose({
     <div class="flex items-end justify-between mb-[24px]">
       <h2 class="text-xl font-semibold text-[#0a0a0a]">历史记录</h2>
       <span class="text-xs text-[#0a0a0a]">
-        本月已生成 {{ useNumber }} / 100 条
+        本月已生成 {{ useNumber }} / 100 张
       </span>
     </div>
 
