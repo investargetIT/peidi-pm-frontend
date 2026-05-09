@@ -36,16 +36,17 @@ import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterial
 import PictureSizeDailog from "./pictureSizeDailog.vue";
 import ResultCard from "./resultCard.vue";
 
-import { AI_MODEL_OPTIONS } from "../drawingPro/utils/config";
+import { AI_MODEL_OPTIONS_WITH_PARAMS } from "./utils/config";
 
 const pictureSizeDailogRef = ref(null);
 const resultCardRef = ref(null);
 
 const loading = ref(false);
-const aiModel = ref(AI_MODEL_OPTIONS[0].value);
+const aiModel = ref(AI_MODEL_OPTIONS_WITH_PARAMS[0].modelName);
 const configForm = reactive({
-  size: "4K",
-  ratio: "auto",
+  size: AI_MODEL_OPTIONS_WITH_PARAMS[0].imageSize[0],
+  ratio: AI_MODEL_OPTIONS_WITH_PARAMS[0].imageRatio[0],
+  number: AI_MODEL_OPTIONS_WITH_PARAMS[0].imageNumber[0],
   prompt: ""
 });
 const resultPictures = ref<string[]>([
@@ -60,6 +61,18 @@ const dialogImageUrl = ref("");
 const dialogVisible = ref(false);
 const MAX_IMAGE_COUNT = 9;
 
+const handleModelChange = () => {
+  // 初始化图片尺寸、比例、生成数量等
+  configForm.size = AI_MODEL_OPTIONS_WITH_PARAMS.find(
+    item => item.modelName === aiModel.value
+  ).imageSize[0];
+  configForm.ratio = AI_MODEL_OPTIONS_WITH_PARAMS.find(
+    item => item.modelName === aiModel.value
+  ).imageRatio[0];
+  configForm.number = AI_MODEL_OPTIONS_WITH_PARAMS.find(
+    item => item.modelName === aiModel.value
+  ).imageNumber[0];
+};
 //#region 素材图片相关逻辑
 const handleFileChange: UploadProps["onChange"] = (uploadFile, uploadFiles) => {
   if (uploadFiles.length > MAX_IMAGE_COUNT) {
@@ -117,7 +130,7 @@ const handleGenerateClick = async () => {
   const paramsContent = await formatParams();
 
   const promises = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < configForm.number; i++) {
     if (
       aiModel.value === "wan2.7-image" ||
       aiModel.value === "wan2.7-image-pro"
@@ -166,14 +179,15 @@ const handleGenerateClick = async () => {
         resultPictures.value = validImages;
         selectedPictureIndex.value = 0;
 
-        if (successCount === 4) {
-          resultInfo.value = `生成完成，成功 ${successCount}/4`;
+        if (successCount === configForm.number) {
+          resultInfo.value = `生成完成，成功 ${successCount}/${configForm.number}`;
           ElMessage.success(resultInfo.value);
         } else {
-          resultInfo.value = `生成完成，成功 ${successCount}/4，失败 ${4 - successCount}/4`;
+          resultInfo.value = `生成完成，成功 ${successCount}/${configForm.number}，失败 ${configForm.number - successCount}/${configForm.number}`;
           ElMessage.warning(resultInfo.value);
         }
 
+        // return;
         const addRecordPromises = resultPictures.value.map((pic, index) => {
           return (
             resultCardRef.value?.addDrawRecord(pic, generateID()) ||
@@ -247,7 +261,7 @@ const formatParams = async () => {
         ]
       },
       parameters: {
-        size: "2K",
+        size: configForm.size,
         n: 1,
         watermark: false,
         thinking_mode: true
@@ -266,7 +280,7 @@ const formatParams = async () => {
       prompt: configForm.prompt,
       image: processedImageList,
       image_config: {
-        aspect_ratio: configForm.ratio,
+        aspect_ratio: configForm.ratio === "自动" ? "1:1" : configForm.ratio,
         image_size: configForm.size
       }
     };
@@ -376,6 +390,7 @@ onUnmounted(() => {
                   v-model="aiModel"
                   placeholder="请选择 AI 模型"
                   style="width: 180px"
+                  @change="handleModelChange"
                 >
                   <!-- <el-option label="nano-banana-2" value="nano-banana-2" />
                   <el-option label="nano-banana-pro" value="nano-banana-pro" />
@@ -385,10 +400,10 @@ onUnmounted(() => {
                     value="nano-banana-fast"
                   /> -->
                   <el-option
-                    v-for="item in AI_MODEL_OPTIONS"
-                    :key="item.value"
-                    :label="item.label"
-                    :value="item.value"
+                    v-for="item in AI_MODEL_OPTIONS_WITH_PARAMS"
+                    :key="item.modelName"
+                    :label="item.labelName"
+                    :value="item.modelName"
                   />
                 </el-select>
               </div>
@@ -420,34 +435,53 @@ onUnmounted(() => {
                 </el-form-item>
 
                 <div class="flex items-center justify-between">
-                  <el-form-item label="图片尺寸" style="width: 50%">
+                  <el-form-item label="图片尺寸" style="width: 33%">
                     <el-select
                       v-model="configForm.size"
                       placeholder="请选择图片尺寸"
                       style="width: 160px"
                     >
-                      <el-option label="1K" value="1K" />
-                      <el-option label="2K" value="2K" />
-                      <el-option label="4K" value="4K" />
+                      <el-option
+                        v-for="item in AI_MODEL_OPTIONS_WITH_PARAMS.find(
+                          item => item.modelName === aiModel
+                        ).imageSize"
+                        :key="item"
+                        :label="item"
+                        :value="item"
+                      />
                     </el-select>
                   </el-form-item>
-                  <el-form-item label="宽高比" style="width: 50%">
+                  <el-form-item label="宽高比" style="width: 33%">
                     <el-select
                       v-model="configForm.ratio"
                       placeholder="请选择宽高比"
                       style="width: 160px"
                     >
-                      <el-option label="自动" value="auto" />
-                      <el-option label="1:1" value="1:1" />
-                      <el-option label="16:9" value="16:9" />
-                      <el-option label="9:16" value="9:16" />
-                      <el-option label="4:3" value="4:3" />
-                      <el-option label="3:4" value="3:4" />
-                      <el-option label="3:2" value="3:2" />
-                      <el-option label="2:3" value="2:3" />
-                      <el-option label="5:4" value="5:4" />
-                      <el-option label="4:5" value="4:5" />
-                      <el-option label="21:9" value="21:9" />
+                      <el-option
+                        v-for="item in AI_MODEL_OPTIONS_WITH_PARAMS.find(
+                          item => item.modelName === aiModel
+                        ).imageRatio"
+                        :key="item"
+                        :label="item"
+                        :value="item"
+                      />
+                    </el-select>
+                  </el-form-item>
+
+                  <el-form-item label="生成数量" style="width: 33%">
+                    <el-select
+                      v-model="configForm.number"
+                      placeholder="请选择生成数量"
+                      style="width: 160px"
+                    >
+                      <el-option
+                        v-for="item in AI_MODEL_OPTIONS_WITH_PARAMS.find(
+                          item => item.modelName === aiModel
+                        ).imageNumber"
+                        :key="item"
+                        :label="item"
+                        :value="item"
+                      />
                     </el-select>
                   </el-form-item>
                 </div>
