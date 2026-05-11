@@ -248,8 +248,8 @@ export const processAndExportOBMData = async (
 
       // 填充到对应列
       row.getCell(9).value = valueI; // I 列
-      row.getCell(11).value = valueK; // K 列
-      row.getCell(13).value = Number(Math.max(0, valueM).toFixed(2)); // M 列，保留两位小数，小于 0 时为 0
+      row.getCell(11).value = Number(Math.max(0, valueK).toFixed(2)); // K 列 保留两位小数，小于 0 时为 0
+      row.getCell(13).value = Number(Math.max(0, valueM).toFixed(2)); // M 列 保留两位小数，小于 0 时为 0
       row.getCell(15).value = valueO; // O 列
 
       modifiedCount++;
