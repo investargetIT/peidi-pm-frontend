@@ -187,6 +187,7 @@ const handleGenerateClick = async () => {
           ElMessage.warning(resultInfo.value);
         }
 
+        // console.log("resultPictures.value:", resultPictures.value);
         // return;
         const addRecordPromises = resultPictures.value.map((pic, index) => {
           return (

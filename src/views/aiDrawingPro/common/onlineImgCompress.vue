@@ -84,6 +84,7 @@ const handlePreview = async () => {
       objectName: originalUrl
     });
     if (response) {
+      // console.log("response:", response);
       // 将 Blob 转换为 Base64
       const reader = new FileReader();
       reader.onloadend = () => {
