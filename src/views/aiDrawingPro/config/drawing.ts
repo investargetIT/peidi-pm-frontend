@@ -1,4 +1,4 @@
-import { ExcelTableItem } from "../type/drawing";
+import type { ExcelTableItem } from "../type/drawing";
 
 // 模型名称
 // export const GRSAI_MODEL_NAME = "nano-banana-fast";

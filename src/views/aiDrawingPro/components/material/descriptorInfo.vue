@@ -353,25 +353,25 @@ const descriptor = \`
           <el-button
             :icon="Pointer"
             type="primary"
-            @click="handleGenerateDescriptor"
             :loading="geminiLoading"
+            @click="handleGenerateDescriptor"
           >
             生成描述词
           </el-button>
         </el-form-item>
         <el-form-item label="描述词" prop="descriptor">
-          <el-input type="textarea" :rows="16" v-model="ruleForm.descriptor" />
+          <el-input v-model="ruleForm.descriptor" type="textarea" :rows="16" />
         </el-form-item>
         <el-form-item label="参数对照" prop="mapping">
-          <el-input type="textarea" :rows="12" v-model="ruleForm.mapping" />
+          <el-input v-model="ruleForm.mapping" type="textarea" :rows="12" />
         </el-form-item>
 
         <el-form-item>
           <div class="flex justify-end w-full">
             <el-button
               type="primary"
-              @click="submitForm(ruleFormRef)"
               :loading="loading"
+              @click="submitForm(ruleFormRef)"
             >
               保存
             </el-button>

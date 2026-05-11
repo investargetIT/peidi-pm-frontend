@@ -26,9 +26,15 @@ const initChangeFolderForm = (data: any) => {
 
   nextTick(() => {
     ruleFormRef.value?.resetFields();
-    const folder = JSON.parse(folderData.value.type)?.folder;
-    if (folder) {
-      ruleForm.folder = folder;
+    // const folder = JSON.parse(folderData.value.type)?.folder;
+    // if (folder) {
+    //   ruleForm.folder = folder;
+    // }
+    try {
+      const folder = JSON.parse(folderData.value.type)?.folder;
+      ruleForm.folder = folder || "默认文件夹";
+    } catch (e) {
+      ruleForm.folder = "默认文件夹";
     }
   });
 };
@@ -123,7 +129,7 @@ defineExpose({
 
         <el-form-item>
           <div class="flex justify-end w-full">
-            <el-button type="primary" @click="submitForm" :loading="loading">
+            <el-button type="primary" :loading="loading" @click="submitForm">
               保存
             </el-button>
           </div>

@@ -81,7 +81,7 @@ const fetchDrawRecordPage = () => {
 };
 
 const fetchAddDrawRecord = ({ path, imgName, imgType, useNumber }) => {
-  getDrawRecordNew({
+  return getDrawRecordNew({
     path,
     type: JSON.stringify({
       // imgType: "Original" | "Thumbnail"
@@ -117,116 +117,100 @@ onMounted(() => {
   // );
 });
 
-// 传入绝对路径地址 例"https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=800&fit=crop"
+// 传入绝对路径地址 例"https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=800&fit=crop" 或 base64 字符串
 const addDrawRecord = async (url: string, imgName: string) => {
-  // 随机生成 ID
   const randomId = generateID();
-  try {
-    // 1. 直接使用 fetch 下载图片（支持外部 URL）
-    const response = await fetch(url);
 
-    if (!response.ok) {
-      throw new Error(
-        `图片下载失败：${response.status} ${response.statusText}`
-      );
+  try {
+    let blob: Blob;
+    let base64_original: string;
+
+    if (url.startsWith("data:")) {
+      base64_original = url;
+      blob = blobManager.base64ToBlob(base64_original);
+    } else {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(
+          `图片下载失败：${response.status} ${response.statusText}`
+        );
+      }
+
+      blob = await response.blob();
+
+      const reader = new FileReader();
+      base64_original = await new Promise((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("图片读取失败"));
+        reader.readAsDataURL(blob);
+      });
     }
 
-    const blob = await response.blob();
+    const compressionResult = await processImageCompression(
+      base64_original,
+      url,
+      0.45
+    );
 
-    // 2. 将 Blob 转换为 base64
-    const reader = new FileReader();
+    const base64_thumbnail = compressionResult.compressedBase64;
 
-    return new Promise((resolve, reject) => {
-      reader.onloadend = async () => {
-        try {
-          const base64_original = reader.result as string;
+    const originalBlob = blobManager.base64ToBlob(base64_original);
+    const thumbnailBlob = blobManager.base64ToBlob(base64_thumbnail);
 
-          // 3. 压缩图片生成缩略图
-          const compressionResult = await processImageCompression(
-            base64_original,
-            url,
-            0.2
-          );
+    const originalFile = new File(
+      [originalBlob],
+      `${imgName}_${randomId}_original.png`,
+      {
+        type: "image/png"
+      }
+    );
+    const originalFormData = new FormData();
+    originalFormData.append("file", originalFile);
 
-          const base64_thumbnail = compressionResult.compressedBase64;
+    const originalRes: any = await uploadDraw(originalFormData);
 
-          // 4. 将 base64 转换为 Blob
-          const originalBlob = blobManager.base64ToBlob(base64_original);
-          const thumbnailBlob = blobManager.base64ToBlob(base64_thumbnail);
+    if (originalRes.code !== 200 || !originalRes.data) {
+      throw new Error("原图上传失败");
+    }
+    const originalPath = originalRes.data;
 
-          // 5. 创建 FormData 上传原图
-          const originalFile = new File(
-            [originalBlob],
-            `${imgName}_${randomId}_original.png`,
-            {
-              type: "image/png"
-            }
-          );
-          const originalFormData = new FormData();
-          originalFormData.append("file", originalFile);
+    const thumbnailFile = new File(
+      [thumbnailBlob],
+      `${imgName}_${randomId}_thumbnail.png`,
+      {
+        type: "image/png"
+      }
+    );
+    const thumbnailFormData = new FormData();
+    thumbnailFormData.append("file", thumbnailFile);
 
-          // 6. 上传原图，得到返回的相对路径
-          const originalRes: any = await uploadDraw(originalFormData);
+    const thumbnailRes: any = await uploadDraw(thumbnailFormData);
 
-          if (originalRes.code !== 200 || !originalRes.data) {
-            throw new Error("原图上传失败");
-          }
-          const originalPath = originalRes.data;
+    if (thumbnailRes.code !== 200 || !thumbnailRes.data) {
+      throw new Error("缩略图上传失败");
+    }
+    const thumbnailPath = thumbnailRes.data;
 
-          // 7. 创建 FormData 上传缩略图
-          const thumbnailFile = new File(
-            [thumbnailBlob],
-            `${imgName}_${randomId}_thumbnail.png`,
-            {
-              type: "image/png"
-            }
-          );
-          const thumbnailFormData = new FormData();
-          thumbnailFormData.append("file", thumbnailFile);
-
-          // 8. 上传缩略图，得到返回的相对路径
-          const thumbnailRes: any = await uploadDraw(thumbnailFormData);
-
-          if (thumbnailRes.code !== 200 || !thumbnailRes.data) {
-            throw new Error("缩略图上传失败");
-          }
-          const thumbnailPath = thumbnailRes.data;
-
-          // 9. 使用上传后得到的相对路径调用 fetchAddDrawRecord 添加记录
-          await fetchAddDrawRecord({
-            path: originalPath,
-            imgName,
-            imgType: "Original",
-            useNumber: useNumberTime
-          });
-
-          await fetchAddDrawRecord({
-            path: thumbnailPath,
-            imgName,
-            imgType: "Thumbnail",
-            useNumber: useNumberTime
-          });
-
-          ElMessage.success("记录添加成功");
-          resolve(true);
-        } catch (error) {
-          console.error("添加记录失败:", error);
-          ElMessage.error("添加记录失败:" + error.message);
-          reject(error);
-        }
-      };
-
-      reader.onerror = () => {
-        const error = new Error("图片读取失败");
-        ElMessage.error("图片读取失败");
-        reject(error);
-      };
-
-      reader.readAsDataURL(blob);
+    await fetchAddDrawRecord({
+      path: originalPath,
+      imgName,
+      imgType: "Original",
+      useNumber: useNumberTime
     });
+
+    await fetchAddDrawRecord({
+      path: thumbnailPath,
+      imgName,
+      imgType: "Thumbnail",
+      useNumber: useNumberTime
+    });
+
+    ElMessage.success("记录添加成功");
+    return true;
   } catch (error) {
-    console.error("下载图片失败:", error);
-    ElMessage.error("下载图片失败:" + error.message);
+    console.error("添加记录失败:", error);
+    ElMessage.error("添加记录失败:" + error.message);
     throw error;
   }
 };
@@ -254,7 +238,7 @@ defineExpose({
     <div class="flex items-end justify-between mb-[24px]">
       <h2 class="text-xl font-semibold text-[#0a0a0a]">历史记录</h2>
       <span class="text-xs text-[#0a0a0a]">
-        本月已生成 {{ useNumber }} / 100 条
+        本月已生成 {{ useNumber }} / 100 张
       </span>
     </div>
 

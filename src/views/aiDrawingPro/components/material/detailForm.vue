@@ -203,7 +203,10 @@ defineExpose({
         :disabled="loading"
       >
         <el-form-item label="名称" prop="name">
-          <el-input v-model="ruleForm.name" />
+          <el-input
+            v-model="ruleForm.name"
+            placeholder="素材名称必须全局唯一"
+          />
         </el-form-item>
         <el-form-item label="类型" prop="type">
           <el-select v-model="ruleForm.type" placeholder="请选择">
@@ -217,9 +220,9 @@ defineExpose({
         </el-form-item>
 
         <el-form-item
+          v-show="ruleForm.type === 'componentMaterial'"
           label="所属文件夹"
           prop="folder"
-          v-show="ruleForm.type === 'componentMaterial'"
         >
           <el-select
             v-model="ruleForm.folder"
@@ -253,7 +256,7 @@ defineExpose({
             </template>
 
             <template #tip>
-              <div class="el-upload__tip">
+              <div class="el-upload__tip !text-red-500">
                 限制上传1张图片，新图片会覆盖旧图片，大小不超过50MB
               </div>
             </template>
@@ -264,8 +267,8 @@ defineExpose({
           <div class="flex justify-end w-full">
             <el-button
               type="primary"
-              @click="submitForm(ruleFormRef)"
               :loading="loading"
+              @click="submitForm(ruleFormRef)"
             >
               保存
             </el-button>

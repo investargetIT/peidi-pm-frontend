@@ -151,3 +151,73 @@ const downloadImage = async (
   });
 };
 //#endregion
+
+// ... existing code ...
+//#endregion
+
+/**
+ * 调整图片尺寸，确保最小尺寸符合要求
+ * @param file 原始图片文件
+ * @param minSize 最小尺寸（宽度和高度），默认为 240
+ * @returns Promise<File> 返回调整后的文件（如果不需要调整则返回原文件）
+ */
+export const resizeImageIfNeeded = (
+  file: File,
+  minSize: number = 240
+): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+
+      if (img.width >= minSize && img.height >= minSize) {
+        resolve(file);
+        return;
+      }
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      let newWidth = img.width;
+      let newHeight = img.height;
+
+      if (newWidth < minSize) {
+        const ratio = minSize / newWidth;
+        newWidth = minSize;
+        newHeight = Math.round(img.height * ratio);
+      }
+
+      if (newHeight < minSize) {
+        const ratio = minSize / newHeight;
+        newHeight = minSize;
+        newWidth = Math.round(newWidth * ratio);
+      }
+
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+
+      ctx?.drawImage(img, 0, 0, newWidth, newHeight);
+
+      canvas.toBlob(blob => {
+        if (blob) {
+          const resizedFile = new File([blob], file.name, {
+            type: file.type,
+            lastModified: Date.now()
+          });
+          resolve(resizedFile);
+        } else {
+          reject(new Error("图片调整大小失败"));
+        }
+      }, file.type);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("图片加载失败"));
+    };
+
+    img.src = url;
+  });
+};

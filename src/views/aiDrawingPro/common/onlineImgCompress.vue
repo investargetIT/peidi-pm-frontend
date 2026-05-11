@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { onUnmounted, ref, watch } from "vue";
 import { downloadFile } from "@/api/aiDraw";
 import { ElMessage } from "element-plus";
 import { snapdom } from "@zumer/snapdom";
@@ -26,6 +26,11 @@ const exportContainer = ref<HTMLElement | null>(null);
 watch(
   () => props.url,
   async newVal => {
+    // 释放旧的 Blob URL
+    if (imageUrl.value && imageUrl.value.startsWith("blob:")) {
+      URL.revokeObjectURL(imageUrl.value);
+    }
+
     if (!newVal) {
       imageUrl.value = "";
       return;
@@ -51,6 +56,15 @@ watch(
   { immediate: true }
 );
 
+onUnmounted(() => {
+  if (imageUrl.value && imageUrl.value.startsWith("blob:")) {
+    URL.revokeObjectURL(imageUrl.value);
+  }
+  if (previewImageUrl.value && previewImageUrl.value.startsWith("blob:")) {
+    URL.revokeObjectURL(previewImageUrl.value);
+  }
+});
+
 //#region 图片预览
 const previewVisible = ref(false);
 const previewImageUrl = ref("");
@@ -70,6 +84,7 @@ const handlePreview = async () => {
       objectName: originalUrl
     });
     if (response) {
+      // console.log("response:", response);
       // 将 Blob 转换为 Base64
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -139,10 +154,9 @@ const exportAsPNG = async () => {
           fit="contain"
           preview-teleported
           :style="{ width: props.size, height: props.size }"
-          @click="handlePreview"
           style="cursor: pointer"
-        >
-        </el-image>
+          @click="handlePreview"
+        />
       </div>
     </div>
 
@@ -153,10 +167,10 @@ const exportAsPNG = async () => {
           placeholder="请选择导出尺寸"
           style="width: 160px; margin-right: 10px"
         >
-          <el-option label="800*800" value="800"></el-option>
-          <el-option label="1400*1400" value="1400"></el-option>
-          <el-option label="2048*2048" value="2048"></el-option>
-          <el-option label="4096*4096" value="4096"></el-option>
+          <el-option label="800*800" value="800" />
+          <el-option label="1400*1400" value="1400" />
+          <el-option label="2048*2048" value="2048" />
+          <el-option label="4096*4096" value="4096" />
         </el-select>
         <div>
           <el-button type="primary" @click="exportAsPNG"> 导出 PNG </el-button>
@@ -177,8 +191,7 @@ const exportAsPNG = async () => {
               :src="previewImageUrl"
               alt="图片预览"
               fit="contain"
-            >
-            </el-image>
+            />
           </template>
         </el-skeleton>
       </div>

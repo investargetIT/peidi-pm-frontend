@@ -247,9 +247,9 @@ defineExpose({
     />
 
     <TableDataCard
+      v-model:tableData="tableData"
       :loading="loading"
       :loadingTableData="loadingTableData"
-      v-model:tableData="tableData"
       :handleEditStatus="handleEditStatus"
       :handleGoodsClick="handleGoodsClick"
       :handleSelectionChange="handleSelectionChange"

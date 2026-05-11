@@ -116,6 +116,14 @@ export const transferDrawAliyun = (data: { urlParam: string }) => {
   });
 };
 
+// 中转 qnaigc模型
+export const transferDrawQnaigc = (data: { urlParam: string }) => {
+  return http.request("post", baseUrlApi("/ai/draw/transfer/qnaigc"), {
+    data,
+    timeout: 0
+  });
+};
+
 // 获取bi_almama_image数据 点击率数据
 export const getClickRateTrend = (params: AiDrawPageRequest) => {
   return http.request("get", baseUrlApi("/oms/bi/almama-image"), {

@@ -104,7 +104,7 @@ defineExpose({
               :value="item.objectName"
             />
           </el-select>
-          <OnlineImg :url="ruleForm.gift" size="100px" v-if="ruleForm.gift" />
+          <OnlineImg v-if="ruleForm.gift" :url="ruleForm.gift" size="100px" />
         </el-form-item>
 
         <el-form-item label="模板" prop="template">
@@ -117,9 +117,9 @@ defineExpose({
             />
           </el-select>
           <OnlineImg
+            v-if="ruleForm.template"
             :url="ruleForm.template"
             size="100px"
-            v-if="ruleForm.template"
           />
         </el-form-item>
 
@@ -137,9 +137,9 @@ defineExpose({
             />
           </el-select>
           <OnlineImg
+            v-if="ruleForm.activityLogo"
             :url="ruleForm.activityLogo"
             size="100px"
-            v-if="ruleForm.activityLogo"
           />
         </el-form-item>
 
@@ -153,9 +153,9 @@ defineExpose({
             />
           </el-select>
           <OnlineImg
+            v-if="ruleForm.shopLogo"
             :url="ruleForm.shopLogo"
             size="100px"
-            v-if="ruleForm.shopLogo"
           />
         </el-form-item>
 
@@ -181,7 +181,7 @@ defineExpose({
 
         <el-form-item>
           <div class="flex justify-end w-full">
-            <el-button type="primary" @click="submitForm" :loading="loading">
+            <el-button type="primary" :loading="loading" @click="submitForm">
               保存
             </el-button>
           </div>

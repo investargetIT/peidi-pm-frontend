@@ -5,7 +5,12 @@ import {
   exportConfigToExcel,
   importConfigFromExcel
 } from "./utils/exportConfigExcel";
-import { transferDraw, transferDrawAliyun } from "@/api/aiDraw";
+import { AI_MODEL_OPTIONS } from "./utils/config";
+import {
+  transferDraw,
+  transferDrawAliyun,
+  transferDrawQnaigc
+} from "@/api/aiDraw";
 import imageUrl1 from "@/views/debug/assets/绘图1.png";
 import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
 import { blobManager } from "../../utils/blobManager";
@@ -23,14 +28,7 @@ import {
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
-const AI_MODEL_OPTIONS = [
-  { label: "阿里 wan2.7-image", value: "wan2.7-image" },
-  { label: "阿里 wan2.7-image-pro", value: "wan2.7-image-pro" },
-  { label: "谷歌 nano-banana-2", value: "nano-banana-2" },
-  { label: "谷歌 nano-banana-pro", value: "nano-banana-pro" },
-  { label: "谷歌 nano-banana-fast", value: "nano-banana-fast" }
-];
-const aiModel = ref("wan2.7-image");
+const aiModel = ref(AI_MODEL_OPTIONS[0].value);
 
 const props = defineProps({
   imageConfig: {
@@ -72,7 +70,7 @@ const tableColumns = computed(() => {
     prop: string;
     label: string;
     width?: number;
-    type?: "text" | "image" | "aiRef" | "keepRef" | "remark";
+    type?: "text" | "image" | "aiRef" | "eraseRef" | "remark";
   }> = [];
 
   let index = 0;
@@ -93,17 +91,17 @@ const tableColumns = computed(() => {
         width: 200,
         type: "image"
       });
+      // columns.push({
+      //   prop: `${item.id}_aiRef`,
+      //   label: `AI 引用`,
+      //   width: 100,
+      //   type: "aiRef"
+      // });
       columns.push({
-        prop: `${item.id}_aiRef`,
-        label: `AI 引用`,
+        prop: `${item.id}_eraseRef`,
+        label: `是否抹除`,
         width: 100,
-        type: "aiRef"
-      });
-      columns.push({
-        prop: `${item.id}_keepRef`,
-        label: `是否保留`,
-        width: 100,
-        type: "keepRef"
+        type: "eraseRef"
       });
     } else if (item.type === "group" && item.content) {
       item.content.forEach(field => {
@@ -120,12 +118,19 @@ const tableColumns = computed(() => {
   // 添加备注列
   columns.push({
     prop: "remark",
-    label: "第一优先级提示词",
+    label: "必做事项",
     width: 200,
     type: "remark"
   });
 
   return columns;
+});
+
+// 判断是否至少有一个结果
+const hasAnyResult = computed(() => {
+  return Object.keys(generatedResults.value).some(
+    id => generatedResults.value[Number(id)]?.length > 0
+  );
 });
 
 const exportConfig = () => {
@@ -173,7 +178,7 @@ const parseExcelData = (jsonData: any[]) => {
         } else if (item.type === "image") {
           const imageKey = `${item.id}_image`;
           const aiRefKey = `${item.id}_aiRef`;
-          const keepRefKey = `${item.id}_keepRef`;
+          const eraseRefKey = `${item.id}_eraseRef`;
 
           const imageName = row[item.name];
           // console.log("数据解析函数", imageName, props.materialList);
@@ -200,9 +205,9 @@ const parseExcelData = (jsonData: any[]) => {
             row[`${item.name}-AI 引用`] === "是" ||
             row[`${item.name}-AI 引用`] === true ||
             false;
-          parsedRow[keepRefKey] =
-            row[`${item.name}-是否保留`] === "是" ||
-            row[`${item.name}-是否保留`] === true ||
+          parsedRow[eraseRefKey] =
+            row[`${item.name}-是否抹除`] === "是" ||
+            row[`${item.name}-是否抹除`] === true ||
             false;
         } else if (item.type === "group" && item.content) {
           item.content.forEach(field => {
@@ -213,17 +218,8 @@ const parseExcelData = (jsonData: any[]) => {
       });
 
       // 解析备注字段
-      if (
-        row["第一优先级提示词"] ||
-        row["备注 Remark"] ||
-        row["Remark"] ||
-        row["备注"]
-      ) {
-        parsedRow["remark"] =
-          row["第一优先级提示词"] ||
-          row["备注 Remark"] ||
-          row["Remark"] ||
-          row["备注"];
+      if (row["第一优先级提示词"] || row["必做事项"]) {
+        parsedRow["remark"] = row["第一优先级提示词"] || row["必做事项"];
       }
 
       // 如果存在全局的第一优先级提示词，则添加到 remark 字段
@@ -431,7 +427,12 @@ const renderCell = (row: Record<string, any>, column: any) => {
   }
 
   // 是否保留列显示开关状态
-  if (prop.endsWith("_keepRef")) {
+  // if (prop.endsWith("_keepRef")) {
+  //   return value ? "是" : "否";
+  // }
+
+  // 是否抹除列显示开关状态
+  if (prop.endsWith("_eraseRef")) {
     return value ? "是" : "否";
   }
 
@@ -550,7 +551,7 @@ const buildPrompt = (rowData: Record<string, any>) => {
       // return { ...baseItem };
       const imageData = rowData[`${item.id}_image`];
       const aiRef = rowData[`${item.id}_aiRef`];
-      const keepRef = rowData[`${item.id}_keepRef`];
+      const eraseRef = rowData[`${item.id}_eraseRef`];
 
       if (aiRef && imageData) {
         imageCount++;
@@ -559,7 +560,7 @@ const buildPrompt = (rowData: Record<string, any>) => {
           image: `第 ${imageCount + 1} 张图`
         };
       }
-      if (!imageData && keepRef) {
+      if (!imageData && !eraseRef) {
         return {
           ...baseItem,
           image: null,
@@ -732,49 +733,92 @@ const generateSingleImage = async (
         throw new Error(response?.msg || "生成失败");
       }
     } else {
+      // 切换接口为 qnaigc模型
+      const processedImageList = [base64Url1_, ...base64MaterialUrls].map(
+        url => {
+          return url.replace(
+            "data:application/json;base64,",
+            "data:image/png;base64,"
+          );
+        }
+      );
+
       params = {
         model: aiModel.value,
         prompt: buildPrompt(row),
-        aspectRatio: "auto",
-        imageSize: "4K",
-        shutProgress: false,
-        urls: [base64Url1_, ...base64MaterialUrls]
-        // urls: [base64Url1_]
+        image: processedImageList,
+        image_config: {
+          aspect_ratio: "auto",
+          image_size: "4K"
+        }
       };
-      console.log("params:", params);
-      // return;
-      response = await transferDraw({
+      console.log("通用模型请求参数：", params);
+
+      response = await transferDrawQnaigc({
         urlParam: JSON.stringify(params)
       });
-      console.log("response:", response);
-      if (response.code === 200 && response.data?.[0]) {
-        // 将结果图片转为 base64
-        const resultImg = new Image();
-        resultImg.crossOrigin = "anonymous";
+      console.log("通用模型响应：", response);
 
-        return new Promise<string>((resolve, reject) => {
-          resultImg.onload = () => {
-            const canvas = document.createElement("canvas");
-            canvas.width = resultImg.width;
-            canvas.height = resultImg.height;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) {
-              reject(new Error("无法获取 canvas 上下文"));
-              return;
-            }
-            ctx.drawImage(resultImg, 0, 0);
-            const base64 = canvas.toDataURL("image/png");
-            resolve(base64);
-          };
-          resultImg.onerror = () => {
-            reject(new Error("结果图片加载失败"));
-          };
-          resultImg.src = response.data[0];
-        });
+      if (response.code === 200 && response.data) {
+        const dataArray =
+          typeof response.data === "string"
+            ? JSON.parse(response.data)
+            : response.data;
+
+        if (dataArray?.[0]?.b64_json) {
+          const resultBase64 = "data:image/png;base64," + dataArray[0].b64_json;
+          return resultBase64;
+        } else {
+          throw new Error("生成失败: 未获取到图片数据");
+        }
       } else {
         throw new Error(response?.msg || "生成失败");
       }
     }
+    // {
+    //   params = {
+    //     model: aiModel.value,
+    //     prompt: buildPrompt(row),
+    //     aspectRatio: "auto",
+    //     imageSize: "4K",
+    //     shutProgress: false,
+    //     urls: [base64Url1_, ...base64MaterialUrls]
+    //     // urls: [base64Url1_]
+    //   };
+    //   console.log("params:", params);
+    //   // return;
+    //   response = await transferDraw({
+    //     urlParam: JSON.stringify(params)
+    //   });
+    //   console.log("response:", response);
+    //   if (response.code === 200 && response.data?.[0]) {
+    //     // 将结果图片转为 base64
+    //     const resultImg = new Image();
+    //     resultImg.crossOrigin = "anonymous";
+
+    //     return new Promise<string>((resolve, reject) => {
+    //       resultImg.onload = () => {
+    //         const canvas = document.createElement("canvas");
+    //         canvas.width = resultImg.width;
+    //         canvas.height = resultImg.height;
+    //         const ctx = canvas.getContext("2d");
+    //         if (!ctx) {
+    //           reject(new Error("无法获取 canvas 上下文"));
+    //           return;
+    //         }
+    //         ctx.drawImage(resultImg, 0, 0);
+    //         const base64 = canvas.toDataURL("image/png");
+    //         resolve(base64);
+    //       };
+    //       resultImg.onerror = () => {
+    //         reject(new Error("结果图片加载失败"));
+    //       };
+    //       resultImg.src = response.data[0];
+    //     });
+    //   } else {
+    //     throw new Error(response?.msg || "生成失败");
+    //   }
+    // }
     //#endregion
   } catch (error: any) {
     console.error("生成图片失败:", error);
@@ -816,15 +860,20 @@ const handleBatchGenerate = async () => {
   for (let i = 0; i < importedDataList.value.length; i++) {
     const row = importedDataList.value[i];
     currentGeneratingId.value = row._id;
-    generatingProgress.value = Math.round(((i + 1) / total) * 100);
+
+    if (i === 0) {
+      generatingProgress.value = Math.round((1 / total) * 50);
+    }
 
     try {
       const resultBase64 = await generateSingleImage(row);
       generatedResults.value[row._id] = [resultBase64];
       successCount.value++;
+      generatingProgress.value = Math.round(((i + 1) / total) * 100);
       ElMessage.success(`第 ${i + 1} 张图片生成成功`);
     } catch (error: any) {
       failCount.value++;
+      generatingProgress.value = Math.round(((i + 1) / total) * 100);
       ElMessage.error(`第 ${i + 1} 张图片生成失败：${error.message}`);
       generatedResults.value[row._id] = [];
     }
@@ -868,6 +917,16 @@ const generateCompositeFromRowData = async (
     console.log("背景图 URL:", imageUrl);
     console.log("行数据:", rowData);
     console.log("图片配置:", imageConfig);
+
+    const bgImg = new Image();
+    await new Promise<void>((resolve, reject) => {
+      bgImg.onload = () => resolve();
+      bgImg.onerror = () => reject(new Error("背景图加载失败"));
+      bgImg.src = imageUrl;
+    });
+    const canvasWidth = size;
+    const canvasHeight = Math.round(size * (bgImg.height / bgImg.width));
+    console.log(`画布尺寸: ${canvasWidth} × ${canvasHeight}`);
 
     const imageConfigs = imageConfig.filter(item => item.type === "image");
     console.log("图片类型配置数量:", imageConfigs.length);
@@ -925,12 +984,18 @@ const generateCompositeFromRowData = async (
                 console.log(`✓ 从素材库下载并转换成功：${config.name}`);
               } else {
                 const response = await fetch(materialUrl);
+                if (!response.ok) {
+                  throw new Error(`HTTP error: ${response.status}`);
+                }
                 const blob = await response.blob();
                 base64Data = await blobManager.blobToBase64(blob);
                 console.log(`✓ 从 HTTP URL 加载成功：${config.name}`);
               }
             } else if (imageData.startsWith("http")) {
               const response = await fetch(imageData);
+              if (!response.ok) {
+                throw new Error(`HTTP error: ${response.status}`);
+              }
               const blob = await response.blob();
               base64Data = await blobManager.blobToBase64(blob);
               console.log(`✓ 从 HTTP URL 加载成功：${config.name}`);
@@ -993,8 +1058,8 @@ const generateCompositeFromRowData = async (
       let offsetY = 0;
 
       if (config.rect?.width && config.rect?.height) {
-        const targetWidth = config.rect.width * 700;
-        const targetHeight = config.rect.height * 700;
+        const targetWidth = config.rect.width * canvasWidth;
+        const targetHeight = config.rect.height * canvasHeight;
 
         imgRatio = imgElement.width / imgElement.height;
         const targetRatio = targetWidth / targetHeight;
@@ -1016,8 +1081,11 @@ const generateCompositeFromRowData = async (
 
       const element = {
         src: task.base64Data,
-        x: (config.rect?.x * 700 || 50 + elements.length * 20) + offsetX,
-        y: (config.rect?.y * 700 || 50 + elements.length * 20) + offsetY,
+        x:
+          (config.rect?.x * canvasWidth || 50 + elements.length * 20) + offsetX,
+        y:
+          (config.rect?.y * canvasHeight || 50 + elements.length * 20) +
+          offsetY,
         width: elementWidth,
         height: elementHeight
       };
@@ -1033,8 +1101,39 @@ const generateCompositeFromRowData = async (
     console.log(`\n最终加载的元素数量：${elements.length}`);
     console.log("元素列表:", elements);
 
+    const hasGiftElement = loadImageTasks.some(
+      task => task.config.name === "赠品"
+    );
+
+    if (!hasGiftElement) {
+      const productImageTask = loadImageTasks.find(
+        task => task.config.name === "商品图"
+      );
+
+      if (productImageTask) {
+        const productElementIndex = elements.findIndex(
+          (_, index) => loadImageTasks[index].config.name === "商品图"
+        );
+
+        if (productElementIndex !== -1) {
+          // const containerWidth = 700;
+          const productElement = elements[productElementIndex];
+          productElement.x = (canvasWidth - productElement.width) / 2;
+
+          console.log(
+            `✓ 赠品不存在，商品图已居中，新X坐标: ${productElement.x.toFixed(2)}`
+          );
+        }
+      }
+    }
+
     console.log("开始 Canvas 合成...");
-    const compositeBase64 = await compositeImage(imageUrl, elements, size);
+    const compositeBase64 = await compositeImage(
+      imageUrl,
+      elements,
+      canvasWidth,
+      canvasHeight
+    );
     console.log("✓ Canvas 合成成功");
     return compositeBase64;
   } catch (error) {
@@ -1106,7 +1205,11 @@ const exportAllResults = async () => {
         console.log("批量导出合成结果图:", compositeBase64);
 
         if (compositeBase64) {
-          const fileName = `${rowData.productName || `AI_Image_${i + 1}`}.png`;
+          // 查找rowData对象里是否有属性名带有产品名称的属性
+          const productName = Object.keys(rowData).find(key =>
+            key.includes("产品名称")
+          );
+          const fileName = `${rowData[productName] || `AI_Image_${i + 1}`}.jpg`;
 
           const base64Data = compositeBase64.split(",")[1];
           const binaryString = atob(base64Data);
@@ -1197,16 +1300,16 @@ defineExpose({
                 <el-button
                   color="#217346"
                   size="small"
-                  @click="exportConfig"
                   :icon="Download"
+                  @click="exportConfig"
                 >
-                  导出配置表
+                  生成配置表
                 </el-button>
                 <el-button
                   color="#427AED"
                   size="small"
-                  @click="importConfig"
                   :icon="Upload"
+                  @click="importConfig"
                 >
                   导入配置表
                 </el-button>
@@ -1219,7 +1322,7 @@ defineExpose({
         <div class="text-base font-bold text-gray-800">
           配置表
           <span class="text-sm text-gray-500 font-normal">
-            (点击右侧导出配置表，支持多次导入配置表)
+            (点击右侧生成配置表，支持多次导入配置表，导出名称默认取带有产品名称的属性值)
           </span>
         </div>
         <div class="flex items-center">
@@ -1227,17 +1330,17 @@ defineExpose({
             color="#CC6600"
             type="primary"
             size="small"
+            :disabled="!hasAnyResult || batchGenerating"
             @click="exportAllResults"
-            :disabled="importedDataList.length === 0 || batchGenerating"
           >
             📥 导出全部结果图
           </el-button>
           <el-button
             type="danger"
             size="small"
-            @click="clearAll"
             :disabled="importedDataList.length === 0"
             :icon="Delete"
+            @click="clearAll"
           >
             清空全部
           </el-button>
@@ -1245,9 +1348,9 @@ defineExpose({
             color="#534CE7"
             type="primary"
             size="small"
-            @click="handleBatchGenerate"
             :loading="batchGenerating"
             :disabled="importedDataList.length === 0"
+            @click="handleBatchGenerate"
           >
             ✨ 开始绘制
           </el-button>
@@ -1283,6 +1386,7 @@ defineExpose({
                     :percentage="generatingProgress"
                     :stroke-width="10"
                     color="#534CE7"
+                    class="rotating-progress-circle"
                   />
                   <span class="ml-4 text-gray-600">正在生成...</span>
                 </div>
@@ -1333,7 +1437,6 @@ defineExpose({
             :key="col.prop"
             :prop="col.prop"
             :label="col.label"
-            :width="col.width"
             align="center"
           >
             <template #default="{ row }">
@@ -1343,10 +1446,7 @@ defineExpose({
                   <OnlineImg :url="row[col.prop]" size="70px" />
                 </div>
               </div>
-              <div
-                v-else
-                v-text="renderCell(row, { property: col.prop })"
-              ></div>
+              <div v-else v-text="renderCell(row, { property: col.prop })" />
             </template>
           </el-table-column>
 
@@ -1357,7 +1457,7 @@ defineExpose({
             fixed="right"
             align="center"
           >
-            <template #default="{ $index, row, $codex }">
+            <template #default="{ $index, row }">
               <el-tooltip
                 effect="dark"
                 content="重新生成"
@@ -1368,16 +1468,16 @@ defineExpose({
                   text
                   type="primary"
                   size="small"
-                  @click="regenerateRow($index, row)"
                   :icon="Refresh"
+                  @click="regenerateRow($index, row)"
                 />
               </el-tooltip>
               <el-button
                 text
                 type="danger"
                 size="small"
-                @click="deleteRow($index)"
                 :icon="Delete"
+                @click="deleteRow($index)"
               />
             </template>
           </el-table-column>
@@ -1404,5 +1504,20 @@ defineExpose({
 <style scoped>
 .empty-data-tip {
   color: #909399;
+}
+
+.rotating-progress-circle :deep(.el-progress-circle__track),
+.rotating-progress-circle :deep(.el-progress-circle__path) {
+  animation: rotate 2s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

@@ -18,13 +18,16 @@ import {
   getMaterialPage,
   newMaterial,
   uploadDraw,
-  transferDraw
+  transferDraw,
+  transferDrawAliyun,
+  transferDrawQnaigc
 } from "@/api/aiDraw";
 
 import {
   fileToBase64,
   downloadImageFromUrl,
-  generateID
+  generateID,
+  resizeImageIfNeeded
 } from "../../utils/general";
 import { imageCache } from "../../utils/imageCache";
 import { blobManager } from "../../utils/blobManager";
@@ -33,14 +36,17 @@ import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterial
 import PictureSizeDailog from "./pictureSizeDailog.vue";
 import ResultCard from "./resultCard.vue";
 
+import { AI_MODEL_OPTIONS_WITH_PARAMS } from "./utils/config";
+
 const pictureSizeDailogRef = ref(null);
 const resultCardRef = ref(null);
 
 const loading = ref(false);
-const aiModel = ref("nano-banana-2");
+const aiModel = ref(AI_MODEL_OPTIONS_WITH_PARAMS[0].modelName);
 const configForm = reactive({
-  size: "4K",
-  ratio: "auto",
+  size: AI_MODEL_OPTIONS_WITH_PARAMS[0].imageSize[0],
+  ratio: AI_MODEL_OPTIONS_WITH_PARAMS[0].imageRatio[0],
+  number: AI_MODEL_OPTIONS_WITH_PARAMS[0].imageNumber[0],
   prompt: ""
 });
 const resultPictures = ref<string[]>([
@@ -55,6 +61,18 @@ const dialogImageUrl = ref("");
 const dialogVisible = ref(false);
 const MAX_IMAGE_COUNT = 9;
 
+const handleModelChange = () => {
+  // 初始化图片尺寸、比例、生成数量等
+  configForm.size = AI_MODEL_OPTIONS_WITH_PARAMS.find(
+    item => item.modelName === aiModel.value
+  ).imageSize[0];
+  configForm.ratio = AI_MODEL_OPTIONS_WITH_PARAMS.find(
+    item => item.modelName === aiModel.value
+  ).imageRatio[0];
+  configForm.number = AI_MODEL_OPTIONS_WITH_PARAMS.find(
+    item => item.modelName === aiModel.value
+  ).imageNumber[0];
+};
 //#region 素材图片相关逻辑
 const handleFileChange: UploadProps["onChange"] = (uploadFile, uploadFiles) => {
   if (uploadFiles.length > MAX_IMAGE_COUNT) {
@@ -112,33 +130,65 @@ const handleGenerateClick = async () => {
   const paramsContent = await formatParams();
 
   const promises = [];
-  for (let i = 0; i < 4; i++) {
-    promises.push(transferDraw({ urlParam: JSON.stringify(paramsContent) }));
+  for (let i = 0; i < configForm.number; i++) {
+    if (
+      aiModel.value === "wan2.7-image" ||
+      aiModel.value === "wan2.7-image-pro"
+    ) {
+      promises.push(
+        transferDrawAliyun({ urlParam: JSON.stringify(paramsContent) })
+      );
+    } else {
+      promises.push(
+        transferDrawQnaigc({ urlParam: JSON.stringify(paramsContent) })
+      );
+    }
   }
 
   Promise.all(promises)
     .then((results: any[]) => {
-      const successCount = results.filter(
-        res => res.code === 200 && res.data?.[0]
-      ).length;
+      const validImages: string[] = [];
+
+      results.forEach(res => {
+        if (res.code === 200 && res.data) {
+          let imageUrl = null;
+
+          if (
+            aiModel.value === "wan2.7-image" ||
+            aiModel.value === "wan2.7-image-pro"
+          ) {
+            imageUrl = res.data;
+          } else {
+            const dataArray =
+              typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+
+            if (dataArray?.[0]?.b64_json) {
+              imageUrl = "data:image/png;base64," + dataArray[0].b64_json;
+            }
+          }
+
+          if (imageUrl) {
+            validImages.push(imageUrl);
+          }
+        }
+      });
+
+      const successCount = validImages.length;
 
       if (successCount > 0) {
-        const validImages = results
-          .filter(res => res.code === 200 && res.data?.[0])
-          .map(res => res.data[0]);
-
         resultPictures.value = validImages;
         selectedPictureIndex.value = 0;
 
-        if (successCount === 4) {
-          resultInfo.value = `生成完成，成功 ${successCount}/4`;
+        if (successCount === configForm.number) {
+          resultInfo.value = `生成完成，成功 ${successCount}/${configForm.number}`;
           ElMessage.success(resultInfo.value);
         } else {
-          resultInfo.value = `生成完成，成功 ${successCount}/4，失败 ${4 - successCount}/4`;
+          resultInfo.value = `生成完成，成功 ${successCount}/${configForm.number}，失败 ${configForm.number - successCount}/${configForm.number}`;
           ElMessage.warning(resultInfo.value);
         }
 
-        // 生成成功几个 就调用几次 addDrawRecord
+        // console.log("resultPictures.value:", resultPictures.value);
+        // return;
         const addRecordPromises = resultPictures.value.map((pic, index) => {
           return (
             resultCardRef.value?.addDrawRecord(pic, generateID()) ||
@@ -171,9 +221,13 @@ const formatParams = async () => {
   let base64Urls = [];
   if (fileList.value && fileList.value.length > 0) {
     try {
-      const promises = fileList.value.map(file => {
+      const promises = fileList.value.map(async file => {
         if (file.raw) {
-          return fileToBase64(file as any);
+          const resizedFile = await resizeImageIfNeeded(file.raw);
+          if (resizedFile !== file.raw) {
+            // ElMessage.success(`图片 "${file.name}" 已自动调整为合适尺寸`);
+          }
+          return fileToBase64({ raw: resizedFile } as any);
         }
         return Promise.resolve(file.url || "");
       });
@@ -184,14 +238,54 @@ const formatParams = async () => {
     }
   }
 
-  return {
-    model: aiModel.value,
-    prompt: configForm.prompt,
-    aspectRatio: configForm.ratio,
-    imageSize: configForm.size,
-    urls: base64Urls,
-    shutProgress: false
-  };
+  // 图片配置
+  // const PictureConfigPrompt =
+  //   "图片尺寸: " + configForm.size + " 图片比例: " + configForm.ratio;
+
+  if (
+    aiModel.value === "wan2.7-image" ||
+    aiModel.value === "wan2.7-image-pro"
+  ) {
+    return {
+      model: aiModel.value,
+      input: {
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                text: configForm.prompt
+              },
+              ...base64Urls.map(url => ({ image: url }))
+            ]
+          }
+        ]
+      },
+      parameters: {
+        size: configForm.size,
+        n: 1,
+        watermark: false,
+        thinking_mode: true
+      }
+    };
+  } else {
+    const processedImageList = base64Urls.map(url => {
+      return url.replace(
+        "data:application/json;base64,",
+        "data:image/png;base64,"
+      );
+    });
+
+    return {
+      model: aiModel.value,
+      prompt: configForm.prompt,
+      image: processedImageList,
+      image_config: {
+        aspect_ratio: configForm.ratio === "自动" ? "1:1" : configForm.ratio,
+        image_size: configForm.size
+      }
+    };
+  }
 };
 //#endregion
 
@@ -297,23 +391,21 @@ onUnmounted(() => {
                   v-model="aiModel"
                   placeholder="请选择 AI 模型"
                   style="width: 180px"
+                  @change="handleModelChange"
                 >
-                  <el-option
-                    label="nano-banana-2"
-                    value="nano-banana-2"
-                  ></el-option>
-                  <el-option
-                    label="nano-banana-pro"
-                    value="nano-banana-pro"
-                  ></el-option>
-                  <el-option
-                    label="nano-banana"
-                    value="nano-banana"
-                  ></el-option>
+                  <!-- <el-option label="nano-banana-2" value="nano-banana-2" />
+                  <el-option label="nano-banana-pro" value="nano-banana-pro" />
+                  <el-option label="nano-banana" value="nano-banana" />
                   <el-option
                     label="nano-banana-fast"
                     value="nano-banana-fast"
-                  ></el-option>
+                  /> -->
+                  <el-option
+                    v-for="item in AI_MODEL_OPTIONS_WITH_PARAMS"
+                    :key="item.modelName"
+                    :label="item.labelName"
+                    :value="item.modelName"
+                  />
                 </el-select>
               </div>
 
@@ -344,34 +436,53 @@ onUnmounted(() => {
                 </el-form-item>
 
                 <div class="flex items-center justify-between">
-                  <el-form-item label="图片尺寸" style="width: 50%">
+                  <el-form-item label="图片尺寸" style="width: 33%">
                     <el-select
                       v-model="configForm.size"
                       placeholder="请选择图片尺寸"
                       style="width: 160px"
                     >
-                      <el-option label="1K" value="1K" />
-                      <el-option label="2K" value="2K" />
-                      <el-option label="4K" value="4K" />
+                      <el-option
+                        v-for="item in AI_MODEL_OPTIONS_WITH_PARAMS.find(
+                          item => item.modelName === aiModel
+                        ).imageSize"
+                        :key="item"
+                        :label="item"
+                        :value="item"
+                      />
                     </el-select>
                   </el-form-item>
-                  <el-form-item label="宽高比" style="width: 50%">
+                  <el-form-item label="宽高比" style="width: 33%">
                     <el-select
                       v-model="configForm.ratio"
                       placeholder="请选择宽高比"
                       style="width: 160px"
                     >
-                      <el-option label="自动" value="auto" />
-                      <el-option label="1:1" value="1:1" />
-                      <el-option label="16:9" value="16:9" />
-                      <el-option label="9:16" value="9:16" />
-                      <el-option label="4:3" value="4:3" />
-                      <el-option label="3:4" value="3:4" />
-                      <el-option label="3:2" value="3:2" />
-                      <el-option label="2:3" value="2:3" />
-                      <el-option label="5:4" value="5:4" />
-                      <el-option label="4:5" value="4:5" />
-                      <el-option label="21:9" value="21:9" />
+                      <el-option
+                        v-for="item in AI_MODEL_OPTIONS_WITH_PARAMS.find(
+                          item => item.modelName === aiModel
+                        ).imageRatio"
+                        :key="item"
+                        :label="item"
+                        :value="item"
+                      />
+                    </el-select>
+                  </el-form-item>
+
+                  <el-form-item label="生成数量" style="width: 33%">
+                    <el-select
+                      v-model="configForm.number"
+                      placeholder="请选择生成数量"
+                      style="width: 160px"
+                    >
+                      <el-option
+                        v-for="item in AI_MODEL_OPTIONS_WITH_PARAMS.find(
+                          item => item.modelName === aiModel
+                        ).imageNumber"
+                        :key="item"
+                        :label="item"
+                        :value="item"
+                      />
                     </el-select>
                   </el-form-item>
                 </div>
@@ -387,14 +498,14 @@ onUnmounted(() => {
                 <el-form-item>
                   <el-button
                     type="primary"
-                    @click="handleGenerateClick"
                     style="width: 100%; font-size: 16px; padding: 24px 0"
                     :loading="loading"
+                    @click="handleGenerateClick"
                   >
                     <StarIcon
+                      v-show="!loading"
                       color="none"
                       style="width: 16px; height: 16px"
-                      v-show="!loading"
                     />
                     生成图片
                   </el-button>
@@ -419,7 +530,7 @@ onUnmounted(() => {
             >
               <div class="flex items-center justify-between mb-[16px]">
                 <h2 class="text-xl font-semibold text-[#0a0a0a]">预览</h2>
-                <div class="flex" v-show="resultPictures.length > 0">
+                <div v-show="resultPictures.length > 0" class="flex">
                   <el-button
                     color="#F3F5F8"
                     style="font-size: 13px"
@@ -445,8 +556,8 @@ onUnmounted(() => {
               </div>
 
               <div
-                class="relative aspect-square rounded-lg overflow-hidden bg-[#eaeff5]"
                 v-if="resultPictures.length === 0"
+                class="relative aspect-square rounded-lg overflow-hidden bg-[#eaeff5]"
               >
                 <div
                   class="absolute inset-0 flex flex-col items-center justify-center text-[#0a0a0a]"

@@ -1,6 +1,6 @@
 import { downloadFile } from "@/api/aiDraw";
 import { ElMessage } from "element-plus";
-import { blobManager } from "../blobManager";
+// import { blobManager } from "../blobManager";
 
 // 创建一个可取消的Promise包装器
 class CancellablePromise<T> implements PromiseLike<T> {

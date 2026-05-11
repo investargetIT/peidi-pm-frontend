@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import imageUrl1 from "@/views/debug/assets/绘图1.png";
 import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
-import { ref, onMounted, onUnmounted, nextTick, inject } from "vue";
+import { ref, onMounted, onUnmounted, nextTick, inject, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { snapdom } from "@zumer/snapdom";
 import { saveToMaterialLibrary } from "../../utils/operationIogic/saveToMaterialLibrary";
@@ -26,7 +26,9 @@ const imageCacheManager = inject("imageCacheManager") as {
   getOriginalImage: (url: string) => Promise<string | null>;
 };
 
-const CANVAS_SIZE = 500;
+const CANVAS_WIDTH = 500;
+const canvasHeight = ref<number>(CANVAS_WIDTH);
+
 const exportSize = ref("800");
 
 const showStatus = ref(true);
@@ -44,6 +46,19 @@ const exportContainer = ref<HTMLElement | null>(null);
 
 const materialLoadRequests = ref<Array<{ cancel: () => void }>>([]);
 
+const calculateCanvasHeight = (imageUrl: string) => {
+  const img = new Image();
+  img.onload = () => {
+    const aspectRatio = img.height / img.width;
+    canvasHeight.value = Math.round(CANVAS_WIDTH * aspectRatio);
+  };
+  img.onerror = () => {
+    console.warn("图片加载失败，使用默认正方形画布");
+    canvasHeight.value = CANVAS_WIDTH;
+  };
+  img.src = imageUrl;
+};
+
 const initResultImg = async (
   config: any,
   data: any,
@@ -56,6 +71,8 @@ const initResultImg = async (
   resultImage.value = base64Url;
   importedImages.value = [];
   showStatus.value = true;
+
+  calculateCanvasHeight(base64Url);
 
   await nextTick();
   importMaterialElements(aiRefStatus);
@@ -113,8 +130,8 @@ const startDrag = (event: MouseEvent, element: any) => {
 
   if (containerRect.value) {
     const elementRect = {
-      left: containerRect.value.left + element.rect.x * CANVAS_SIZE,
-      top: containerRect.value.top + element.rect.y * CANVAS_SIZE
+      left: containerRect.value.left + element.rect.x * CANVAS_WIDTH,
+      top: containerRect.value.top + element.rect.y * canvasHeight.value
     };
 
     dragOffset.value = {
@@ -135,8 +152,8 @@ const handleMouseMove = (event: MouseEvent) => {
   const x = event.clientX - containerRect.value.left - dragOffset.value.x;
   const y = event.clientY - containerRect.value.top - dragOffset.value.y;
 
-  dragElement.value.rect.x = x / CANVAS_SIZE;
-  dragElement.value.rect.y = y / CANVAS_SIZE;
+  dragElement.value.rect.x = x / CANVAS_WIDTH;
+  dragElement.value.rect.y = y / canvasHeight.value;
 };
 
 const handleMouseUp = () => {
@@ -163,24 +180,36 @@ const resizeImage = (event: MouseEvent, element: any, direction: string) => {
 
     switch (direction) {
       case "se":
-        element.rect.width = Math.max(0.1, startWidth + deltaX / CANVAS_SIZE);
-        element.rect.height = Math.max(0.1, startHeight + deltaY / CANVAS_SIZE);
+        element.rect.width = Math.max(0.1, startWidth + deltaX / CANVAS_WIDTH);
+        element.rect.height = Math.max(
+          0.1,
+          startHeight + deltaY / canvasHeight.value
+        );
         break;
       case "sw":
-        element.rect.width = Math.max(0.1, startWidth - deltaX / CANVAS_SIZE);
-        element.rect.x = startXPos + deltaX / CANVAS_SIZE;
-        element.rect.height = Math.max(0.1, startHeight + deltaY / CANVAS_SIZE);
+        element.rect.width = Math.max(0.1, startWidth - deltaX / CANVAS_WIDTH);
+        element.rect.x = startXPos + deltaX / CANVAS_WIDTH;
+        element.rect.height = Math.max(
+          0.1,
+          startHeight + deltaY / canvasHeight.value
+        );
         break;
       case "ne":
-        element.rect.width = Math.max(0.1, startWidth + deltaX / CANVAS_SIZE);
-        element.rect.y = startYPos + deltaY / CANVAS_SIZE;
-        element.rect.height = Math.max(0.1, startHeight - deltaY / CANVAS_SIZE);
+        element.rect.width = Math.max(0.1, startWidth + deltaX / CANVAS_WIDTH);
+        element.rect.y = startYPos + deltaY / canvasHeight.value;
+        element.rect.height = Math.max(
+          0.1,
+          startHeight - deltaY / canvasHeight.value
+        );
         break;
       case "nw":
-        element.rect.width = Math.max(0.1, startWidth - deltaX / CANVAS_SIZE);
-        element.rect.x = startXPos + deltaX / CANVAS_SIZE;
-        element.rect.y = startYPos + deltaY / CANVAS_SIZE;
-        element.rect.height = Math.max(0.1, startHeight - deltaY / CANVAS_SIZE);
+        element.rect.width = Math.max(0.1, startWidth - deltaX / CANVAS_WIDTH);
+        element.rect.x = startXPos + deltaX / CANVAS_WIDTH;
+        element.rect.y = startYPos + deltaY / canvasHeight.value;
+        element.rect.height = Math.max(
+          0.1,
+          startHeight - deltaY / canvasHeight.value
+        );
         break;
     }
   };
@@ -270,10 +299,10 @@ const importImage = () => {
               id: "img_" + Date.now(),
               type: "image",
               rect: {
-                x: 50 / CANVAS_SIZE,
-                y: 50 / CANVAS_SIZE,
-                width: (Math.min(img.width, 200) / CANVAS_SIZE) * scale,
-                height: (Math.min(img.height, 200) / CANVAS_SIZE) * scale
+                x: 50 / CANVAS_WIDTH,
+                y: 50 / canvasHeight.value,
+                width: (Math.min(img.width, 200) / CANVAS_WIDTH) * scale,
+                height: (Math.min(img.height, 200) / canvasHeight.value) * scale
               },
               src: event.target.result,
               selected: false,
@@ -317,7 +346,7 @@ const handleSaveToMaterialLibraryClick = async () => {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const capture = await snapdom(exportContainer.value, {
-      scale: Number(exportSize.value) / CANVAS_SIZE,
+      scale: Number(exportSize.value) / CANVAS_WIDTH,
       dpr: window.devicePixelRatio,
       backgroundColor: "#ffffff"
     });
@@ -364,7 +393,7 @@ const exportAsPNG = async () => {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const capture = await snapdom(exportContainer.value, {
-      scale: Number(exportSize.value) / CANVAS_SIZE,
+      scale: Number(exportSize.value) / CANVAS_WIDTH,
       dpr: window.devicePixelRatio,
       backgroundColor: "#ffffff"
     });
@@ -408,21 +437,21 @@ defineExpose({
 <template>
   <div v-if="showStatus && resultImage">
     <div class="text-base font-bold mb-4 text-gray-800">演示生成结果图</div>
-    <div class="text-red-500 text-sm" v-if="props.errorMsg">
+    <div v-if="props.errorMsg" class="text-red-500 text-sm">
       生成失败：{{ props.errorMsg }}
     </div>
     <div class="flex gap-12 flex-wrap">
       <div
+        ref="exportContainer"
         class="relative result-image-container"
         :style="{
-          width: `${CANVAS_SIZE}px`,
-          height: `${CANVAS_SIZE}px`,
+          width: `${CANVAS_WIDTH}px`,
+          height: `${canvasHeight}px`,
           overflow: 'hidden',
           flexShrink: 0,
-          minWidth: `${CANVAS_SIZE}px`,
-          minHeight: `${CANVAS_SIZE}px`
+          minWidth: `${CANVAS_WIDTH}px`,
+          minHeight: `${canvasHeight}px`
         }"
-        ref="exportContainer"
         @mouseup="handleMouseUp"
         @mouseleave="handleMouseUp"
         @click="deselectAll"
@@ -431,7 +460,7 @@ defineExpose({
           v-if="resultImage"
           :src="resultImage"
           alt="图片"
-          :style="{ width: `${CANVAS_SIZE}px`, height: `${CANVAS_SIZE}px` }"
+          :style="{ width: `${CANVAS_WIDTH}px`, height: `${canvasHeight}px` }"
           class="shadow-md"
         />
         <div v-else>
@@ -499,10 +528,10 @@ defineExpose({
         <template v-for="item in importedImages" :key="item.id">
           <div
             :style="{
-              left: `${item.rect.x * CANVAS_SIZE}px`,
-              top: `${item.rect.y * CANVAS_SIZE}px`,
-              width: `${item.rect.width * CANVAS_SIZE}px`,
-              height: `${item.rect.height * CANVAS_SIZE}px`,
+              left: `${item.rect.x * CANVAS_WIDTH}px`,
+              top: `${item.rect.y * canvasHeight}px`,
+              width: `${item.rect.width * CANVAS_WIDTH}px`,
+              height: `${item.rect.height * canvasHeight}px`,
               cursor: item.dragging ? 'grabbing' : 'pointer'
             }"
             class="absolute image-element"
@@ -512,37 +541,37 @@ defineExpose({
           >
             <img :src="item.src" :alt="item.name" class="element-image" />
 
-            <div class="element-controls" v-if="item.selected">
+            <div v-if="item.selected" class="element-controls">
               <el-button
                 size="small"
                 type="danger"
-                @click="e => deleteImageElement(e, item.id)"
                 class="delete-btn"
+                @click="e => deleteImageElement(e, item.id)"
               >
                 删除
               </el-button>
             </div>
 
             <div
+              v-if="item.selected"
               class="resize-handle se"
-              v-if="item.selected"
               @mousedown="e => resizeImage(e, item, 'se')"
-            ></div>
+            />
             <div
+              v-if="item.selected"
               class="resize-handle sw"
-              v-if="item.selected"
               @mousedown="e => resizeImage(e, item, 'sw')"
-            ></div>
+            />
             <div
+              v-if="item.selected"
               class="resize-handle ne"
-              v-if="item.selected"
               @mousedown="e => resizeImage(e, item, 'ne')"
-            ></div>
+            />
             <div
-              class="resize-handle nw"
               v-if="item.selected"
+              class="resize-handle nw"
               @mousedown="e => resizeImage(e, item, 'nw')"
-            ></div>
+            />
           </div>
         </template>
       </div>
@@ -552,8 +581,8 @@ defineExpose({
           <div>
             <el-button
               type="primary"
-              @click="importImage"
               :disabled="!resultImage"
+              @click="importImage"
             >
               导入素材
             </el-button>
@@ -569,11 +598,14 @@ defineExpose({
             placeholder="请选择导出尺寸"
             style="width: 160px; margin-right: 10px"
           >
-            <el-option label="800*800" value="800"></el-option>
-            <el-option label="1400*1400" value="1400"></el-option>
-            <el-option label="2048*2048" value="2048"></el-option>
-            <el-option label="4096*4096" value="4096"></el-option>
+            <el-option label="800px 宽" value="800" />
+            <el-option label="1400px 宽" value="1400" />
+            <el-option label="2048px 宽" value="2048" />
+            <el-option label="4096px 宽" value="4096" />
           </el-select>
+          <span class="text-xs text-gray-500 mt-1">
+            导出高度将根据图片比例自动计算
+          </span>
           <div class="mt-2">
             <el-button
               type="primary"
@@ -589,8 +621,8 @@ defineExpose({
           <div>
             <el-button
               type="primary"
-              @click="handleSaveToMaterialLibraryClick"
               :disabled="!resultImage"
+              @click="handleSaveToMaterialLibraryClick"
             >
               保存到素材库
             </el-button>

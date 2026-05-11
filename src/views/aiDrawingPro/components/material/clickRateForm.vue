@@ -138,13 +138,13 @@ defineExpose({
 
         <el-form-item label="主图库" class="mt-4" prop="product">
           <div
-            class="bg-gray-50 p-4 rounded-lg border border-dashed border-gray-300"
             v-if="productConfigUrls.length > 0"
+            class="bg-gray-50 p-4 rounded-lg border border-dashed border-gray-300"
           >
             <el-scrollbar height="380px">
               <el-space wrap :size="30">
                 <div
-                  v-for="(item, index) in productConfigUrls"
+                  v-for="item in productConfigUrls"
                   :key="item.unitId"
                   class="flex flex-col items-center box-border p-[4px]"
                   :class="{
@@ -183,7 +183,7 @@ defineExpose({
 
         <el-form-item class="mt-6">
           <div class="flex justify-end w-full">
-            <el-button type="primary" @click="saveForm" :loading="loading">
+            <el-button type="primary" :loading="loading" @click="saveForm">
               保存
             </el-button>
           </div>
