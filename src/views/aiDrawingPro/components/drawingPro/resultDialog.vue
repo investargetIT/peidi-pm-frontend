@@ -72,6 +72,7 @@ const actualExportHeight = computed(() => {
 const calculateContainerHeight = (imageUrl: string) => {
   const img = new Image();
   img.onload = () => {
+    if (!dialogVisible.value || templateImgBase64.value !== imageUrl) return;
     const aspectRatio = img.height / img.width;
     containerHeight.value = Math.round(CONTAINER_WIDTH * aspectRatio);
   };

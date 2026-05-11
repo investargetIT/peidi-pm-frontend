@@ -47,7 +47,7 @@ const ruleForm = reactive({
 const submitForm = () => {
   loading.value = true;
   // console.log("ruleForm:", ruleForm, folderData.value);
-  const type = JSON.parse(folderData.value.type);
+  const type = JSON.parse(folderData.value?.type || "{}");
   const temp = {
     ...folderData.value,
     type: JSON.stringify({

@@ -61,6 +61,8 @@ const templateImageBlob = ref<Blob | null>(null);
 const templateImageUrl = ref<string>("");
 // 测试图的显示尺寸（固定为400px）
 const TEST_IMAGE_SIZE = 400;
+// 在 loadAndCacheTemplateImage 或 imageCache 加载后，记录宽高比
+const templateAspectRatio = ref(1);
 
 const rules = reactive<FormRules>({
   image: [{ required: true, message: "请上传模板标记图", trigger: "change" }]
@@ -156,6 +158,11 @@ const loadAndCacheTemplateImage = (objectName: string) => {
       }
       templateImageUrl.value = URL.createObjectURL(res);
       console.log("模板图已下载并缓存");
+      const img = new Image();
+      img.onload = () => {
+        templateAspectRatio.value = img.height / img.width;
+      };
+      img.src = templateImageUrl.value;
     })
     .catch(error => {
       console.error("加载模板图失败:", error);
@@ -602,8 +609,8 @@ const handleQuickGeneratePrompt = (type: string) => {
                     width: `${item.rect.width * TEST_IMAGE_SIZE}px`,
                     height: `${item.rect.height * TEST_IMAGE_SIZE}px`,
                     backgroundImage: `url(${templateImageUrl})`,
-                    backgroundSize: `${TEST_IMAGE_SIZE}px ${TEST_IMAGE_SIZE}px`,
-                    backgroundPosition: `-${item.rect.x * TEST_IMAGE_SIZE}px -${item.rect.y * TEST_IMAGE_SIZE}px`
+                    backgroundSize: `${TEST_IMAGE_SIZE}px ${TEST_IMAGE_SIZE * templateAspectRatio}px`,
+                    backgroundPosition: `-${item.rect.x * TEST_IMAGE_SIZE}px -${item.rect.y * TEST_IMAGE_SIZE * templateAspectRatio}px`
                   }"
                 />
               </div>

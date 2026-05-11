@@ -229,14 +229,13 @@ onMounted(() => {
   });
 });
 
-// onUnmounted(() => {
-//   Object.keys(thumbnailUrls.value).forEach(key => {
-//     const url = thumbnailUrls.value[key];
-//     if (url) {
-//       URL.revokeObjectURL(url);
-//     }
-//   });
-// });
+onUnmounted(() => {
+  Object.keys(thumbnailUrls.value).forEach(objectName => {
+    const cacheId = `${props.cacheKey}:${objectName}`;
+    blobManager.releaseBlobURL(cacheId);
+  });
+  thumbnailUrls.value = {};
+});
 </script>
 
 <template>

@@ -435,39 +435,40 @@ defineExpose({
 </script>
 
 <template>
-  <div v-if="showStatus && resultImage">
-    <div class="text-base font-bold mb-4 text-gray-800">演示生成结果图</div>
+  <div v-if="showStatus">
     <div v-if="props.errorMsg" class="text-red-500 text-sm">
       生成失败：{{ props.errorMsg }}
     </div>
-    <div class="flex gap-12 flex-wrap">
-      <div
-        ref="exportContainer"
-        class="relative result-image-container"
-        :style="{
-          width: `${CANVAS_WIDTH}px`,
-          height: `${canvasHeight}px`,
-          overflow: 'hidden',
-          flexShrink: 0,
-          minWidth: `${CANVAS_WIDTH}px`,
-          minHeight: `${canvasHeight}px`
-        }"
-        @mouseup="handleMouseUp"
-        @mouseleave="handleMouseUp"
-        @click="deselectAll"
-      >
-        <img
-          v-if="resultImage"
-          :src="resultImage"
-          alt="图片"
-          :style="{ width: `${CANVAS_WIDTH}px`, height: `${canvasHeight}px` }"
-          class="shadow-md"
-        />
-        <div v-else>
-          <div class="text-gray-500 text-sm">暂无图片</div>
-        </div>
+    <template v-if="resultImage">
+      <div class="text-base font-bold mb-4 text-gray-800">演示生成结果图</div>
+      <div class="flex gap-12 flex-wrap">
+        <div
+          ref="exportContainer"
+          class="relative result-image-container"
+          :style="{
+            width: `${CANVAS_WIDTH}px`,
+            height: `${canvasHeight}px`,
+            overflow: 'hidden',
+            flexShrink: 0,
+            minWidth: `${CANVAS_WIDTH}px`,
+            minHeight: `${canvasHeight}px`
+          }"
+          @mouseup="handleMouseUp"
+          @mouseleave="handleMouseUp"
+          @click="deselectAll"
+        >
+          <img
+            v-if="resultImage"
+            :src="resultImage"
+            alt="图片"
+            :style="{ width: `${CANVAS_WIDTH}px`, height: `${canvasHeight}px` }"
+            class="shadow-md"
+          />
+          <div v-else>
+            <div class="text-gray-500 text-sm">暂无图片</div>
+          </div>
 
-        <!-- <template v-for="item in resultConfig">
+          <!-- <template v-for="item in resultConfig">
           <div
             :key="item.id"
             v-if="
@@ -525,115 +526,116 @@ defineExpose({
           </div>
         </template> -->
 
-        <template v-for="item in importedImages" :key="item.id">
-          <div
-            :style="{
-              left: `${item.rect.x * CANVAS_WIDTH}px`,
-              top: `${item.rect.y * canvasHeight}px`,
-              width: `${item.rect.width * CANVAS_WIDTH}px`,
-              height: `${item.rect.height * canvasHeight}px`,
-              cursor: item.dragging ? 'grabbing' : 'pointer'
-            }"
-            class="absolute image-element"
-            :class="{ selected: item.selected }"
-            @mousedown="e => startDrag(e, item)"
-            @click="e => selectElement(e, item)"
-          >
-            <img :src="item.src" :alt="item.name" class="element-image" />
+          <template v-for="item in importedImages" :key="item.id">
+            <div
+              :style="{
+                left: `${item.rect.x * CANVAS_WIDTH}px`,
+                top: `${item.rect.y * canvasHeight}px`,
+                width: `${item.rect.width * CANVAS_WIDTH}px`,
+                height: `${item.rect.height * canvasHeight}px`,
+                cursor: item.dragging ? 'grabbing' : 'pointer'
+              }"
+              class="absolute image-element"
+              :class="{ selected: item.selected }"
+              @mousedown="e => startDrag(e, item)"
+              @click="e => selectElement(e, item)"
+            >
+              <img :src="item.src" :alt="item.name" class="element-image" />
 
-            <div v-if="item.selected" class="element-controls">
+              <div v-if="item.selected" class="element-controls">
+                <el-button
+                  size="small"
+                  type="danger"
+                  class="delete-btn"
+                  @click="e => deleteImageElement(e, item.id)"
+                >
+                  删除
+                </el-button>
+              </div>
+
+              <div
+                v-if="item.selected"
+                class="resize-handle se"
+                @mousedown="e => resizeImage(e, item, 'se')"
+              />
+              <div
+                v-if="item.selected"
+                class="resize-handle sw"
+                @mousedown="e => resizeImage(e, item, 'sw')"
+              />
+              <div
+                v-if="item.selected"
+                class="resize-handle ne"
+                @mousedown="e => resizeImage(e, item, 'ne')"
+              />
+              <div
+                v-if="item.selected"
+                class="resize-handle nw"
+                @mousedown="e => resizeImage(e, item, 'nw')"
+              />
+            </div>
+          </template>
+        </div>
+
+        <div>
+          <div class="flex flex-col">
+            <div>
               <el-button
-                size="small"
-                type="danger"
-                class="delete-btn"
-                @click="e => deleteImageElement(e, item.id)"
+                type="primary"
+                :disabled="!resultImage"
+                @click="importImage"
               >
-                删除
+                导入素材
+              </el-button>
+            </div>
+            <span class="text-xs text-gray-500 mt-2">
+              导入的素材将作为可拖动的元素添加到画布中
+            </span>
+          </div>
+
+          <div class="mt-12 flex flex-col">
+            <el-select
+              v-model="exportSize"
+              placeholder="请选择导出尺寸"
+              style="width: 160px; margin-right: 10px"
+            >
+              <el-option label="800px 宽" value="800" />
+              <el-option label="1400px 宽" value="1400" />
+              <el-option label="2048px 宽" value="2048" />
+              <el-option label="4096px 宽" value="4096" />
+            </el-select>
+            <span class="text-xs text-gray-500 mt-1">
+              导出高度将根据图片比例自动计算
+            </span>
+            <div class="mt-2">
+              <el-button
+                type="primary"
+                :disabled="!resultImage"
+                @click="exportAsPNG"
+              >
+                导出 PNG
+              </el-button>
+            </div>
+          </div>
+
+          <div class="mt-12">
+            <div>
+              <el-button
+                type="primary"
+                :disabled="!resultImage"
+                @click="handleSaveToMaterialLibraryClick"
+              >
+                保存到素材库
               </el-button>
             </div>
 
-            <div
-              v-if="item.selected"
-              class="resize-handle se"
-              @mousedown="e => resizeImage(e, item, 'se')"
-            />
-            <div
-              v-if="item.selected"
-              class="resize-handle sw"
-              @mousedown="e => resizeImage(e, item, 'sw')"
-            />
-            <div
-              v-if="item.selected"
-              class="resize-handle ne"
-              @mousedown="e => resizeImage(e, item, 'ne')"
-            />
-            <div
-              v-if="item.selected"
-              class="resize-handle nw"
-              @mousedown="e => resizeImage(e, item, 'nw')"
-            />
+            <span class="text-xs text-gray-500 mt-2">
+              素材将保存到【素材库 - 结果图片】中
+            </span>
           </div>
-        </template>
-      </div>
-
-      <div>
-        <div class="flex flex-col">
-          <div>
-            <el-button
-              type="primary"
-              :disabled="!resultImage"
-              @click="importImage"
-            >
-              导入素材
-            </el-button>
-          </div>
-          <span class="text-xs text-gray-500 mt-2">
-            导入的素材将作为可拖动的元素添加到画布中
-          </span>
-        </div>
-
-        <div class="mt-12 flex flex-col">
-          <el-select
-            v-model="exportSize"
-            placeholder="请选择导出尺寸"
-            style="width: 160px; margin-right: 10px"
-          >
-            <el-option label="800px 宽" value="800" />
-            <el-option label="1400px 宽" value="1400" />
-            <el-option label="2048px 宽" value="2048" />
-            <el-option label="4096px 宽" value="4096" />
-          </el-select>
-          <span class="text-xs text-gray-500 mt-1">
-            导出高度将根据图片比例自动计算
-          </span>
-          <div class="mt-2">
-            <el-button
-              type="primary"
-              :disabled="!resultImage"
-              @click="exportAsPNG"
-            >
-              导出 PNG
-            </el-button>
-          </div>
-        </div>
-
-        <div class="mt-12">
-          <div>
-            <el-button
-              type="primary"
-              :disabled="!resultImage"
-              @click="handleSaveToMaterialLibraryClick"
-            >
-              保存到素材库
-            </el-button>
-          </div>
-
-          <span class="text-xs text-gray-500 mt-2">
-            素材将保存到【素材库 - 结果图片】中
-          </span>
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
