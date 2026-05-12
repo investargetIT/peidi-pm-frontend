@@ -109,9 +109,9 @@ export const processAndExportOBMData = async (
       throw new Error("Excel 文件中没有工作表");
     }
 
-    // 先删除第 72 行和第 32 行（从下往上删除，避免行号变化）
+    // 先删除第 74 行和第 32 行（从下往上删除，避免行号变化）
     try {
-      const rowsToDelete = [72, 32].filter(
+      const rowsToDelete = [74, 32].filter(
         rowNum => rowNum <= worksheet.rowCount
       );
 
@@ -200,28 +200,46 @@ export const processAndExportOBMData = async (
       // 根据不同行范围使用不同的计算逻辑
       if ((rowNumber >= 3 && rowNumber <= 31) || rowNumber === 60) {
         // 第 3-31 行：累计值计算（行号不变）
-        // I 列：前 previousMonth 个月的目标值之和
-        // console.log("累计", findObjectByMonthIndex(targetData, previousMonth));
-        valueI = targetData
-          .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
-          .reduce((sum: number, item: any) => sum + item.value, 0);
+        //#region 侯子洋 好适嘉项目净毛利20% 单独处理 取上上个月
+        if (
+          userName === "侯子洋" &&
+          examinationType === "好适嘉项目净毛利20%"
+        ) {
+          valueI = targetData
+            .slice(0, findObjectByMonthIndex(targetData, previousMonth - 1) + 1)
+            .reduce((sum: number, item: any) => sum + item.value, 0);
 
-        // K 列：前 previousMonth 个月的实际值之和
-        valueK = actualData
-          .slice(0, findObjectByMonthIndex(actualData, previousMonth) + 1)
-          .reduce((sum: number, item: any) => sum + item.value, 0);
+          valueK = actualData
+            .slice(0, findObjectByMonthIndex(actualData, previousMonth - 1) + 1)
+            .reduce((sum: number, item: any) => sum + item.value, 0);
 
-        // O 列：前 currentMonth 个月的目标值之和
-        valueO = targetData
-          .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
-          .reduce((sum: number, item: any) => sum + item.value, 0);
+          valueO = targetData
+            .slice(0, findObjectByMonthIndex(targetData, currentMonth - 1) + 1)
+            .reduce((sum: number, item: any) => sum + item.value, 0);
+        } else {
+          // I 列：前 previousMonth 个月的目标值之和
+          // console.log("累计", findObjectByMonthIndex(targetData, previousMonth));
+          valueI = targetData
+            .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
+            .reduce((sum: number, item: any) => sum + item.value, 0);
+
+          // K 列：前 previousMonth 个月的实际值之和
+          valueK = actualData
+            .slice(0, findObjectByMonthIndex(actualData, previousMonth) + 1)
+            .reduce((sum: number, item: any) => sum + item.value, 0);
+
+          // O 列：前 currentMonth 个月的目标值之和
+          valueO = targetData
+            .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
+            .reduce((sum: number, item: any) => sum + item.value, 0);
+        }
       } else if (
-        (rowNumber >= 32 && rowNumber <= 70) ||
-        (rowNumber >= 71 && rowNumber <= 81)
+        (rowNumber >= 32 && rowNumber <= 72) ||
+        (rowNumber >= 73 && rowNumber <= 83)
       ) {
-        // 第 32-70 行和第 71-81 行：当月值计算
-        // 原第 33-71 行 → 现第 32-70 行（删除第 32 行后前移 1 行）
-        // 原第 73-83 行 → 现第 71-81 行（删除第 32 和 72 行后前移 2 行）
+        // 第 32-72 行和第 73-83 行：当月值计算
+        // 原第 33-73 行 → 现第 32-72 行（删除第 32 行后前移 1 行）
+        // 原第 75-85 行 → 现第 73-83 行（删除第 32 和 74 行后前移 2 行）
 
         // I 列：上个月的目标值（索引为 previousMonth）
         // console.log(
@@ -248,7 +266,7 @@ export const processAndExportOBMData = async (
 
       // 填充到对应列
       row.getCell(9).value = valueI; // I 列
-      row.getCell(11).value = Number(Math.max(0, valueK).toFixed(2)); // K 列 保留两位小数，小于 0 时为 0
+      row.getCell(11).value = Number(valueK.toFixed(2)); // K 列 保留两位小数
       row.getCell(13).value = Number(Math.max(0, valueM).toFixed(2)); // M 列 保留两位小数，小于 0 时为 0
       row.getCell(15).value = valueO; // O 列
 

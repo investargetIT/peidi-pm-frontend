@@ -1,14 +1,31 @@
 <template>
   <div class="examination-list">
-    <!-- 月份选择器 -->
-    <el-date-picker v-model="selectedMonth" type="month" placeholder="选择月份" :clearable="false"
-      :disabled-date="disabledDate" class="mb-[20px]" />
+    <el-space wrap>
+      <!-- 月份选择器 -->
+      <el-date-picker
+        v-model="selectedMonth"
+        type="month"
+        placeholder="选择月份"
+        :clearable="false"
+        :disabled-date="disabledDate"
+        class="mb-[20px]"
+      />
+      <!-- 姓名搜索框 -->
+      <el-input
+        v-model="searchUserName"
+        placeholder="请输入姓名（支持模糊搜索）"
+        clearable
+        class="mb-[20px]"
+        :prefix-icon="Search"
+        style="width: 200px"
+      />
+    </el-space>
     <!-- 修改月份选择器 -->
     <!-- <el-select v-model="selectedMonth" placeholder="选择月份" @change="filterByMonth" class="mb-[20px]">
       <el-option v-for="month in months" :key="month.value" :label="month.label" :value="month.value" />
     </el-select> -->
 
-    <el-table :data="filteredExamList" border style="width: 100%">
+    <el-table :data="filteredExamListForUserName" border style="width: 100%">
       <el-table-column prop="userName" label="姓名" />
       <el-table-column prop="month" label="月份" />
       <el-table-column label="部门">
@@ -36,9 +53,19 @@
       <el-table-column prop="achieved" label="完成值">
         <template #default="{ row }">
           <div v-if="row.isEditingAchieved" class="edit-cell">
-            <el-input v-model="row.achieved" type="number" step="0.01" @blur="handleSave(row, 'achieved')" v-focus />
+            <el-input
+              v-model="row.achieved"
+              type="number"
+              step="0.01"
+              @blur="handleSave(row, 'achieved')"
+              v-focus
+            />
           </div>
-          <div v-else class="cell-content" @dblclick="handleEdit(row, 'achieved')">
+          <div
+            v-else
+            class="cell-content"
+            @dblclick="handleEdit(row, 'achieved')"
+          >
             {{ row.achieved }}
           </div>
         </template>
@@ -48,117 +75,138 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { getExaminationList, getModifyUser, updateExamination } from '@/api/pmApi.ts' // 添加 getModifyUser 和 updateExamination 导入
-import { dayjs, ElMessage } from 'element-plus'
+import { ref, onMounted, watch, computed } from "vue";
+import {
+  getExaminationList,
+  getModifyUser,
+  updateExamination
+} from "@/api/pmApi.ts"; // 添加 getModifyUser 和 updateExamination 导入
+import { dayjs, ElMessage } from "element-plus";
+import { Search } from "@element-plus/icons-vue";
 
-const examList = ref([])
-const selectedMonth = ref(dayjs().subtract(1, 'month').format('YYYY-MM'))
+const examList = ref([]);
+const selectedMonth = ref(dayjs().subtract(1, "month").format("YYYY-MM"));
 // 修改 months 数组，使其值与 examList 中的 month 属性的月份部分匹配
 const months = ref([
-  { label: '1月', value: '01' },
-  { label: '2月', value: '02' },
-  { label: '3月', value: '03' },
-  { label: '4月', value: '04' },
-  { label: '5月', value: '05' },
-  { label: '6月', value: '06' },
-  { label: '7月', value: '07' },
-  { label: '8月', value: '08' },
-  { label: '9月', value: '09' },
-  { label: '10月', value: '10' },
-  { label: '11月', value: '11' },
-  { label: '12月', value: '12' }
-])
-const filteredExamList = ref([])
+  { label: "1月", value: "01" },
+  { label: "2月", value: "02" },
+  { label: "3月", value: "03" },
+  { label: "4月", value: "04" },
+  { label: "5月", value: "05" },
+  { label: "6月", value: "06" },
+  { label: "7月", value: "07" },
+  { label: "8月", value: "08" },
+  { label: "9月", value: "09" },
+  { label: "10月", value: "10" },
+  { label: "11月", value: "11" },
+  { label: "12月", value: "12" }
+]);
+const filteredExamList = ref([]);
+// 搜索人名
+const searchUserName = ref("");
+const filteredExamListForUserName = computed(() => {
+  if (!searchUserName.value) {
+    return filteredExamList.value;
+  }
+  return filteredExamList.value.filter(item =>
+    item.userName.includes(searchUserName.value)
+  );
+});
 
 // 禁用当月之后的每个月
-const disabledDate = (time) => {
+const disabledDate = time => {
   // 获取当月的第一天
-  const currentMonth = dayjs().startOf('month')
+  const currentMonth = dayjs().startOf("month");
   // 如果选择的日期在当月之后，则禁用
-  return dayjs(time).isAfter(currentMonth, 'month')
-}
+  return dayjs(time).isAfter(currentMonth, "month");
+};
 
 // 自定义指令：自动聚焦
 const vFocus = {
-  mounted: (el) => el.querySelector('input').focus()
-}
+  mounted: el => el.querySelector("input").focus()
+};
 
 // 获取考核列表数据
 const fetchExamList = async () => {
   try {
     // 从 localStorage 获取 ddUserInfo
-    const ddUserInfo = JSON.parse(localStorage.getItem('ddUserInfo') || '{}')
-    const manageName = ddUserInfo.name
+    const ddUserInfo = JSON.parse(localStorage.getItem("ddUserInfo") || "{}");
+    const manageName = ddUserInfo.name;
     // const manageName = '付阳'
     // const manageName = '范振吉'
     // const manageName = '王家琦'
-    console.log('manageName', manageName);
+    console.log("manageName", manageName);
 
     // 调用 getModifyUser 并打印结果
-    const res1 = await getModifyUser({ manageName })
-    const userResult = res1.data
-    console.log('getModifyUser 返回结果：', userResult)
+    const res1 = await getModifyUser({ manageName });
+    const userResult = res1.data;
+    console.log("getModifyUser 返回结果：", userResult);
 
     const res = await getExaminationList({
       pageNo: 1,
       pageSize: 1000,
       searchStr: JSON.stringify([
         {
-          searchName: 'month',
-          searchValue: `${dayjs(selectedMonth.value).format('YYYY-MM')}`,
-          searchType: 'like'
+          searchName: "month",
+          searchValue: `${dayjs(selectedMonth.value).format("YYYY-MM")}`,
+          searchType: "like"
         }
       ])
-    })
+    });
 
     // 为每条数据添加编辑状态标记
     examList.value = res.data.records.map(item => ({
       ...item,
       isEditingTarget: false,
       isEditingAchieved: false
-    }))
+    }));
 
     // 过滤 examList，只保留在 userResult 中存在的 examinationTypeId
     // 如果examinationTypeId的值是'all'，则保留所有数据
     // 如果userResult是空数组，则不能查看任何数据
-    const tempArr = userResult.length === 0 ? [] : examList.value.filter(exam =>
-      userResult.some(user => (user.examinationTypeId == exam.examinationTypeId ||
-        user.examinationTypeId === 'all'))
-    );
+    const tempArr =
+      userResult.length === 0
+        ? []
+        : examList.value.filter(exam =>
+            userResult.some(
+              user =>
+                user.examinationTypeId == exam.examinationTypeId ||
+                user.examinationTypeId === "all"
+            )
+          );
     filteredExamList.value = tempArr;
     console.log(filteredExamList);
   } catch (error) {
-    console.error('获取数据失败：', error)
+    console.error("获取数据失败：", error);
   }
-}
+};
 
 // 获取部门名称（这里需要根据实际业务逻辑补充）
 const getDepartmentName = (dept1, dept2) => {
   // 返回完整的部门名称
-  return `${dept1}-${dept2}`
-}
+  return `${dept1}-${dept2}`;
+};
 
 // 获取职位名称（这里需要根据实际业务逻辑补充）
-const getPositionName = (position) => {
+const getPositionName = position => {
   // 返回职位名称
-  return position
-}
+  return position;
+};
 
 // 获取考核类型名称（这里需要根据实际业务逻辑补充）
-const getExaminationType = (type) => {
+const getExaminationType = type => {
   // 返回考核类型名称
-  return type
-}
+  return type;
+};
 
 // 处理编辑状态
 const handleEdit = (row, field) => {
-  if (field === 'target') {
-    row.isEditingTarget = true
+  if (field === "target") {
+    row.isEditingTarget = true;
   } else {
-    row.isEditingAchieved = true
+    row.isEditingAchieved = true;
   }
-}
+};
 
 // 处理保存操作
 const handleSave = async (row, field) => {
@@ -172,36 +220,40 @@ const handleSave = async (row, field) => {
       userName: row.userName,
       target: row.target,
       achieved: row.achieved
-    }
+    };
 
     // 调用更新API
-    const response = await updateExamination(updateData)
+    const response = await updateExamination(updateData);
 
     // 检查返回的 code
     if (response.code === 200) {
-      ElMessage.success('保存成功')
+      ElMessage.success("保存成功");
     } else {
-      throw new Error('保存失败')
+      throw new Error("保存失败");
     }
   } catch (error) {
-    console.error('保存失败：', error)
-    ElMessage.error('保存失败')
+    console.error("保存失败：", error);
+    ElMessage.error("保存失败");
   } finally {
     // 无论成功还是失败，都退出编辑状态
-    if (field === 'target') {
-      row.isEditingTarget = false
+    if (field === "target") {
+      row.isEditingTarget = false;
     } else {
-      row.isEditingAchieved = false
+      row.isEditingAchieved = false;
     }
   }
-}
+};
 
 // 监听 selectedMonth 变化
-watch(selectedMonth, (newMonth, oldMonth) => {
-  if (newMonth) {
-    fetchExamList()
-  }
-}, { immediate: true })
+watch(
+  selectedMonth,
+  (newMonth, oldMonth) => {
+    if (newMonth) {
+      fetchExamList();
+    }
+  },
+  { immediate: true }
+);
 
 // // 过滤 examList 以匹配选定的月份
 // const filterByMonth = () => {

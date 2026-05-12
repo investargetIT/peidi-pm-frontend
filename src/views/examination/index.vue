@@ -4,9 +4,11 @@ import Examination from "./examination.vue";
 import ReportExport from "./reportExport.vue";
 import FileUpload from "./fileUpload.vue";
 import Designer from "./designer.vue";
+import Evaluation from "./evaluation/index.vue";
 import NavBar from "./navBar.vue";
 import type { TabsPaneContext } from "element-plus";
 import { storageLocal } from "@pureadmin/utils";
+import "../aiDrawingPro/style/reset.scss";
 
 const DEV_ID = [
   "1846392647319093250", // Summer
@@ -44,10 +46,11 @@ const PERMISSION_ID_LIST = {
     "1926449443739601538", // 王晓莹
     "1874713377599172609", // 熊玉葵
     "1874741663670775810" // 廖佳晨
-  ]
+  ],
+  evaluation: [...DEV_ID]
 };
 
-const activeName = ref("excamination");
+const activeName = ref("evaluation");
 const userInfo: any = storageLocal().getItem("user-check-info");
 const userId = ref(userInfo?.id ?? "");
 
@@ -102,6 +105,15 @@ const checkPermission = (name: string) => {
         v-if="checkPermission('designer')"
       >
         <Designer v-if="activeName === 'designer'" />
+      </el-tab-pane>
+
+      <el-tab-pane
+        label="自动化考核"
+        name="evaluation"
+        lazy
+        v-if="checkPermission('evaluation')"
+      >
+        <Evaluation v-if="activeName === 'evaluation'" />
       </el-tab-pane>
     </el-tabs>
   </div>
