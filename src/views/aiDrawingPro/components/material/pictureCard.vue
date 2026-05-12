@@ -6,6 +6,7 @@ import { getNameFromObjectName } from "../../utils/general/index";
 import { deleteMaterial } from "@/api/aiDraw";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Delete } from "@element-plus/icons-vue";
+import { imageCache } from "../../utils/imageCache";
 
 const props = defineProps({
   data: {
@@ -81,8 +82,9 @@ const handleDelete = () => {
       deleteMaterial({
         id: props.data.id
       })
-        .then((res: any) => {
+        .then(async (res: any) => {
           if (res.code === 200) {
+            await imageCache.deleteImage(props.data.objectName);
             ElMessage.success("删除成功");
             props.fetchMaterialPage();
           } else {
