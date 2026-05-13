@@ -17,3 +17,18 @@ export const getPmKpiGroupNodePage = (params: {
     params
   });
 };
+
+export const getPmKpiTmallUserIncomePage = (params: {
+  brand?: string;
+  endDate?: string;
+  pageNo: number;
+  pageSize: number;
+  shopName?: string;
+  spu?: string;
+  startDate?: string;
+  userName?: string;
+}) => {
+  return http.request("get", baseUrlApi("/pm/kpi-tmall-user-income/page"), {
+    params
+  });
+};

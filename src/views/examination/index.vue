@@ -69,7 +69,7 @@ const checkPermission = (name: string) => {
     <el-tabs
       v-model="activeName"
       type="card"
-      class="demo-tabs"
+      class="demo-tabs peidi-el-tabs-modern-tabs"
       @tab-click="handleClick"
     >
       <el-tab-pane label="考核页面" name="excamination" lazy>
@@ -107,6 +107,7 @@ const checkPermission = (name: string) => {
         <Designer v-if="activeName === 'designer'" />
       </el-tab-pane>
 
+      <!-- #region 自动化考核 -->
       <el-tab-pane
         label="自动化考核"
         name="evaluation"
@@ -115,6 +116,7 @@ const checkPermission = (name: string) => {
       >
         <Evaluation v-if="activeName === 'evaluation'" />
       </el-tab-pane>
+      <!-- #endregion 自动化考核 -->
     </el-tabs>
   </div>
 </template>
