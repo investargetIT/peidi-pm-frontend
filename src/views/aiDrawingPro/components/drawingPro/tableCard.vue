@@ -30,6 +30,7 @@ import { saveAs } from "file-saver";
 
 const aiModel = ref(AI_MODEL_OPTIONS[0].value);
 const exportWidth = ref(1440);
+const exportHeight = ref<number | null>(null);
 const showExportDialog = ref(false);
 
 const props = defineProps({
@@ -912,13 +913,16 @@ const generateCompositeFromRowData = async (
   imageUrl: string,
   rowData: Record<string, any>,
   imageConfig: any[],
-  size: number = 800
+  size: number = 800,
+  fixedHeight?: number
 ): Promise<string | null> => {
   try {
     console.log("\n=== 开始生成合成图片 ===");
     console.log("背景图 URL:", imageUrl);
     console.log("行数据:", rowData);
     console.log("图片配置:", imageConfig);
+    console.log("指定宽度:", size);
+    console.log("指定高度:", fixedHeight || "自适应");
 
     const bgImg = new Image();
     await new Promise<void>((resolve, reject) => {
@@ -926,8 +930,18 @@ const generateCompositeFromRowData = async (
       bgImg.onerror = () => reject(new Error("背景图加载失败"));
       bgImg.src = imageUrl;
     });
-    const canvasWidth = size;
-    const canvasHeight = Math.round(size * (bgImg.height / bgImg.width));
+
+    let canvasWidth = size;
+    let canvasHeight: number;
+
+    if (fixedHeight) {
+      canvasHeight = fixedHeight;
+      console.log(`使用指定高度: ${canvasHeight}px`);
+    } else {
+      canvasHeight = Math.round(size * (bgImg.height / bgImg.width));
+      console.log(`自适应高度: ${canvasHeight}px (基于宽度 ${size}px)`);
+    }
+
     console.log(`画布尺寸: ${canvasWidth} × ${canvasHeight}`);
 
     const imageConfigs = imageConfig.filter(item => item.type === "image");
@@ -1161,7 +1175,7 @@ const confirmExport = async () => {
 
   try {
     await ElMessageBox.confirm(
-      `确定要批量导出 ${importedDataList.value.length} 张图片吗？（宽度：${exportWidth.value}px）`,
+      `确定要批量导出 ${importedDataList.value.length} 张图片吗？${exportHeight.value ? `（高度：${exportHeight.value}px）` : "（高度自适应）"}`,
       "批量导出确认",
       {
         confirmButtonText: "确定",
@@ -1207,7 +1221,8 @@ const confirmExport = async () => {
           resultImageUrl,
           rowData,
           props.imageConfig,
-          exportWidth.value
+          exportWidth.value,
+          exportHeight.value || undefined
         );
 
         console.log("批量导出合成结果图:", compositeBase64);
@@ -1511,22 +1526,38 @@ defineExpose({
   <el-dialog
     v-model="showExportDialog"
     title="批量导出设置"
-    width="400px"
+    width="450px"
     :close-on-click-modal="false"
   >
     <div class="export-dialog-content">
       <el-form label-width="100px">
         <el-form-item label="导出宽度">
-          <el-select
+          <el-input-number
             v-model="exportWidth"
-            placeholder="选择导出宽度"
+            :min="100"
+            :max="4096"
+            :step="100"
+            placeholder="请输入宽度"
             style="width: 100%"
-          >
-            <el-option label="800px" :value="800" />
-            <el-option label="1024px" :value="1024" />
-            <el-option label="1440px" :value="1440" />
-            <el-option label="1920px" :value="1920" />
-          </el-select>
+            controls-position="right"
+          />
+          <div class="text-xs text-gray-500 mt-1">
+            范围：100-4096px，默认 1440px
+          </div>
+        </el-form-item>
+        <el-form-item label="导出高度">
+          <el-input-number
+            v-model="exportHeight"
+            :min="100"
+            :max="4096"
+            :step="100"
+            placeholder="留空自适应"
+            style="width: 100%"
+            controls-position="right"
+          />
+          <div class="text-xs text-gray-500 mt-1">
+            范围：100-4096px，留空则根据宽度自适应
+          </div>
         </el-form-item>
         <el-form-item label="导出数量">
           <span>{{ importedDataList.length }} 张图片</span>
