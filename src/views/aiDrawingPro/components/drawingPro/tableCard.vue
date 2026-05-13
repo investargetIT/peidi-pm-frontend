@@ -29,6 +29,8 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
 const aiModel = ref(AI_MODEL_OPTIONS[0].value);
+const exportWidth = ref(1440);
+const showExportDialog = ref(false);
 
 const props = defineProps({
   imageConfig: {
@@ -1151,9 +1153,15 @@ const exportAllResults = async () => {
     return;
   }
 
+  showExportDialog.value = true;
+};
+
+const confirmExport = async () => {
+  showExportDialog.value = false;
+
   try {
     await ElMessageBox.confirm(
-      `确定要批量导出 ${importedDataList.value.length} 张图片吗？`,
+      `确定要批量导出 ${importedDataList.value.length} 张图片吗？（宽度：${exportWidth.value}px）`,
       "批量导出确认",
       {
         confirmButtonText: "确定",
@@ -1199,7 +1207,7 @@ const exportAllResults = async () => {
           resultImageUrl,
           rowData,
           props.imageConfig,
-          800
+          exportWidth.value
         );
 
         console.log("批量导出合成结果图:", compositeBase64);
@@ -1325,7 +1333,7 @@ defineExpose({
             (点击右侧生成配置表，支持多次导入配置表，导出名称默认取带有产品名称的属性值)
           </span>
         </div>
-        <div class="flex items-center">
+        <div class="flex items-center gap-2">
           <el-button
             color="#CC6600"
             type="primary"
@@ -1499,6 +1507,39 @@ defineExpose({
   </div>
 
   <ResultDialog ref="resultDialogRef" />
+
+  <el-dialog
+    v-model="showExportDialog"
+    title="批量导出设置"
+    width="400px"
+    :close-on-click-modal="false"
+  >
+    <div class="export-dialog-content">
+      <el-form label-width="100px">
+        <el-form-item label="导出宽度">
+          <el-select
+            v-model="exportWidth"
+            placeholder="选择导出宽度"
+            style="width: 100%"
+          >
+            <el-option label="800px" :value="800" />
+            <el-option label="1024px" :value="1024" />
+            <el-option label="1440px" :value="1440" />
+            <el-option label="1920px" :value="1920" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="导出数量">
+          <span>{{ importedDataList.length }} 张图片</span>
+        </el-form-item>
+      </el-form>
+    </div>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="showExportDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmExport"> 确认导出 </el-button>
+      </span>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>

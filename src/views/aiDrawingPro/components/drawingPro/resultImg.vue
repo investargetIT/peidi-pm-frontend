@@ -601,6 +601,7 @@ defineExpose({
             >
               <el-option label="800px 宽" value="800" />
               <el-option label="1400px 宽" value="1400" />
+              <el-option label="1440px 宽" value="1440" />
               <el-option label="2048px 宽" value="2048" />
               <el-option label="4096px 宽" value="4096" />
             </el-select>
