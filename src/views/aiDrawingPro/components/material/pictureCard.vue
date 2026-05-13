@@ -44,6 +44,10 @@ const props = defineProps({
   handleChangeChangeFolder: {
     type: Function,
     required: true
+  },
+  handleChangeReplaceMaterial: {
+    type: Function,
+    required: true
   }
 });
 
@@ -205,12 +209,25 @@ const handleDelete = () => {
           >
             更换文件夹
           </el-button>
+          <el-button
+            v-if="getMTType === 'componentMaterial'"
+            type="primary"
+            text
+            size="small"
+            @click="props.handleChangeReplaceMaterial(props.data)"
+          >
+            替换素材图片
+          </el-button>
         </el-space>
       </template>
 
       <div class="flex flex-col justify-center items-center">
         <div>
-          <OnlineImg :url="props.data.objectName" size="200px" />
+          <OnlineImg
+            :key="props.data.objectName + props.data.type"
+            :url="props.data.objectName"
+            size="200px"
+          />
         </div>
 
         <div v-if="getMTType === 'resultImage'" class="w-full mt-[10px]">

@@ -36,6 +36,10 @@ const props = defineProps({
     type: Function,
     required: true
   },
+  handleChangeReplaceMaterial: {
+    type: Function,
+    required: true
+  },
   cardData: {
     type: Array<any>,
     required: true
@@ -126,6 +130,7 @@ watch(
           :handleEditPhraseInfo="handleEditPhraseInfo"
           :handleModuleEdit="handleModuleEdit"
           :handleChangeChangeFolder="handleChangeChangeFolder"
+          :handleChangeReplaceMaterial="handleChangeReplaceMaterial"
         />
       </div>
       <div v-else>
@@ -160,6 +165,7 @@ watch(
             :handleEditPhraseInfo="handleEditPhraseInfo"
             :handleModuleEdit="handleModuleEdit"
             :handleChangeChangeFolder="handleChangeChangeFolder"
+            :handleChangeReplaceMaterial="handleChangeReplaceMaterial"
           />
         </div>
 

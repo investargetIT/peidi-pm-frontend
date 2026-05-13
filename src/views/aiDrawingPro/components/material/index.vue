@@ -12,6 +12,7 @@ import ClickRateForm from "./clickRateForm.vue";
 import DescriptorInfo from "./descriptorInfo.vue";
 import EditPhraseInfo from "./editPhraseInfo.vue";
 import ChangeFolder from "./changeFolder.vue";
+import ReplaceMaterial from "./replaceMaterial.vue";
 import dayjs from "dayjs";
 import { type ClickRateTrendItem } from "../../type/material";
 
@@ -27,6 +28,7 @@ const clickRateFormRef = ref(null);
 const descriptorInfoRef = ref(null);
 const editPhraseInfoRef = ref(null);
 const changeFolderRef = ref(null);
+const replaceMaterialRef = ref(null);
 
 const updateCardData = () => {
   cardData.value = materialList.value[radio.value] || [];
@@ -187,6 +189,10 @@ const handleChangeChangeFolder = (data: any) => {
   changeFolderRef.value.initChangeFolderForm(data);
 };
 
+const handleChangeReplaceMaterial = (data: any) => {
+  replaceMaterialRef.value.initDetailForm(data);
+};
+
 defineExpose({
   fetchMaterialPage
 });
@@ -228,6 +234,7 @@ defineExpose({
         :handleEditPhraseInfo="handleEditPhraseInfo"
         :handleModuleEdit="handleModuleEdit"
         :handleChangeChangeFolder="handleChangeChangeFolder"
+        :handleChangeReplaceMaterial="handleChangeReplaceMaterial"
       />
     </div>
 
@@ -273,6 +280,14 @@ defineExpose({
     <div>
       <ChangeFolder
         ref="changeFolderRef"
+        :materialList="materialList"
+        :fetchMaterialPage="fetchMaterialPage"
+      />
+    </div>
+
+    <div>
+      <ReplaceMaterial
+        ref="replaceMaterialRef"
         :materialList="materialList"
         :fetchMaterialPage="fetchMaterialPage"
       />
