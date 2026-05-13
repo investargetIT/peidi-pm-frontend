@@ -1,6 +1,7 @@
 /**
  * 图片缓存工具类 - 基于IndexedDB的图片存储管理
  * 支持图片Blob数据的存储、检索和删除
+ * 增加 freshness 检查机制，支持自动检测服务器更新
  */
 import { blobManager } from "../blobManager";
 
@@ -9,13 +10,17 @@ interface ImageData {
   originalBlob: Blob; // 源文件Blob数据
   compressedBlob: Blob; // 压缩后的Blob数据
   timestamp: number; // 存储时间戳
+  etag?: string; // HTTP ETag
+  lastModified?: string; // HTTP Last-Modified
+  fileSize?: number; // 文件大小，用于简单校验
 }
 
 class ImageCache {
   private dbName: string = "ImageCacheDB";
   private storeName: string = "images";
-  private version: number = 2; // 增加版本号以触发数据库升级
+  private version: number = 3; // 增加版本号以触发数据库升级
   private db: IDBDatabase | null = null;
+  private defaultMaxAge: number = 24 * 60 * 60 * 1000; // 默认缓存有效期：24小时
 
   /**
    * 初始化数据库连接
@@ -37,17 +42,19 @@ class ImageCache {
 
       request.onupgradeneeded = event => {
         const db = (event.target as IDBOpenDBRequest).result;
+        const oldVersion = event.oldVersion || 0;
 
-        // 删除旧的对象存储空间（如果存在）
-        if (db.objectStoreNames.contains(this.storeName)) {
+        // 如果是从旧版本升级，删除旧的存储
+        if (oldVersion < 3 && db.objectStoreNames.contains(this.storeName)) {
           db.deleteObjectStore(this.storeName);
         }
 
-        // 创建新的对象存储空间
-        const store = db.createObjectStore(this.storeName, { keyPath: "id" });
-        // 创建索引以便按id快速查找
-        store.createIndex("id", "id", { unique: true });
-        store.createIndex("timestamp", "timestamp", { unique: false });
+        // 创建新的对象存储空间（如果不存在）
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          const store = db.createObjectStore(this.storeName, { keyPath: "id" });
+          store.createIndex("id", "id", { unique: true });
+          store.createIndex("timestamp", "timestamp", { unique: false });
+        }
       };
     });
   }
@@ -57,12 +64,14 @@ class ImageCache {
    * @param id 图片ID (如: "/ai/1.png")
    * @param originalData 源文件数据（base64字符串或Blob对象）
    * @param compressedData 压缩后的数据（base64字符串或Blob对象）
+   * @param metadata 可选的元数据（etag, lastModified等）
    * @returns Promise<boolean> 存储是否成功
    */
   public async storeImage(
     id: string,
     originalData: string | Blob,
-    compressedData: string | Blob
+    compressedData: string | Blob,
+    metadata?: { etag?: string; lastModified?: string }
   ): Promise<boolean> {
     try {
       const db = await this.initDB();
@@ -86,7 +95,10 @@ class ImageCache {
           id,
           originalBlob,
           compressedBlob,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          etag: metadata?.etag,
+          lastModified: metadata?.lastModified,
+          fileSize: originalBlob.size
         };
 
         const request = store.put(imageData);
@@ -98,6 +110,74 @@ class ImageCache {
       console.error("存储图片失败:", error);
       return false;
     }
+  }
+
+  /**
+   * 更新图片的元数据（不改变图片内容）
+   */
+  public async updateImageMetadata(
+    id: string,
+    metadata: { etag?: string; lastModified?: string; timestamp?: number }
+  ): Promise<boolean> {
+    try {
+      const existingData = await this.getImageData(id);
+      if (!existingData) {
+        return false;
+      }
+
+      const db = await this.initDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction([this.storeName], "readwrite");
+        const store = transaction.objectStore(this.storeName);
+
+        const updatedData: ImageData = {
+          ...existingData,
+          etag: metadata.etag ?? existingData.etag,
+          lastModified: metadata.lastModified ?? existingData.lastModified,
+          timestamp: metadata.timestamp ?? Date.now()
+        };
+
+        const request = store.put(updatedData);
+        request.onsuccess = () => resolve(true);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (error) {
+      console.error("更新元数据失败:", error);
+      return false;
+    }
+  }
+
+  /**
+   * 检查缓存是否过期
+   * @param id 图片ID
+   * @param maxAge 最大有效期（毫秒），默认24小时
+   * @returns boolean 是否过期
+   */
+  public isCacheExpired(id: string, maxAge?: number): Promise<boolean> {
+    const age = maxAge ?? this.defaultMaxAge;
+    return this.getImageData(id).then(data => {
+      if (!data) return true;
+      return Date.now() - data.timestamp > age;
+    });
+  }
+
+  /**
+   * 获取缓存的元数据
+   */
+  public async getCacheMetadata(id: string): Promise<{
+    timestamp: number;
+    etag?: string;
+    lastModified?: string;
+    fileSize?: number;
+  } | null> {
+    const data = await this.getImageData(id);
+    if (!data) return null;
+    return {
+      timestamp: data.timestamp,
+      etag: data.etag,
+      lastModified: data.lastModified,
+      fileSize: data.fileSize
+    };
   }
 
   /**
