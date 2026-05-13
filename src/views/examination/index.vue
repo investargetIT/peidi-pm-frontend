@@ -50,7 +50,9 @@ const PERMISSION_ID_LIST = {
   evaluation: [...DEV_ID]
 };
 
-const activeName = ref("evaluation");
+// const activeName = ref("evaluation");
+const activeName = ref("excamination");
+
 const userInfo: any = storageLocal().getItem("user-check-info");
 const userId = ref(userInfo?.id ?? "");
 

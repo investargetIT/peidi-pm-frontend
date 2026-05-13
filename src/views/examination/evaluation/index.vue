@@ -2,13 +2,15 @@
 import { ref } from "vue";
 import ReSegmented from "@/components/ReSegmented";
 import Organization from "./components/organization/index.vue";
+import TmallRevenue from "./components/tmallRevenue/index.vue";
+import MonthlyIndicators from "./components/monthlyIndicators/index.vue";
 
 const activeIndex = ref(0);
 
 const options = [
   { label: "组织架构" },
   { label: "天猫收入" },
-  { label: "标签3" },
+  { label: "月度指标" },
   { label: "标签4" },
   { label: "标签5" },
   { label: "标签6" },
@@ -39,10 +41,10 @@ const handleChange = (value: number) => {
         <Organization />
       </div>
       <div v-show="activeIndex === 1">
-        <p>内容2</p>
+        <TmallRevenue />
       </div>
       <div v-show="activeIndex === 2">
-        <p>内容3</p>
+        <MonthlyIndicators />
       </div>
       <div v-show="activeIndex === 3">
         <p>内容4</p>

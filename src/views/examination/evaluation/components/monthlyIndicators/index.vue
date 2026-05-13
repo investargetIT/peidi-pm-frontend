@@ -1,18 +1,19 @@
 <script lang="ts" setup>
 import { ref, onMounted } from "vue";
-import { getPmKpiTmallUserIncomePage } from "@/api/evaluation";
+import { getPmKpiMonthMetricTargetPage } from "@/api/evaluation";
 import dayjs from "dayjs";
 
 interface RecordItem {
   id: number;
+  username: string;
   month: string;
-  shopName: string;
-  brand: string;
-  spu: string;
-  taxedIncome: number;
-  grossProfit: string;
-  userName: string;
-  userId: number | null;
+  targetName: string;
+  target: number;
+  achieved: number;
+  nodeId: number;
+  nodeName: string;
+  treePath: string;
+  treePathName: string;
 }
 
 interface ApiResponse {
@@ -36,10 +37,8 @@ const pageSize = ref(20);
 
 // 搜索条件
 const searchParams = ref({
-  brand: "",
-  shopName: "",
-  spu: "",
-  userName: "",
+  username: "",
+  treePathName: "",
   startDate: "",
   endDate: ""
 });
@@ -47,11 +46,9 @@ const searchParams = ref({
 const fetchData = async () => {
   loading.value = true;
   try {
-    const res = (await getPmKpiTmallUserIncomePage({
-      brand: searchParams.value.brand || undefined,
-      shopName: searchParams.value.shopName || undefined,
-      spu: searchParams.value.spu || undefined,
-      userName: searchParams.value.userName || undefined,
+    const res = (await getPmKpiMonthMetricTargetPage({
+      username: searchParams.value.username || undefined,
+      treePathName: searchParams.value.treePathName || undefined,
       startDate: searchParams.value.startDate || undefined,
       endDate: searchParams.value.endDate || undefined,
       pageNo: currentPage.value,
@@ -62,7 +59,7 @@ const fetchData = async () => {
       total.value = res.data.total;
     }
   } catch (error) {
-    console.error("获取天猫收入数据失败", error);
+    console.error("获取月度指标数据失败", error);
   } finally {
     loading.value = false;
   }
@@ -75,10 +72,8 @@ const handleSearch = () => {
 
 const handleReset = () => {
   searchParams.value = {
-    brand: "",
-    shopName: "",
-    spu: "",
-    userName: "",
+    username: "",
+    treePathName: "",
     startDate: "",
     endDate: ""
   };
@@ -97,14 +92,20 @@ const handleSizeChange = (size: number) => {
   fetchData();
 };
 
-// 格式化金额
-const formatCurrency = (value: number | string) => {
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  if (isNaN(num)) return "-";
-  return num.toLocaleString("zh-CN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+// 计算完成率
+const getCompletionRate = (target: number, achieved: number) => {
+  if (!target || target === 0) return "-";
+  const rate = (achieved / target) * 100;
+  return rate.toFixed(2) + "%";
+};
+
+// 根据完成率返回样式
+const getRateClass = (target: number, achieved: number) => {
+  if (!target || target === 0) return "";
+  const rate = achieved / target;
+  if (rate >= 1) return "rate-excellent";
+  if (rate >= 0.8) return "rate-good";
+  return "rate-poor";
 };
 
 // 格式化月份
@@ -113,52 +114,28 @@ const formatMonth = (dateStr: string) => {
   return dayjs(dateStr).format("YYYY-MM");
 };
 
-// 根据毛利率正负返回样式
-const getProfitClass = (value: string) => {
-  const num = parseFloat(value);
-  if (num > 0) return "profit-positive";
-  if (num < 0) return "profit-negative";
-  return "";
-};
-
 onMounted(() => {
   fetchData();
 });
 </script>
 
 <template>
-  <div class="tmall-revenue-container">
+  <div class="monthly-indicators-container">
     <!-- 搜索区域 -->
     <div class="search-section">
       <el-form :model="searchParams" inline size="default">
-        <el-form-item label="店铺名称">
-          <el-input
-            v-model="searchParams.shopName"
-            placeholder="请输入店铺名称"
-            clearable
-            style="width: 200px"
-          />
-        </el-form-item>
-        <el-form-item label="品牌">
-          <el-input
-            v-model="searchParams.brand"
-            placeholder="请输入品牌"
-            clearable
-            style="width: 200px"
-          />
-        </el-form-item>
-        <el-form-item label="SPU">
-          <el-input
-            v-model="searchParams.spu"
-            placeholder="请输入SPU"
-            clearable
-            style="width: 200px"
-          />
-        </el-form-item>
         <el-form-item label="负责人">
           <el-input
-            v-model="searchParams.userName"
+            v-model="searchParams.username"
             placeholder="请输入负责人"
+            clearable
+            style="width: 200px"
+          />
+        </el-form-item>
+        <el-form-item label="组织路径">
+          <el-input
+            v-model="searchParams.treePathName"
+            placeholder="请输入组织路径"
             clearable
             style="width: 200px"
           />
@@ -203,37 +180,44 @@ onMounted(() => {
             {{ formatMonth(row.month) }}
           </template>
         </el-table-column>
-        <el-table-column prop="shopName" label="店铺名称" min-width="140" />
-        <el-table-column prop="brand" label="品牌" min-width="120" />
-        <el-table-column prop="spu" label="SPU" min-width="140" />
         <el-table-column
-          prop="taxedIncome"
-          label="税后收入（元）"
-          width="160"
-          align="right"
-        >
-          <template #default="{ row }">
-            {{ formatCurrency(row.taxedIncome) }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="grossProfit"
-          label="毛利（元）"
-          width="160"
-          align="right"
-        >
-          <template #default="{ row }">
-            <span :class="getProfitClass(row.grossProfit)">
-              {{ formatCurrency(row.grossProfit) }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="userName"
+          prop="username"
           label="负责人"
           width="100"
           align="center"
         />
+        <el-table-column prop="nodeName" label="岗位" min-width="140" />
+        <el-table-column
+          prop="treePathName"
+          label="组织路径"
+          min-width="200"
+          show-overflow-tooltip
+        />
+        <el-table-column
+          prop="targetName"
+          label="指标名称"
+          min-width="200"
+          show-overflow-tooltip
+        />
+        <el-table-column
+          prop="target"
+          label="目标值"
+          width="140"
+          align="right"
+        />
+        <el-table-column
+          prop="achieved"
+          label="实际值"
+          width="140"
+          align="right"
+        />
+        <el-table-column label="完成率" width="140" align="center">
+          <template #default="{ row }">
+            <span :class="getRateClass(row.target, row.achieved)">
+              {{ getCompletionRate(row.target, row.achieved) }}
+            </span>
+          </template>
+        </el-table-column>
       </el-table>
 
       <!-- 分页 -->
@@ -253,7 +237,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.tmall-revenue-container {
+.monthly-indicators-container {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -266,13 +250,19 @@ onMounted(() => {
   background: #fff;
 }
 
+.search-section :deep(.el-form) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
 .search-section :deep(.el-form-item) {
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .search-section :deep(.el-form-item:last-child) {
-  margin-bottom: 0;
-  margin-left: 8px;
+  margin-left: auto;
 }
 
 .table-section {
@@ -288,12 +278,17 @@ onMounted(() => {
   margin-top: 16px;
 }
 
-.profit-positive {
+.rate-excellent {
   color: var(--el-color-success);
+  font-weight: 600;
+}
+
+.rate-good {
+  color: var(--el-color-warning);
   font-weight: 500;
 }
 
-.profit-negative {
+.rate-poor {
   color: var(--el-color-danger);
   font-weight: 500;
 }

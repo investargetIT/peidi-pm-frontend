@@ -18,6 +18,7 @@ export const getPmKpiGroupNodePage = (params: {
   });
 };
 
+// 分页查询天猫用户收入
 export const getPmKpiTmallUserIncomePage = (params: {
   brand?: string;
   endDate?: string;
@@ -29,6 +30,20 @@ export const getPmKpiTmallUserIncomePage = (params: {
   userName?: string;
 }) => {
   return http.request("get", baseUrlApi("/pm/kpi-tmall-user-income/page"), {
+    params
+  });
+};
+
+// 分页查询月度指标目标
+export const getPmKpiMonthMetricTargetPage = (params: {
+  endDate?: string;
+  pageNo: number;
+  pageSize: number;
+  startDate?: string;
+  treePathName?: string;
+  username?: string;
+}) => {
+  return http.request("get", baseUrlApi("/pm/kpi-month-metric-target/page"), {
     params
   });
 };
