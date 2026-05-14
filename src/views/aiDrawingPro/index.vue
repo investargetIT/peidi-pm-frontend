@@ -12,6 +12,8 @@ import Creative from "./components/creative/index.vue";
 import DrawingPro from "./components/drawingPro/index.vue";
 import NavBar from "./components/navBar/index.vue";
 
+import AiDrawLovart from "../aiDrawLovart/index.vue";
+
 import { imageCache } from "./utils/imageCache/index";
 import { processImageCompression } from "./utils/compressImage/index";
 import { blobManager } from "./utils/blobManager";
@@ -38,6 +40,7 @@ const activeTab = ref("Material");
 const materialTabRef = ref(null);
 const drawingProTabRef = ref(null);
 const creativeTabRef = ref(null);
+const lovarTabRef = ref(null);
 
 //#region 变更Tabs逻辑
 const initDrawingPro = (data: any) => {
@@ -128,6 +131,9 @@ onUnmounted(() => {
         </template>
         <DrawingPro ref="drawingProTabRef" />
       </el-tab-pane>
+      <!-- <el-tab-pane label="Lovart" name="Lovart" lazy>
+        <AiDrawLovart ref="lovarTabRef" />
+      </el-tab-pane> -->
     </el-tabs>
 
     <!-- #region NavBar 用来实现TOKEN过期重登录 -->
