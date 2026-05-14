@@ -1,6 +1,9 @@
 <script lang="ts" setup>
 import { ref, onMounted } from "vue";
-import { getPmKpiMetricUserPage, getUserListApi } from "@/api/evaluation";
+import { getPmKpiMetricUserPage } from "@/api/evaluation";
+import RiAddLine from "@iconify-icons/ri/add-line";
+import RiEditLine from "@iconify-icons/ri/edit-line";
+import DetailDialog from "./components/detailDialog.vue";
 
 interface RecordItem {
   id: number;
@@ -33,6 +36,10 @@ const tableData = ref<RecordItem[]>([]);
 const total = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(20);
+
+const dialogVisible = ref(false);
+const dialogType = ref<"add" | "edit">("add");
+const currentRowData = ref<RecordItem | null>(null);
 
 // 搜索条件
 const searchParams = ref({
@@ -82,6 +89,22 @@ const handleSizeChange = (size: number) => {
   fetchData();
 };
 
+const handleAdd = () => {
+  dialogType.value = "add";
+  currentRowData.value = null;
+  dialogVisible.value = true;
+};
+
+const handleEdit = (row: RecordItem) => {
+  dialogType.value = "edit";
+  currentRowData.value = row;
+  dialogVisible.value = true;
+};
+
+const handleDialogSuccess = () => {
+  fetchData();
+};
+
 onMounted(() => {
   fetchData();
 });
@@ -105,6 +128,14 @@ onMounted(() => {
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
+      <div class="action-section">
+        <el-button type="primary" @click="handleAdd">
+          <template #icon>
+            <IconifyIconOffline :icon="RiAddLine" />
+          </template>
+          新增
+        </el-button>
+      </div>
     </div>
 
     <!-- 表格区域 -->
@@ -158,6 +189,20 @@ onMounted(() => {
           min-width="250"
           show-overflow-tooltip
         />
+        <el-table-column fixed="right" label="操作" width="80" align="center">
+          <template #default="scope">
+            <el-button
+              link
+              type="primary"
+              size="small"
+              @click="handleEdit(scope.row)"
+            >
+              <template #icon>
+                <IconifyIconOffline :icon="RiEditLine" />
+              </template>
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <!-- 分页 -->
@@ -173,6 +218,13 @@ onMounted(() => {
         />
       </div>
     </div>
+
+    <DetailDialog
+      v-model="dialogVisible"
+      :type="dialogType"
+      :form-data="currentRowData || undefined"
+      @success="handleDialogSuccess"
+    />
   </div>
 </template>
 
@@ -188,6 +240,16 @@ onMounted(() => {
   border: 1px solid var(--el-border-color);
   border-radius: 8px;
   background: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.action-section {
+  display: flex;
+  align-items: center;
 }
 
 .search-section :deep(.el-form) {

@@ -9,8 +9,8 @@ const baseUrlApi = (url: string) => {
 export const getUserListApi = (params: { name: string }) => {
   return http.request(
     "get",
-    // "http://12.18.1.36:8080/user/user/list",
-    "https://user.peidigroup.cn/user/user/list",
+    "http://12.18.1.36:8080/user/user/list",
+    // "https://user.peidigroup.cn/user/user/list",
     {
       params
     }
@@ -69,5 +69,57 @@ export const getPmKpiMetricUserPage = (params: {
 }) => {
   return http.request("get", baseUrlApi("/pm/kpi-metric-user/page"), {
     params
+  });
+};
+
+// 新增KPI指标用户
+export const addPmKpiMetricUserApi = (data: {
+  createdAt?: string;
+  id?: number;
+  metricConfigId?: number;
+  metricId?: string;
+  metricType?: number;
+  status?: number;
+  updatedAt?: string;
+  userId?: number;
+}) => {
+  return http.request("post", baseUrlApi("/pm/kpi-metric-user/add"), {
+    data
+  });
+};
+
+// 修改KPI指标用户
+export const updatePmKpiMetricUserApi = (data: {
+  /**
+   * pm_kpi_metric_user表主键id
+   */
+  id: number;
+  /**
+   * 工号
+   */
+  jobNum?: string;
+  /**
+   * 指标描述
+   */
+  kpiDepict?: string;
+  /**
+   * 指标配置id
+   */
+  metricConfigId?: number;
+  /**
+   * 指标id
+   */
+  metricId?: string;
+  /**
+   * 比率
+   */
+  rate?: string;
+  /**
+   * 用户id（用于调用外部接口更新jobNum）
+   */
+  userId: number;
+}) => {
+  return http.request("post", baseUrlApi("/pm/kpi-metric-user/update"), {
+    data
   });
 };
