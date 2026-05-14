@@ -88,7 +88,15 @@ const handlePreview = async () => {
       // 将 Blob 转换为 Base64
       const reader = new FileReader();
       reader.onloadend = () => {
-        previewImageUrl.value = reader.result as string;
+        let base64String = reader.result as string;
+        // 将 data:application/json;base64 替换为 data:image/png;base64
+        if (base64String && base64String.startsWith("data:")) {
+          base64String = base64String.replace(
+            /^data:[^;]+;base64,/,
+            "data:image/png;base64,"
+          );
+        }
+        previewImageUrl.value = base64String;
       };
       reader.onerror = () => {
         previewImageUrl.value = "";
@@ -185,13 +193,15 @@ const exportAsPNG = async () => {
             />
           </template>
           <template #default>
-            <el-image
-              ref="exportContainer"
-              w-full
-              :src="previewImageUrl"
-              alt="图片预览"
-              fit="contain"
-            />
+            <div ref="exportContainer" style="line-height: 0; font-size: 0">
+              <el-image
+                w-full
+                :src="previewImageUrl"
+                alt="图片预览"
+                fit="contain"
+                style="display: block"
+              />
+            </div>
           </template>
         </el-skeleton>
       </div>
