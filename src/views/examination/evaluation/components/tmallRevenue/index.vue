@@ -1,7 +1,9 @@
 <script lang="ts" setup>
 import { ref, onMounted } from "vue";
-import { getPmKpiTmallUserIncomePage } from "@/api/evaluation";
+import { getPmKpiTmallUserIncomePage, getUserListApi } from "@/api/evaluation";
+import RiAddLine from "@iconify-icons/ri/add-line";
 import dayjs from "dayjs";
+import DetailDialog from "./detailDialog.vue";
 
 interface RecordItem {
   id: number;
@@ -34,6 +36,10 @@ const total = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(20);
 
+const userList = ref<any[]>([]);
+const dialogVisible = ref(false);
+const currentRowData = ref<RecordItem | null>(null);
+
 // 搜索条件
 const searchParams = ref({
   brand: "",
@@ -43,6 +49,17 @@ const searchParams = ref({
   startDate: "",
   endDate: ""
 });
+
+const fetchUserList = async () => {
+  try {
+    const res = (await getUserListApi({ name: "" })) as any;
+    if (res.success && res.data) {
+      userList.value = res.data;
+    }
+  } catch (error) {
+    console.error("获取用户列表失败", error);
+  }
+};
 
 const fetchData = async () => {
   loading.value = true;
@@ -122,8 +139,18 @@ const getProfitClass = (value: string) => {
 };
 
 onMounted(() => {
+  fetchUserList();
   fetchData();
 });
+
+const handleAdd = (row: RecordItem) => {
+  currentRowData.value = row;
+  dialogVisible.value = true;
+};
+
+const handleDialogSuccess = () => {
+  fetchData();
+};
 </script>
 
 <template>
@@ -234,6 +261,20 @@ onMounted(() => {
           width="100"
           align="center"
         />
+        <el-table-column fixed="right" label="操作">
+          <template #default="scope">
+            <el-button
+              link
+              type="primary"
+              size="small"
+              @click="handleAdd(scope.row)"
+            >
+              <template #icon>
+                <IconifyIconOffline :icon="RiAddLine" />
+              </template>
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <!-- 分页 -->
@@ -249,6 +290,13 @@ onMounted(() => {
         />
       </div>
     </div>
+
+    <DetailDialog
+      v-model="dialogVisible"
+      :form-data="currentRowData || undefined"
+      :user-list="userList"
+      @success="handleDialogSuccess"
+    />
   </div>
 </template>
 
