@@ -1,8 +1,12 @@
 <script lang="ts" setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { ElTree, ElButton, ElMessage, ElInput } from "element-plus";
-import { getPmKpiGroupNodePage } from "@/api/evaluation";
+import {
+  addPmKpiGroupNodeNodeConfigApi,
+  getPmKpiGroupNodePage
+} from "@/api/evaluation";
 import type { TreeInstance } from "element-plus";
+import { Search } from "@element-plus/icons-vue";
 
 interface MetricConfig {
   id: number;
@@ -49,6 +53,7 @@ const loading = ref(false);
 const selectedNode = ref<TreeNode | null>(null);
 const newMetricName = ref("");
 const newMetricFormula = ref(">=");
+const searchKeyword = ref("");
 let tempId = 10000;
 let metricTempId = 20000;
 
@@ -149,26 +154,46 @@ const remove = (data: TreeNode) => {
   ElMessage.success("删除节点成功");
 };
 
-const addMetric = () => {
+const addMetric = async () => {
   if (!selectedNode.value || !newMetricName.value.trim()) {
     ElMessage.warning("请输入指标名称");
     return;
   }
-  const newMetric: MetricConfig = {
-    id: metricTempId++,
-    nodeId: selectedNode.value.id,
-    targetName: newMetricName.value.trim(),
-    weight: null,
-    score: null,
-    calculationFormula: newMetricFormula.value,
-    createdAt: new Date().toISOString()
-  };
-  if (!selectedNode.value.metricConfigs) {
-    selectedNode.value.metricConfigs = [];
+  const currentNodeId = selectedNode.value.id;
+  try {
+    await addPmKpiGroupNodeNodeConfigApi({
+      nodeId: selectedNode.value.id,
+      targetName: newMetricName.value.trim(),
+      weight: null,
+      score: null,
+      calculationFormula: newMetricFormula.value
+    });
+    ElMessage.success("添加指标成功");
+    newMetricName.value = "";
+    await fetchPmKpiGroupNodePage();
+    const restoredNode = findNodeById(dataSource.value, currentNodeId);
+    if (restoredNode) {
+      selectedNode.value = restoredNode;
+    }
+  } catch (error) {
+    console.error("添加指标失败", error);
+    ElMessage.error("添加指标失败");
   }
-  selectedNode.value.metricConfigs.push(newMetric);
-  newMetricName.value = "";
-  ElMessage.success("添加指标成功");
+};
+
+const findNodeById = (nodes: TreeNode[], id: number): TreeNode | null => {
+  for (const node of nodes) {
+    if (node.id === id) {
+      return node;
+    }
+    if (node.children && node.children.length > 0) {
+      const found = findNodeById(node.children, id);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
 };
 
 const removeMetric = (metricId: number) => {
@@ -182,6 +207,17 @@ const removeMetric = (metricId: number) => {
   }
 };
 
+const filterNode = (value: string, data: TreeNode) => {
+  if (!value) return true;
+  return data.nodeName.toLowerCase().includes(value.toLowerCase());
+};
+
+const handleSearch = () => {
+  if (treeRef.value) {
+    treeRef.value.filter(searchKeyword.value);
+  }
+};
+
 onMounted(() => {
   fetchPmKpiGroupNodePage();
 });
@@ -192,6 +228,18 @@ onMounted(() => {
     <div class="tree-section">
       <div class="section-header">
         <h3>绩效考核组织架构树</h3>
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索节点名称"
+          clearable
+          size="small"
+          class="search-input"
+          @input="handleSearch"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
       </div>
       <el-tree
         ref="treeRef"
@@ -202,6 +250,7 @@ onMounted(() => {
         :default-expand-all="true"
         :expand-on-click-node="false"
         :props="{ label: 'nodeName' }"
+        :filter-node-method="filterNode"
         @check="handleCheck"
         @node-click="handleNodeClick"
       >
@@ -326,17 +375,33 @@ onMounted(() => {
   border-radius: 8px;
   padding: 16px;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .section-header {
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--el-border-color-lighter);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .section-header h3 {
   margin: 0;
   font-size: 16px;
+  white-space: nowrap;
+}
+
+.search-input {
+  width: 240px;
+  flex-shrink: 0;
+}
+
+.search-icon {
+  font-size: 14px;
 }
 
 .detail-section {

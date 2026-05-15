@@ -31,6 +31,27 @@ export const getPmKpiGroupNodePage = (params: {
   });
 };
 
+// 新增节点指标配置
+export const addPmKpiGroupNodeNodeConfigApi = (data: {
+  calculationFormula?: string;
+  createdAt?: string;
+  id?: number;
+  kpiDepict?: string;
+  nodeId?: number;
+  rate?: string;
+  score?: number;
+  targetName?: string;
+  weight?: number;
+}) => {
+  return http.request(
+    "post",
+    baseUrlApi("/pm/kpi-group-node/node/config/add"),
+    {
+      data
+    }
+  );
+};
+
 // 分页查询天猫用户收入
 export const getPmKpiTmallUserIncomePage = (params: {
   brand?: string;
