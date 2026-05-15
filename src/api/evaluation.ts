@@ -31,6 +31,46 @@ export const getPmKpiGroupNodePage = (params: {
   });
 };
 
+// 新增节点
+export const addPmKpiGroupNodeApi = (data: {
+  createdAt?: string;
+  id?: number;
+  nodeName?: string;
+  nodeType?: string;
+  parentId?: number;
+  sortNo?: number;
+  status?: number;
+  targetType?: string;
+  treeLevel?: number;
+  treePath?: string;
+  treePathName?: string;
+  updatedAt?: string;
+}) => {
+  return http.request("post", baseUrlApi("/pm/kpi-group-node/add"), {
+    data
+  });
+};
+
+// 更新节点
+export const updatePmKpiGroupNodeApi = (data: {
+  createdAt?: string;
+  id?: number;
+  nodeName?: string;
+  nodeType?: string;
+  parentId?: number;
+  sortNo?: number;
+  status?: number;
+  targetType?: string;
+  treeLevel?: number;
+  treePath?: string;
+  treePathName?: string;
+  updatedAt?: string;
+}) => {
+  return http.request("post", baseUrlApi("/pm/kpi-group-node/update"), {
+    data
+  });
+};
+
 // 新增节点指标配置
 export const addPmKpiGroupNodeNodeConfigApi = (data: {
   calculationFormula?: string;
@@ -46,6 +86,27 @@ export const addPmKpiGroupNodeNodeConfigApi = (data: {
   return http.request(
     "post",
     baseUrlApi("/pm/kpi-group-node/node/config/add"),
+    {
+      data
+    }
+  );
+};
+
+// 更新节点指标配置
+export const updatePmKpiGroupNodeNodeConfigApi = (data: {
+  calculationFormula?: string;
+  createdAt?: string;
+  id?: number;
+  kpiDepict?: string;
+  nodeId?: number;
+  rate?: string;
+  score?: number;
+  targetName?: string;
+  weight?: number;
+}) => {
+  return http.request(
+    "post",
+    baseUrlApi("/pm/kpi-group-node/node/config/update"),
     {
       data
     }

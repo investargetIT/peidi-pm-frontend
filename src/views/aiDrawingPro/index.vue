@@ -131,9 +131,9 @@ onUnmounted(() => {
         </template>
         <DrawingPro ref="drawingProTabRef" />
       </el-tab-pane>
-      <!-- <el-tab-pane label="Lovart" name="Lovart" lazy>
+      <el-tab-pane label="Lovart" name="Lovart" lazy>
         <AiDrawLovart ref="lovarTabRef" />
-      </el-tab-pane> -->
+      </el-tab-pane>
     </el-tabs>
 
     <!-- #region NavBar 用来实现TOKEN过期重登录 -->

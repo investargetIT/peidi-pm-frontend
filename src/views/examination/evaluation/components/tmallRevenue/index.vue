@@ -314,13 +314,19 @@ const handleDialogSuccess = () => {
   background: #fff;
 }
 
+.search-section :deep(.el-form) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
 .search-section :deep(.el-form-item) {
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .search-section :deep(.el-form-item:last-child) {
-  margin-bottom: 0;
-  margin-left: 8px;
+  margin-left: auto;
 }
 
 .table-section {
