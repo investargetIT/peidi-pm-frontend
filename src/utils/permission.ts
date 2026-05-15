@@ -90,6 +90,13 @@ export const canExamineTask = data => {
   console.log("canExamineTask", userId, workerAds);
   // 测试是自己
   // return isInArr(userId, [{ userId }])
+   if (
+     [
+       "01120001112921100107" // 公菲艳钉钉id
+     ].includes(userId)
+   ) {
+     return true;
+   }
   return isInArr(userId, workerAds);
 };
 
