@@ -48,6 +48,7 @@ const detailForm = reactive({
   jobNum: "",
   metricType: 1,
   metricId: "",
+  metricConfigId: null as number | null,
   kpiDepict: "",
   rate: ""
 });
@@ -58,7 +59,10 @@ const detailRules = reactive<FormRules>({
   metricType: [
     { required: true, message: "请选择指标类型", trigger: "change" }
   ],
-  metricId: [{ required: true, message: "请输入指标ID", trigger: "blur" }]
+  metricId: [
+    { required: true, message: "请输入指标编号", trigger: "blur" },
+    { min: 18, max: 18, message: "指标编号长度必须为18位", trigger: "blur" }
+  ]
 });
 
 const fetchUserList = async () => {
@@ -83,6 +87,7 @@ watch(
         detailForm.jobNum = props.formData.jobNum || "";
         detailForm.metricType = props.formData.metricType || 1;
         detailForm.metricId = props.formData.metricId || "";
+        detailForm.metricConfigId = props.formData.metricConfigId || null;
         detailForm.kpiDepict = props.formData.kpiDepict || "";
         detailForm.rate = props.formData.rate || "";
       } else {
@@ -105,6 +110,7 @@ const resetForm = () => {
   detailForm.jobNum = "";
   detailForm.metricType = 1;
   detailForm.metricId = "";
+  detailForm.metricConfigId = null;
   detailForm.kpiDepict = "";
   detailForm.rate = "";
   formRef.value?.clearValidate();
@@ -126,6 +132,7 @@ const handleSubmit = async () => {
           jobNum: selectedUser?.jobNum || detailForm.jobNum,
           metricType: detailForm.metricType,
           metricId: detailForm.metricId,
+          metricConfigId: detailForm.metricConfigId,
           kpiDepict: detailForm.kpiDepict,
           rate: detailForm.rate
         };
@@ -190,8 +197,13 @@ const handleClose = () => {
       <el-form-item label="工号" prop="jobNum">
         <el-input v-model="detailForm.jobNum" placeholder="请输入工号" />
       </el-form-item>
-      <el-form-item label="指标ID" prop="metricId">
-        <el-input v-model="detailForm.metricId" placeholder="请输入指标ID" />
+      <el-form-item label="指标编号" prop="metricId">
+        <el-input
+          v-model="detailForm.metricId"
+          placeholder="请输入指标编号"
+          show-word-limit
+          maxlength="18"
+        />
       </el-form-item>
       <el-form-item label="指标类型" prop="metricType">
         <el-select
@@ -200,6 +212,15 @@ const handleClose = () => {
           style="width: 100%"
         >
           <el-option label="定量考核" :value="1" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="指标名称" prop="metricConfigId">
+        <el-select
+          v-model="detailForm.metricConfigId"
+          placeholder="请选择指标名称"
+          style="width: 100%"
+        >
+          <el-option label="1" :value="1" />
         </el-select>
       </el-form-item>
 

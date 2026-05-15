@@ -162,7 +162,7 @@ onMounted(() => {
         />
         <el-table-column
           prop="metricId"
-          label="指标ID"
+          label="指标编号"
           width="180"
           align="center"
         />
