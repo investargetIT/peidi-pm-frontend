@@ -10,13 +10,12 @@ export const useLovartStore = defineStore("lovart", () => {
   // 状态定义
   const layers = ref<Layer[]>([]);
   const selectedLayerId = ref<string | null>(null);
+  const selectedLayerIds = ref<string[]>([]);
   const history = ref<HistorySnapshot[]>([]);
   const historyIndex = ref(-1);
   const messages = ref<ChatMessage[]>([]);
   const canvasZoom = ref(1);
   const canvasPan = ref({ x: 0, y: 0 });
-  const canvasWidth = ref(1024);
-  const canvasHeight = ref(1024);
   const isGenerating = ref(false);
   const currentModel = ref<AiModelType>("aliyun");
 
@@ -74,6 +73,29 @@ export const useLovartStore = defineStore("lovart", () => {
   // 选中图层
   const selectLayer = (layerId: string | null) => {
     selectedLayerId.value = layerId;
+    selectedLayerIds.value = layerId ? [layerId] : [];
+  };
+
+  // 多选图层
+  const selectLayers = (layerIds: string[]) => {
+    selectedLayerIds.value = layerIds;
+    selectedLayerId.value = layerIds[0] || null;
+  };
+
+  // 切换图层选中状态（用于Ctrl+点击多选）
+  const toggleLayerSelection = (layerId: string) => {
+    const index = selectedLayerIds.value.indexOf(layerId);
+    if (index === -1) {
+      selectedLayerIds.value.push(layerId);
+      if (selectedLayerIds.value.length === 1) {
+        selectedLayerId.value = layerId;
+      }
+    } else {
+      selectedLayerIds.value.splice(index, 1);
+      if (selectedLayerId.value === layerId) {
+        selectedLayerId.value = selectedLayerIds.value[0] || null;
+      }
+    }
   };
 
   // 添加图层
@@ -207,11 +229,6 @@ export const useLovartStore = defineStore("lovart", () => {
     canvasPan.value = { x: 0, y: 0 };
   };
 
-  // 设置画布尺寸
-  const setCanvasSize = (width: number, height: number) => {
-    canvasWidth.value = Math.max(100, Math.min(4096, width));
-    canvasHeight.value = Math.max(100, Math.min(4096, height));
-  };
 
   // 设置当前模型
   const setCurrentModel = (model: AiModelType) => {
@@ -309,13 +326,12 @@ export const useLovartStore = defineStore("lovart", () => {
     // 状态
     layers,
     selectedLayerId,
+    selectedLayerIds,
     history,
     historyIndex,
     messages,
     canvasZoom,
     canvasPan,
-    canvasWidth,
-    canvasHeight,
     isGenerating,
     currentModel,
     // 计算属性
@@ -325,6 +341,8 @@ export const useLovartStore = defineStore("lovart", () => {
     // 方法
     initLayers,
     selectLayer,
+    selectLayers,
+    toggleLayerSelection,
     addLayer,
     deleteLayer,
     updateLayer,
@@ -339,7 +357,6 @@ export const useLovartStore = defineStore("lovart", () => {
     clearMessages,
     setCanvasZoom,
     setCanvasPan,
-    setCanvasSize,
     resetCanvas,
     undo,
     saveSnapshot,

@@ -45,14 +45,12 @@ export interface ChatMessage {
 export interface LovartState {
   layers: Layer[];
   selectedLayerId: string | null;
+  selectedLayerIds: string[];
   history: HistorySnapshot[];
   historyIndex: number;
   messages: ChatMessage[];
   canvasZoom: number;
   canvasPan: { x: number; y: number };
-  // 画布尺寸
-  canvasWidth: number;
-  canvasHeight: number;
   // 是否正在生成图片
   isGenerating: boolean;
 }

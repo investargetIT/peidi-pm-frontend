@@ -7,8 +7,6 @@ import LayerPanel from "./components/LayerPanel.vue";
 import ChatPanel from "./components/ChatPanel.vue";
 import {
   RefreshLeft,
-  ZoomIn,
-  ZoomOut,
   ArrowLeft,
   ChatDotRound,
   Operation,
@@ -21,16 +19,14 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import * as fabric from "fabric";
 
 const store = useLovartStore();
-const { canUndo, selectedLayer, canvasWidth, canvasHeight, canvasZoom } = storeToRefs(store);
+const { canUndo, selectedLayer, canvasZoom, selectedLayerIds } =
+  storeToRefs(store);
 const canvasAreaRef = ref<any>(null);
 
-const rightPanelTab = ref<"chat" | "layers">("chat");
+const rightPanelTab = ref<"chat" | "layers" | "properties">("chat");
 const isEditDialogVisible = ref(false);
-const isCanvasSizeDialogVisible = ref(false);
 const editingLayerId = ref<string | null>(null);
 const editingText = ref("");
-const tempCanvasWidth = ref(1024);
-const tempCanvasHeight = ref(1024);
 
 const handleUndo = () => {
   if (canUndo.value) {
@@ -91,26 +87,103 @@ const handleAddTextLayer = () => {
   ElMessage.success("已添加文本图层");
 };
 
+const handlePropertyChange = () => {
+  if (selectedLayer.value) {
+    store.updateLayer(selectedLayer.value.id, {
+      name: selectedLayer.value.name,
+      x: selectedLayer.value.x,
+      y: selectedLayer.value.y,
+      width: selectedLayer.value.width,
+      height: selectedLayer.value.height,
+      angle: selectedLayer.value.angle,
+      opacity: selectedLayer.value.opacity,
+      fontSize: selectedLayer.value.fontSize,
+      fill: selectedLayer.value.fill
+    });
+    nextTick(() => {
+      canvasAreaRef.value?.refreshCanvas();
+    });
+  }
+};
+
 // 导出画布为图片
 const handleExport = async () => {
   try {
-    // 使用 Fabric.js 的 toDataURL 方法
     const fabricCanvas = (window as any).__lovartCanvas;
     if (fabricCanvas) {
-      // 保存当前缩放和平移状态
+      const activeObjects = fabricCanvas.getActiveObjects();
+      const hasSelection = activeObjects.length > 0;
+
+      // 保存当前状态
       const currentZoom = fabricCanvas.getZoom();
       const currentPan = fabricCanvas.viewportTransform;
+      const allObjects = fabricCanvas.getObjects();
 
-      // 临时重置缩放和平移以导出原图尺寸
+      // 临时重置缩放和平移
       fabricCanvas.setZoom(1);
       fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
       fabricCanvas.calcOffset();
 
-      const dataUrl = fabricCanvas.toDataURL({
-        format: "png",
-        quality: 1,
-        multiplier: 1
-      });
+      let dataUrl: string;
+      let exportDesc: string;
+
+      if (hasSelection) {
+        // 计算选中对象的边界
+        const group = new fabric.Group(activeObjects);
+        const bounds = group.getBoundingRect();
+
+        // 临时隐藏未选中的对象
+        allObjects.forEach(obj => {
+          if (!activeObjects.includes(obj)) {
+            (obj as any)._originalVisible = obj.visible;
+            obj.visible = false;
+          }
+        });
+
+        // 裁剪导出选中区域
+        dataUrl = fabricCanvas.toDataURL({
+          format: "png",
+          quality: 1,
+          multiplier: 1,
+          left: bounds.left,
+          top: bounds.top,
+          width: bounds.width,
+          height: bounds.height
+        });
+
+        // 恢复可见性
+        allObjects.forEach(obj => {
+          if ((obj as any)._originalVisible !== undefined) {
+            obj.visible = (obj as any)._originalVisible;
+            delete (obj as any)._originalVisible;
+          }
+        });
+
+        exportDesc = `选中区域 (${Math.round(bounds.width)} × ${Math.round(bounds.height)})`;
+      } else {
+        // 计算所有对象的边界
+        if (allObjects.length === 0) {
+          ElMessage.warning("画布为空，无法导出");
+          return;
+        }
+
+        const allGroup = new fabric.Group(allObjects);
+        const bounds = allGroup.getBoundingRect();
+
+        // 添加一些边距
+        const padding = 20;
+        dataUrl = fabricCanvas.toDataURL({
+          format: "png",
+          quality: 1,
+          multiplier: 1,
+          left: bounds.left - padding,
+          top: bounds.top - padding,
+          width: bounds.width + padding * 2,
+          height: bounds.height + padding * 2
+        });
+
+        exportDesc = `全部内容 (${Math.round(bounds.width)} × ${Math.round(bounds.height)})`;
+      }
 
       // 恢复之前的缩放和平移状态
       fabricCanvas.setZoom(currentZoom);
@@ -123,7 +196,7 @@ const handleExport = async () => {
       link.href = dataUrl;
       link.click();
 
-      ElMessage.success(`导出成功！尺寸: ${store.canvasWidth} × ${store.canvasHeight}`);
+      ElMessage.success(`导出成功！${exportDesc}`);
       return;
     }
 
@@ -180,20 +253,6 @@ const handleUploadImage = () => {
   };
   input.click();
 };
-
-// 打开画布尺寸设置对话框
-const openCanvasSizeDialog = () => {
-  tempCanvasWidth.value = store.canvasWidth;
-  tempCanvasHeight.value = store.canvasHeight;
-  isCanvasSizeDialogVisible.value = true;
-};
-
-// 保存画布尺寸
-const saveCanvasSize = () => {
-  store.setCanvasSize(tempCanvasWidth.value, tempCanvasHeight.value);
-  isCanvasSizeDialogVisible.value = false;
-  ElMessage.success("画布尺寸已更新");
-};
 </script>
 
 <template>
@@ -213,18 +272,6 @@ const saveCanvasSize = () => {
           >
             撤销 (Ctrl+Z)
           </el-button>
-          <el-button
-            :icon="ZoomOut"
-            @click="store.setCanvasZoom(store.canvasZoom - 0.1)"
-          >
-            缩小
-          </el-button>
-          <el-button
-            :icon="ZoomIn"
-            @click="store.setCanvasZoom(store.canvasZoom + 0.1)"
-          >
-            放大
-          </el-button>
           <el-button :icon="ArrowLeft" @click="handleResetView">
             重置视图
           </el-button>
@@ -233,12 +280,8 @@ const saveCanvasSize = () => {
 
       <div class="header-right">
         <div class="canvas-info">
-          <span class="canvas-size">{{ canvasWidth }} × {{ canvasHeight }}</span>
           <span class="canvas-zoom">{{ Math.round(canvasZoom * 100) }}%</span>
         </div>
-        <el-button :icon="Setting" @click="openCanvasSizeDialog">
-          画布设置
-        </el-button>
         <el-button :icon="Upload" @click="handleUploadImage">
           上传图片
         </el-button>
@@ -274,6 +317,14 @@ const saveCanvasSize = () => {
             <el-icon><Operation /></el-icon>
             <span>图层</span>
           </div>
+          <div
+            class="tab-item"
+            :class="{ active: rightPanelTab === 'properties' }"
+            @click="rightPanelTab = 'properties'"
+          >
+            <el-icon><Setting /></el-icon>
+            <span>属性</span>
+          </div>
         </div>
 
         <div class="panel-content-wrapper">
@@ -282,7 +333,139 @@ const saveCanvasSize = () => {
             @edit:text="handleEditText"
             @refreshCanvas="canvasAreaRef.value?.refreshCanvas()"
           />
-          <LayerPanel v-else @edit:text="handleEditText" />
+          <LayerPanel
+            v-else-if="rightPanelTab === 'layers'"
+            @edit:text="handleEditText"
+          />
+          <div v-else class="properties-panel">
+            <div v-if="selectedLayerIds.length === 0" class="no-selection">
+              <el-empty description="请在画布上选择元素" :image-size="80" />
+            </div>
+            <div v-else class="properties-content">
+              <div class="section-title">
+                {{
+                  selectedLayerIds.length === 1
+                    ? "元素属性"
+                    : `已选择 ${selectedLayerIds.length} 个元素`
+                }}
+              </div>
+
+              <div v-if="selectedLayer" class="property-group">
+                <div class="form-item">
+                  <label>名称</label>
+                  <el-input v-model="selectedLayer.name" size="small" />
+                </div>
+              </div>
+
+              <div class="property-group">
+                <div class="form-item">
+                  <label>X</label>
+                  <el-input-number
+                    v-if="selectedLayer"
+                    v-model="selectedLayer.x"
+                    size="small"
+                    :min="-10000"
+                    :max="10000"
+                    style="width: 100%"
+                    @change="handlePropertyChange"
+                  />
+                </div>
+                <div class="form-item">
+                  <label>Y</label>
+                  <el-input-number
+                    v-if="selectedLayer"
+                    v-model="selectedLayer.y"
+                    size="small"
+                    :min="-10000"
+                    :max="10000"
+                    style="width: 100%"
+                    @change="handlePropertyChange"
+                  />
+                </div>
+              </div>
+
+              <div class="property-group">
+                <div class="form-item">
+                  <label>宽度</label>
+                  <el-input-number
+                    v-if="selectedLayer"
+                    v-model="selectedLayer.width"
+                    size="small"
+                    :min="1"
+                    :max="10000"
+                    style="width: 100%"
+                    @change="handlePropertyChange"
+                  />
+                </div>
+                <div class="form-item">
+                  <label>高度</label>
+                  <el-input-number
+                    v-if="selectedLayer"
+                    v-model="selectedLayer.height"
+                    size="small"
+                    :min="1"
+                    :max="10000"
+                    style="width: 100%"
+                    @change="handlePropertyChange"
+                  />
+                </div>
+              </div>
+
+              <div class="property-group">
+                <div class="form-item">
+                  <label>旋转</label>
+                  <el-input-number
+                    v-if="selectedLayer"
+                    v-model="selectedLayer.angle"
+                    size="small"
+                    :min="0"
+                    :max="360"
+                    style="width: 100%"
+                    @change="handlePropertyChange"
+                  />
+                </div>
+                <div class="form-item">
+                  <label>不透明度</label>
+                  <el-input-number
+                    v-if="selectedLayer"
+                    v-model="selectedLayer.opacity"
+                    size="small"
+                    :min="0"
+                    :max="1"
+                    :step="0.1"
+                    style="width: 100%"
+                    @change="handlePropertyChange"
+                  />
+                </div>
+              </div>
+
+              <div
+                v-if="selectedLayer && selectedLayer.type === 'text'"
+                class="property-group"
+              >
+                <div class="form-item">
+                  <label>字体大小</label>
+                  <el-input-number
+                    v-model="selectedLayer.fontSize"
+                    size="small"
+                    :min="8"
+                    :max="500"
+                    style="width: 100%"
+                    @change="handlePropertyChange"
+                  />
+                </div>
+                <div class="form-item">
+                  <label>颜色</label>
+                  <el-color-picker
+                    v-model="selectedLayer.fill"
+                    size="small"
+                    show-alpha
+                    @change="handlePropertyChange"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -297,31 +480,6 @@ const saveCanvasSize = () => {
       <template #footer>
         <el-button @click="isEditDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSaveEdit">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="isCanvasSizeDialogVisible" title="画布设置" width="450px">
-      <el-form label-width="80px">
-        <el-form-item label="预设尺寸">
-          <el-select placeholder="选择预设" @change="(val: number[]) => { tempCanvasWidth = val[0]; tempCanvasHeight = val[1]; }">
-            <el-option label="正方形 512×512" :value="[512, 512]" />
-            <el-option label="正方形 1024×1024" :value="[1024, 1024]" />
-            <el-option label="正方形 2048×2048" :value="[2048, 2048]" />
-            <el-option label="横屏 1920×1080" :value="[1920, 1080]" />
-            <el-option label="竖屏 1080×1920" :value="[1080, 1920]" />
-            <el-option label="A4 2480×3508" :value="[2480, 3508]" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="宽度">
-          <el-input-number v-model="tempCanvasWidth" :min="100" :max="4096" :step="10" style="width: 100%;" />
-        </el-form-item>
-        <el-form-item label="高度">
-          <el-input-number v-model="tempCanvasHeight" :min="100" :max="4096" :step="10" style="width: 100%;" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="isCanvasSizeDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveCanvasSize">应用</el-button>
       </template>
     </el-dialog>
   </div>
@@ -453,5 +611,47 @@ const saveCanvasSize = () => {
 .panel-content-wrapper {
   flex: 1;
   overflow: hidden;
+}
+
+.properties-panel {
+  height: 100%;
+  overflow-y: auto;
+  padding: 16px;
+
+  .no-selection {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+
+  .properties-content {
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #303133;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e4e7ed;
+    }
+
+    .property-group {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+
+      .form-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        label {
+          font-size: 12px;
+          color: #909399;
+        }
+      }
+    }
+  }
 }
 </style>

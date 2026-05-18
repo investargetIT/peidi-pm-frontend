@@ -23,7 +23,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useLovartStore();
-const { sortedLayers, selectedLayerId } = storeToRefs(store);
+const { sortedLayers, selectedLayerId, selectedLayerIds } = storeToRefs(store);
 
 const dragIndex = ref<number | null>(null);
 const dropIndex = ref<number | null>(null);
@@ -32,8 +32,12 @@ const getLayerIcon = (layer: Layer) => {
   return layer.type === "image" ? Picture : Document;
 };
 
-const handleSelectLayer = (layerId: string) => {
-  store.selectLayer(layerId);
+const handleSelectLayer = (evt: MouseEvent, layerId: string) => {
+  if (evt.ctrlKey || evt.metaKey) {
+    store.toggleLayerSelection(layerId);
+  } else {
+    store.selectLayer(layerId);
+  }
 };
 
 const handleToggleVisibility = (evt: Event, layerId: string) => {
@@ -135,11 +139,11 @@ const handleEditText = (evt: Event, layerId: string) => {
           :key="layer.id"
           class="layer-item"
           :class="{
-            selected: selectedLayerId === layer.id,
+            selected: selectedLayerIds.includes(layer.id),
             'drag-over': dropIndex === index
           }"
           draggable="true"
-          @click="handleSelectLayer(layer.id)"
+          @click="handleSelectLayer($event, layer.id)"
           @dragstart="handleDragStart(index)"
           @dragover="handleDragOver($event, index)"
           @drop="handleDrop"
