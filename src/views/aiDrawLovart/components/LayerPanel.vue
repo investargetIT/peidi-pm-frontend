@@ -95,7 +95,11 @@ const handleDragOver = (evt: DragEvent, index: number) => {
 };
 
 const handleDrop = () => {
-  if (dragIndex.value !== null && dropIndex.value !== null && dragIndex.value !== dropIndex.value) {
+  if (
+    dragIndex.value !== null &&
+    dropIndex.value !== null &&
+    dragIndex.value !== dropIndex.value
+  ) {
     store.moveLayer(dragIndex.value, dropIndex.value);
   }
   dragIndex.value = null;
@@ -151,7 +155,10 @@ const handleEditText = (evt: Event, layerId: string) => {
           </div>
 
           <div class="layer-actions">
-            <el-tooltip :content="layer.visible ? '隐藏' : '显示'" placement="top">
+            <el-tooltip
+              :content="layer.visible ? '隐藏' : '显示'"
+              placement="top"
+            >
               <el-icon
                 :size="16"
                 class="action-icon"
@@ -162,7 +169,10 @@ const handleEditText = (evt: Event, layerId: string) => {
               </el-icon>
             </el-tooltip>
 
-            <el-tooltip :content="layer.locked ? '解锁' : '锁定'" placement="top">
+            <el-tooltip
+              :content="layer.locked ? '解锁' : '锁定'"
+              placement="top"
+            >
               <el-icon
                 :size="16"
                 class="action-icon"
@@ -179,11 +189,17 @@ const handleEditText = (evt: Event, layerId: string) => {
               </el-icon>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item v-if="layer.type === 'text'" @click="handleEditText($event, layer.id)">
+                  <el-dropdown-item
+                    v-if="layer.type === 'text'"
+                    @click="handleEditText($event, layer.id)"
+                  >
                     <el-icon><Document /></el-icon>
                     编辑文字
                   </el-dropdown-item>
-                  <el-dropdown-item @click="handleMoveUp($event, index)" :disabled="index === 0">
+                  <el-dropdown-item
+                    @click="handleMoveUp($event, index)"
+                    :disabled="index === 0"
+                  >
                     <el-icon><ArrowUp /></el-icon>
                     上移一层
                   </el-dropdown-item>
@@ -198,11 +214,16 @@ const handleEditText = (evt: Event, layerId: string) => {
                     <el-icon><Top /></el-icon>
                     置于顶层
                   </el-dropdown-item>
-                  <el-dropdown-item @click="handleMoveToBottom($event, layer.id)">
+                  <el-dropdown-item
+                    @click="handleMoveToBottom($event, layer.id)"
+                  >
                     <el-icon><Bottom /></el-icon>
                     置于底层
                   </el-dropdown-item>
-                  <el-dropdown-item divided @click="handleDeleteLayer($event, layer.id)">
+                  <el-dropdown-item
+                    divided
+                    @click="handleDeleteLayer($event, layer.id)"
+                  >
                     <el-icon><Delete /></el-icon>
                     删除图层
                   </el-dropdown-item>

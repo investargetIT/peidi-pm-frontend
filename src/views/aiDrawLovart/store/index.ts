@@ -1,7 +1,8 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
-import type { Layer, HistorySnapshot, ChatMessage, LovartState } from "../types";
+import { ref, computed, nextTick } from "vue";
+import type { Layer, HistorySnapshot, ChatMessage, LovartState, AiModelType } from "../types";
 import { mockInitialLayers, generateId } from "../mock";
+import { transferDraw, transferDrawAliyun, transferDrawQnaigc, transferGemini, type AiTransferParams } from "@/api/aiDraw";
 
 const MAX_HISTORY_LENGTH = 50;
 
@@ -14,6 +15,10 @@ export const useLovartStore = defineStore("lovart", () => {
   const messages = ref<ChatMessage[]>([]);
   const canvasZoom = ref(1);
   const canvasPan = ref({ x: 0, y: 0 });
+  const canvasWidth = ref(1024);
+  const canvasHeight = ref(1024);
+  const isGenerating = ref(false);
+  const currentModel = ref<AiModelType>("aliyun");
 
   // 计算属性
   const selectedLayer = computed(() => {
@@ -202,6 +207,104 @@ export const useLovartStore = defineStore("lovart", () => {
     canvasPan.value = { x: 0, y: 0 };
   };
 
+  // 设置画布尺寸
+  const setCanvasSize = (width: number, height: number) => {
+    canvasWidth.value = Math.max(100, Math.min(4096, width));
+    canvasHeight.value = Math.max(100, Math.min(4096, height));
+  };
+
+  // 设置当前模型
+  const setCurrentModel = (model: AiModelType) => {
+    currentModel.value = model;
+  };
+
+  // 调用 AI 生图 API
+  const generateImage = async (
+    prompt: string,
+    options: {
+      model?: AiModelType;
+      size?: string;
+      n?: number;
+      negativePrompt?: string;
+    } = {}
+  ): Promise<string[]> => {
+    isGenerating.value = true;
+    try {
+      const { model = currentModel.value, size = "1024x1024", n = 1, negativePrompt = "" } = options;
+
+      // 构建参数
+      const params: AiTransferParams = {
+        prompt,
+        negative_prompt: negativePrompt,
+        size,
+        n
+      };
+
+      // 根据模型选择不同的中转接口
+      let response: any;
+      const urlParam = JSON.stringify(params);
+
+      switch (model) {
+        case "aliyun":
+          response = await transferDrawAliyun({ urlParam });
+          break;
+        case "qnaigc":
+          response = await transferDrawQnaigc({ urlParam });
+          break;
+        case "gemini":
+          response = await transferGemini({ urlParam });
+          break;
+        default:
+          response = await transferDraw({ urlParam });
+      }
+
+      // 解析响应结果
+      const images: string[] = [];
+      if (response?.success) {
+        if (response.data?.images) {
+          images.push(...response.data.images);
+        } else if (response.data?.image) {
+          images.push(response.data.image);
+        } else if (Array.isArray(response.data)) {
+          response.data.forEach((item: any) => {
+            if (item.url || item.image) {
+              images.push(item.url || item.image);
+            }
+          });
+        }
+      }
+
+      // 如果没有获取到图片，抛出错误
+      if (images.length === 0) {
+        throw new Error(response?.message || "生成图片失败，请稍后重试");
+      }
+
+      return images;
+    } finally {
+      isGenerating.value = false;
+    }
+  };
+
+  // 将生成的图片添加到画布
+  const addImageToCanvas = (imageUrl: string, name = "AI 生成图片") => {
+    return addLayer({
+      type: "image",
+      name,
+      visible: true,
+      locked: false,
+      x: 100 + Math.random() * 100,
+      y: 100 + Math.random() * 100,
+      width: 512,
+      height: 512,
+      angle: 0,
+      scaleX: 1,
+      scaleY: 1,
+      zIndex: 999,
+      opacity: 1,
+      src: imageUrl
+    });
+  };
+
   return {
     // 状态
     layers,
@@ -211,6 +314,10 @@ export const useLovartStore = defineStore("lovart", () => {
     messages,
     canvasZoom,
     canvasPan,
+    canvasWidth,
+    canvasHeight,
+    isGenerating,
+    currentModel,
     // 计算属性
     selectedLayer,
     sortedLayers,
@@ -232,8 +339,13 @@ export const useLovartStore = defineStore("lovart", () => {
     clearMessages,
     setCanvasZoom,
     setCanvasPan,
+    setCanvasSize,
     resetCanvas,
     undo,
-    saveSnapshot
+    saveSnapshot,
+    // AI 相关
+    generateImage,
+    addImageToCanvas,
+    setCurrentModel
   };
 });

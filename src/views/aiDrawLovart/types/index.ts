@@ -36,6 +36,10 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   targetLayerId?: string;
+  // 消息类型 - 用于区分普通对话和生图结果
+  messageType?: 'text' | 'image_result';
+  // 生图结果图片
+  resultImages?: string[];
 }
 
 export interface LovartState {
@@ -46,4 +50,20 @@ export interface LovartState {
   messages: ChatMessage[];
   canvasZoom: number;
   canvasPan: { x: number; y: number };
+  // 画布尺寸
+  canvasWidth: number;
+  canvasHeight: number;
+  // 是否正在生成图片
+  isGenerating: boolean;
 }
+
+// 预设 AI 模型
+export type AiModelType = 'default' | 'aliyun' | 'qnaigc' | 'gemini';
+
+// 生图配置
+export interface GenerateImageConfig {
+  model: AiModelType;
+  size: string;
+  n: number;
+}
+

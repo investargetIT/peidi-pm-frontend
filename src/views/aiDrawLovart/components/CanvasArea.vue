@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch, nextTick } from "vue";
+import { onMounted, onUnmounted, ref, nextTick, watch } from "vue";
 import * as fabric from "fabric";
 import { useLovartStore } from "../store";
 import type { Layer } from "../types";
-import { storeToRefs } from "pinia";
 
 const props = defineProps<{
   width?: number;
@@ -15,229 +14,130 @@ const emit = defineEmits<{
 }>();
 
 const store = useLovartStore();
-const { layers, selectedLayerId, canvasZoom, canvasPan, sortedLayers } = storeToRefs(store);
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
 let canvas: fabric.Canvas | null = null;
-let fabricObjects = new Map<string, fabric.Object>();
 let isUpdatingFromStore = false;
-let isPanning = false;
-let lastPosX = 0;
-let lastPosY = 0;
+
+// 暴露给父组件的刷新方法
+const refreshCanvas = () => {
+  nextTick(() => {
+    renderAllLayers();
+  });
+};
+
+defineExpose({
+  refreshCanvas
+});
 
 const initCanvas = () => {
   if (!canvasContainer.value) return;
 
   canvas = new fabric.Canvas("lovart-canvas", {
-    width: props.width || 1200,
-    height: props.height || 800,
-    backgroundColor: "#f5f7fa",
+    width: store.canvasWidth,
+    height: store.canvasHeight,
+    backgroundColor: "#ffffff",
     selection: true,
     preserveObjectStacking: true
   });
 
-  canvas.on("mouse:down", handleMouseDown);
-  canvas.on("mouse:move", handleMouseMove);
-  canvas.on("mouse:up", handleMouseUp);
-  canvas.on("selection:created", handleSelectionCreated);
-  canvas.on("selection:updated", handleSelectionUpdated);
-  canvas.on("selection:cleared", handleSelectionCleared);
-  canvas.on("object:modified", handleObjectModified);
-  canvas.on("object:moving", handleObjectMoving);
-  canvas.on("object:scaling", handleObjectScaling);
-  canvas.on("object:rotating", handleObjectRotating);
-  canvas.on("mouse:dblclick", handleDoubleClick);
+  (window as any).__lovartCanvas = canvas;
 
-  window.addEventListener("keydown", handleKeyDown);
+  canvas.on("selection:created", (opt: any) => {
+    if (isUpdatingFromStore) return;
+    const obj = opt.selected?.[0];
+    if (obj && (obj as any).layerId) {
+      store.selectLayer((obj as any).layerId);
+    }
+  });
+
+  canvas.on("selection:cleared", () => {
+    if (isUpdatingFromStore) return;
+    store.selectLayer(null);
+  });
+
+  canvas.on("object:modified", (opt: any) => {
+    const obj = opt.target;
+    if (!obj || !(obj as any).layerId) return;
+    const layerId = (obj as any).layerId;
+    store.updateLayerWithoutSnapshot(layerId, {
+      x: obj.left || 0,
+      y: obj.top || 0,
+      angle: obj.angle || 0,
+      scaleX: obj.scaleX || 1,
+      scaleY: obj.scaleY || 1
+    });
+    store.batchSaveSnapshot();
+  });
+
+  canvas.on("mouse:dblclick", (opt: any) => {
+    const obj = opt.target;
+    if (obj && (obj as any).layerId) {
+      const layerId = (obj as any).layerId;
+      const layer = store.layers.find(l => l.id === layerId);
+      if (layer && layer.type === "text" && !layer.locked) {
+        emit("layer:dblclick", layerId);
+      }
+    }
+  });
+
+  window.addEventListener("keydown", evt => {
+    if ((evt.ctrlKey || evt.metaKey) && evt.key === "z") {
+      evt.preventDefault();
+      store.undo();
+      refreshCanvas();
+    }
+  });
+
   window.addEventListener("resize", handleResize);
-
-  handleResize();
-  renderLayers();
 };
 
 const handleResize = () => {
-  if (!canvas || !canvasContainer.value) return;
-  const rect = canvasContainer.value.getBoundingClientRect();
-  canvas.width = rect.width;
-  canvas.height = rect.height;
+  // 不再根据容器大小调整画布尺寸，画布尺寸由 store 控制
+};
+
+const applyCanvasTransform = () => {
+  if (!canvas) return;
+  canvas.setZoom(store.canvasZoom);
+  canvas.absolutePan(new fabric.Point(store.canvasPan.x, store.canvasPan.y));
   canvas.renderAll();
 };
 
-const handleMouseDown = (opt: any) => {
+const applyCanvasSize = () => {
   if (!canvas) return;
-  const evt = opt.e as MouseEvent;
-  if (evt.button === 1 || (evt.button === 0 && evt.altKey)) {
-    isPanning = true;
-    lastPosX = evt.clientX;
-    lastPosY = evt.clientY;
-    canvas.selection = false;
-    evt.preventDefault();
-  }
+  canvas.setDimensions({ width: store.canvasWidth, height: store.canvasHeight });
+  canvas.renderAll();
 };
 
-const handleMouseMove = (opt: any) => {
-  if (!canvas || !isPanning) return;
-  const evt = opt.e as MouseEvent;
-  const deltaX = evt.clientX - lastPosX;
-  const deltaY = evt.clientY - lastPosY;
-
-  const vpt = canvas.viewportTransform;
-  if (vpt) {
-    vpt[4] += deltaX;
-    vpt[5] += deltaY;
-    canvas.setViewportTransform(vpt);
-    store.setCanvasPan(vpt[4], vpt[5]);
-  }
-
-  lastPosX = evt.clientX;
-  lastPosY = evt.clientY;
-};
-
-const handleMouseUp = () => {
-  if (!canvas) return;
-  isPanning = false;
-  canvas.selection = true;
-};
-
-const handleSelectionCreated = (opt: any) => {
-  if (isUpdatingFromStore) return;
-  const selected = opt.selected;
-  if (selected && selected.length > 0) {
-    const obj = selected[0];
-    if (obj && (obj as any).data) {
-      store.selectLayer(((obj as any).data as any).layerId);
-    }
-  }
-};
-
-const handleSelectionUpdated = (opt: any) => {
-  if (isUpdatingFromStore) return;
-  const selected = opt.selected;
-  if (selected && selected.length > 0) {
-    const obj = selected[0];
-    if (obj && (obj as any).data) {
-      store.selectLayer(((obj as any).data as any).layerId);
-    }
-  }
-};
-
-const handleSelectionCleared = () => {
-  if (isUpdatingFromStore) return;
-  store.selectLayer(null);
-};
-
-const handleObjectModified = () => {
-  store.batchSaveSnapshot();
-};
-
-const updateLayerFromObject = (obj: fabric.Object) => {
-  if (!(obj as any).data) return;
-  const layerId = ((obj as any).data as any).layerId;
-  store.updateLayerWithoutSnapshot(layerId, {
-    x: obj.left || 0,
-    y: obj.top || 0,
-    angle: obj.angle || 0,
-    scaleX: obj.scaleX || 1,
-    scaleY: obj.scaleY || 1,
-    width: (obj.width || 0) * (obj.scaleX || 1),
-    height: (obj.height || 0) * (obj.scaleY || 1)
-  });
-};
-
-const handleObjectMoving = (opt: any) => {
-  const obj = opt.target;
-  if (obj) {
-    updateLayerFromObject(obj);
-  }
-};
-
-const handleObjectScaling = (opt: any) => {
-  const obj = opt.target;
-  if (obj) {
-    updateLayerFromObject(obj);
-  }
-};
-
-const handleObjectRotating = (opt: any) => {
-  const obj = opt.target;
-  if (obj) {
-    updateLayerFromObject(obj);
-  }
-};
-
-const handleDoubleClick = (opt: any) => {
-  const obj = opt.target;
-  if (obj && (obj as any).data) {
-    const layerId = ((obj as any).data as any).layerId;
-    const layer = layers.value.find((l) => l.id === layerId);
-    if (layer && layer.type === "text" && !layer.locked) {
-      emit("layer:dblclick", layerId);
-    }
-  }
-};
-
-const handleKeyDown = (evt: KeyboardEvent) => {
-  if ((evt.ctrlKey || evt.metaKey) && evt.key === "z") {
-    evt.preventDefault();
-    store.undo();
-  }
-};
-
-const renderLayers = () => {
+const renderAllLayers = () => {
   if (!canvas) return;
   isUpdatingFromStore = true;
+  console.log("renderAllLayers, layers:", store.layers);
 
-  canvas.getObjects().forEach((obj) => {
-    canvas!.remove(obj);
+  canvas.getObjects().forEach(obj => canvas!.remove(obj));
+
+  const sorted = [...store.layers].sort((a, b) => a.zIndex - b.zIndex);
+
+  sorted.forEach((layer, index) => {
+    addLayerToCanvas(layer, index);
   });
-  fabricObjects.clear();
-
-  const sorted = [...layers.value].sort((a, b) => a.zIndex - b.zIndex);
-
-  sorted.forEach((layer) => {
-    const obj = createFabricObject(layer);
-    if (obj) {
-      fabricObjects.set(layer.id, obj);
-      canvas!.add(obj);
-    }
-  });
-
-  if (selectedLayerId.value) {
-    const selectedObj = fabricObjects.get(selectedLayerId.value);
-    if (selectedObj) {
-      canvas.setActiveObject(selectedObj);
-    }
-  }
 
   canvas.renderAll();
   isUpdatingFromStore = false;
 };
 
-const createFabricObject = (layer: Layer): fabric.Object | null => {
-  let obj: fabric.Object | null = null;
+const addLayerToCanvas = async (layer: Layer, index: number) => {
+  if (!canvas) return;
 
   if (layer.type === "image" && layer.src) {
-    obj = new fabric.Rect({
-      left: layer.x,
-      top: layer.y,
-      width: layer.width,
-      height: layer.height,
-      angle: layer.angle,
-      scaleX: layer.scaleX,
-      scaleY: layer.scaleY,
-      opacity: layer.opacity,
-      fill: "#ddd",
-      selectable: !layer.locked,
-      evented: !layer.locked,
-      visible: layer.visible
-    });
-
-    fabric.Image.fromURL(layer.src).then((img: fabric.Image) => {
+    try {
+      const img = await fabric.Image.fromURL(layer.src, {
+        crossOrigin: "anonymous"
+      });
+      if (!canvas) return;
       img.set({
         left: layer.x,
         top: layer.y,
-        width: layer.width,
-        height: layer.height,
         angle: layer.angle,
         scaleX: layer.scaleX,
         scaleY: layer.scaleY,
@@ -246,24 +146,40 @@ const createFabricObject = (layer: Layer): fabric.Object | null => {
         evented: !layer.locked,
         visible: layer.visible
       });
-      (img as any).data = { layerId: layer.id };
-
-      const oldObj = fabricObjects.get(layer.id);
-      if (oldObj && canvas) {
-        canvas.remove(oldObj);
+      // 调整图片尺寸
+      const scaleX = layer.width / img.width!;
+      const scaleY = layer.height / img.height!;
+      img.scaleX = scaleX * layer.scaleX;
+      img.scaleY = scaleY * layer.scaleY;
+      (img as any).layerId = layer.id;
+      canvas.add(img);
+      canvas.moveObjectTo(img, index);
+      if (store.selectedLayerId === layer.id) {
+        canvas.setActiveObject(img);
       }
-
-      fabricObjects.set(layer.id, img);
-      if (canvas) {
-        canvas.add(img);
-        if (selectedLayerId.value === layer.id) {
-          canvas.setActiveObject(img);
-        }
-        canvas.renderAll();
-      }
+      canvas.renderAll();
+    } catch (error) {
+      console.error("Failed to load image:", error);
+    }
+  } else if (layer.type === "image") {
+    const rect = new fabric.Rect({
+      left: layer.x,
+      top: layer.y,
+      width: layer.width,
+      height: layer.height,
+      angle: layer.angle,
+      scaleX: layer.scaleX,
+      scaleY: layer.scaleY,
+      opacity: layer.opacity,
+      fill: "#f0f0f0",
+      selectable: !layer.locked,
+      evented: !layer.locked,
+      visible: layer.visible
     });
+    (rect as any).layerId = layer.id;
+    canvas.add(rect);
   } else if (layer.type === "text" && layer.text) {
-    obj = new fabric.Textbox(layer.text, {
+    const text = new fabric.Textbox(layer.text, {
       left: layer.x,
       top: layer.y,
       fontSize: layer.fontSize || 24,
@@ -277,93 +193,44 @@ const createFabricObject = (layer: Layer): fabric.Object | null => {
       evented: !layer.locked,
       visible: layer.visible
     });
+    (text as any).layerId = layer.id;
+    canvas.add(text);
   }
-
-  if (obj) {
-    (obj as any).data = { layerId: layer.id };
-  }
-
-  return obj;
 };
-
-const updateSingleLayer = (layer: Layer) => {
-  if (!canvas || isUpdatingFromStore) return;
-  isUpdatingFromStore = true;
-
-  const oldObj = fabricObjects.get(layer.id);
-  if (oldObj) {
-    canvas.remove(oldObj);
-  }
-
-  const newObj = createFabricObject(layer);
-  if (newObj) {
-    fabricObjects.set(layer.id, newObj);
-    canvas.add(newObj);
-
-    if (selectedLayerId.value === layer.id) {
-      canvas.setActiveObject(newObj);
-    }
-  }
-
-  canvas.renderAll();
-  isUpdatingFromStore = false;
-};
-
-watch(
-  () => layers.value.length,
-  () => {
-    renderLayers();
-  }
-);
-
-watch(selectedLayerId, (newId) => {
-  if (!canvas || isUpdatingFromStore) return;
-  isUpdatingFromStore = true;
-
-  if (newId) {
-    const obj = fabricObjects.get(newId);
-    if (obj) {
-      canvas.setActiveObject(obj);
-    }
-  } else {
-    canvas.discardActiveObject();
-  }
-
-  canvas.renderAll();
-  isUpdatingFromStore = false;
-});
-
-watch(
-  sortedLayers,
-  (newLayers) => {
-    if (!canvas || isUpdatingFromStore) return;
-
-    const sorted = [...newLayers].sort((a, b) => a.zIndex - b.zIndex);
-    sorted.forEach((layer) => {
-      const obj = fabricObjects.get(layer.id);
-      if (obj) {
-        canvas!.moveObjectTo(obj, layer.zIndex + 1000);
-      }
-    });
-
-    canvas!.renderAll();
-  },
-  { deep: true }
-);
 
 onMounted(() => {
   nextTick(() => {
     initCanvas();
     store.initLayers();
+    nextTick(() => {
+      renderAllLayers();
+      applyCanvasTransform();
+    });
   });
 });
 
+// 监听画布缩放和平移变化
+watch(
+  () => [store.canvasZoom, store.canvasPan],
+  () => {
+    applyCanvasTransform();
+  },
+  { deep: true }
+);
+
+// 监听画布尺寸变化
+watch(
+  () => [store.canvasWidth, store.canvasHeight],
+  () => {
+    applyCanvasSize();
+  }
+);
+
 onUnmounted(() => {
-  window.removeEventListener("keydown", handleKeyDown);
-  window.removeEventListener("resize", handleResize);
   if (canvas) {
     canvas.dispose();
   }
+  delete (window as any).__lovartCanvas;
 });
 </script>
 
@@ -377,13 +244,12 @@ onUnmounted(() => {
 .canvas-area {
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #e9e9e9;
   background-image: radial-gradient(#ccc 1px, transparent 1px);
   background-size: 20px 20px;
-
-  :deep(#lovart-canvas) {
-    cursor: default;
-  }
 }
 </style>

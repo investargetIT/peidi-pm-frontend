@@ -12,6 +12,26 @@ export interface AiDrawPageRequest {
   sortStr?: string;
 }
 
+// AI 绘图参数 - 用于中转接口
+export interface AiTransferParams {
+  prompt: string; // 提示词
+  negative_prompt?: string; // 负面提示词
+  size?: string; // 图片尺寸，如 "1024x1024"
+  n?: number; // 生成图片数量
+  model?: string; // 模型名称
+  [key: string]: any; // 其他参数
+}
+
+// 中转接口响应
+export interface AiTransferResponse {
+  success: boolean;
+  data?: {
+    images?: string[]; // 生成的图片 URL 列表
+    image?: string; // 单张图片 URL
+  };
+  message?: string;
+}
+
 // 获取ai画图分页结果
 export const getAiDrawPage = (params: AiDrawPageRequest) => {
   return http.request("get", baseUrlApi("/ai/draw/page"), {
