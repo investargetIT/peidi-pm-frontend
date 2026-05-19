@@ -27,18 +27,143 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
 };
 
 /**
+ * 计算 base64 字符串的大小（KB）
+ */
+const calculateBase64Size = (base64: string): number => {
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.round((base64.length * 0.75 - padding) / 1024);
+};
+
+/**
+ * 压缩图片到指定大小以下
+ * @param canvas Canvas 元素
+ * @param maxSizeKB 最大大小（KB），0 表示不压缩
+ * @param preferPNG 是否优先使用 PNG 格式（即使压缩）
+ * @returns 压缩后的 base64 数据
+ */
+const compressImageToSize = async (
+  canvas: HTMLCanvasElement,
+  maxSizeKB: number = 0,
+  preferPNG: boolean = false
+): Promise<string> => {
+  // 如果不限制大小，直接返回 PNG 最高质量
+  if (maxSizeKB <= 0) {
+    return canvas.toDataURL("image/png", 1.0);
+  }
+
+  // 如果优先 PNG，先尝试 PNG 压缩
+  if (preferPNG) {
+    // PNG 格式 - 先尝试原图
+    let result = canvas.toDataURL("image/png");
+    let sizeKB = calculateBase64Size(result);
+    if (sizeKB <= maxSizeKB) {
+      console.log(`PNG 直接导出成功：大小 ${sizeKB}KB`);
+      return result;
+    }
+
+    // 尝试缩小尺寸来减小 PNG 大小
+    let scale = 0.9;
+    while (scale >= 0.3) {
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = Math.floor(canvas.width * scale);
+      tempCanvas.height = Math.floor(canvas.height * scale);
+      const tempCtx = tempCanvas.getContext("2d");
+      if (!tempCtx) break;
+
+      tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+
+      result = tempCanvas.toDataURL("image/png");
+      sizeKB = calculateBase64Size(result);
+
+      if (sizeKB <= maxSizeKB) {
+        console.log(
+          `PNG 压缩成功：缩放 ${(scale * 100).toFixed(0)}%，大小 ${sizeKB}KB`
+        );
+        return result;
+      }
+      scale -= 0.1;
+    }
+  }
+
+  // 尝试 JPEG 格式，从高质量开始逐步降低
+  let quality = 0.95;
+  while (quality >= 0.1) {
+    const result = canvas.toDataURL("image/jpeg", quality);
+    const sizeKB = calculateBase64Size(result);
+    if (sizeKB <= maxSizeKB) {
+      console.log(
+        `JPEG 压缩成功：质量 ${quality.toFixed(2)}，大小 ${sizeKB}KB`
+      );
+      return result;
+    }
+    quality -= 0.05;
+  }
+
+  // 如果 JPEG 最低质量仍太大，尝试逐步缩小图片尺寸
+  let scale = 0.9;
+  while (scale >= 0.3) {
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = Math.floor(canvas.width * scale);
+    tempCanvas.height = Math.floor(canvas.height * scale);
+    const tempCtx = tempCanvas.getContext("2d");
+    if (!tempCtx) break;
+
+    tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+
+    // 重新用中等质量压缩
+    quality = 0.8;
+    while (quality >= 0.2) {
+      const result = tempCanvas.toDataURL("image/jpeg", quality);
+      const sizeKB = calculateBase64Size(result);
+      if (sizeKB <= maxSizeKB) {
+        console.log(
+          `JPEG 压缩成功：缩放 ${(scale * 100).toFixed(0)}%，质量 ${quality.toFixed(2)}，大小 ${sizeKB}KB`
+        );
+        return result;
+      }
+      quality -= 0.1;
+    }
+    scale -= 0.1;
+  }
+
+  // 最后尝试最小尺寸和最低质量
+  const finalCanvas = document.createElement("canvas");
+  finalCanvas.width = Math.floor(canvas.width * 0.3);
+  finalCanvas.height = Math.floor(canvas.height * 0.3);
+  const finalCtx = finalCanvas.getContext("2d");
+  if (finalCtx) {
+    finalCtx.drawImage(canvas, 0, 0, finalCanvas.width, finalCanvas.height);
+  }
+
+  // 根据 preferPNG 选择最终格式
+  let finalResult;
+  if (preferPNG) {
+    finalResult = finalCanvas.toDataURL("image/png");
+  } else {
+    finalResult = finalCanvas.toDataURL("image/jpeg", 0.1);
+  }
+
+  console.warn(`已压缩到最小尺寸：大小 ${calculateBase64Size(finalResult)}KB`);
+  return finalResult;
+};
+
+/**
  * 使用 Canvas 合成图片
  * @param backgroundImage 背景图（base64 或 blob URL）
  * @param elements 素材元素数组（像素坐标，基于 containerWidth/containerHeight）
  * @param outputWidth 输出宽度
  * @param outputHeight 输出高度
- * @returns PNG 的 base64 数据
+ * @param maxSizeKB 最大文件大小（KB），0 表示不限制
+ * @param preferPNG 是否优先使用 PNG 格式
+ * @returns 压缩后的 base64 数据
  */
 export const compositeImage = async (
   backgroundImage: string,
   elements: CompositeElement[],
   outputWidth: number = 800,
-  outputHeight: number = 800
+  outputHeight: number = 800,
+  maxSizeKB: number = 0,
+  preferPNG: boolean = false
 ): Promise<string> => {
   try {
     const canvas = document.createElement("canvas");
@@ -97,7 +222,8 @@ export const compositeImage = async (
       }
     }
 
-    return canvas.toDataURL("image/png", 1.0);
+    // 根据 maxSizeKB 进行压缩
+    return await compressImageToSize(canvas, maxSizeKB, preferPNG);
   } catch (error) {
     console.error("Canvas 合成错误:", error);
     throw error;

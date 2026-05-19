@@ -31,6 +31,8 @@ import { saveAs } from "file-saver";
 const aiModel = ref(AI_MODEL_OPTIONS[0].value);
 const exportWidth = ref(1440);
 const exportHeight = ref<number | null>(null);
+const exportMaxSizeMB = ref<number | null>(null);
+const exportPreferPNG = ref(false);
 const showExportDialog = ref(false);
 
 const props = defineProps({
@@ -914,7 +916,9 @@ const generateCompositeFromRowData = async (
   rowData: Record<string, any>,
   imageConfig: any[],
   size: number = 800,
-  fixedHeight?: number
+  fixedHeight?: number,
+  maxSizeKB?: number,
+  preferPNG?: boolean
 ): Promise<string | null> => {
   try {
     console.log("\n=== 开始生成合成图片 ===");
@@ -1148,7 +1152,9 @@ const generateCompositeFromRowData = async (
       imageUrl,
       elements,
       canvasWidth,
-      canvasHeight
+      canvasHeight,
+      maxSizeKB || 0,
+      preferPNG || false
     );
     console.log("✓ Canvas 合成成功");
     return compositeBase64;
@@ -1174,8 +1180,20 @@ const confirmExport = async () => {
   showExportDialog.value = false;
 
   try {
+    const sizeTip = exportMaxSizeMB.value
+      ? `最大 ${exportMaxSizeMB.value}MB`
+      : "不限制大小";
+    const heightTip = exportHeight.value
+      ? `高度：${exportHeight.value}px`
+      : "高度自适应";
+    const formatTip = exportMaxSizeMB.value
+      ? exportPreferPNG.value
+        ? "，优先 PNG"
+        : "，默认 JPEG"
+      : "，PNG 格式";
+
     await ElMessageBox.confirm(
-      `确定要批量导出 ${importedDataList.value.length} 张图片吗？${exportHeight.value ? `（高度：${exportHeight.value}px）` : "（高度自适应）"}`,
+      `确定要批量导出 ${importedDataList.value.length} 张图片吗？（${heightTip}，${sizeTip}${formatTip}）`,
       "批量导出确认",
       {
         confirmButtonText: "确定",
@@ -1222,7 +1240,9 @@ const confirmExport = async () => {
           rowData,
           props.imageConfig,
           exportWidth.value,
-          exportHeight.value || undefined
+          exportHeight.value || undefined,
+          exportMaxSizeMB.value ? exportMaxSizeMB.value * 1024 : undefined,
+          exportPreferPNG.value
         );
 
         console.log("批量导出合成结果图:", compositeBase64);
@@ -1232,7 +1252,10 @@ const confirmExport = async () => {
           const productName = Object.keys(rowData).find(key =>
             key.includes("产品名称")
           );
-          const fileName = `${rowData[productName] || `AI_Image_${i + 1}`}.jpg`;
+          // 根据 base64 头判断图片格式，选择正确的扩展名
+          const isPNG = compositeBase64.startsWith("data:image/png");
+          const extension = isPNG ? "png" : "jpg";
+          const fileName = `${rowData[productName] || `AI_Image_${i + 1}`}.${extension}`;
 
           const base64Data = compositeBase64.split(",")[1];
           const binaryString = atob(base64Data);
@@ -1558,6 +1581,27 @@ defineExpose({
           <div class="text-xs text-gray-500 mt-1">
             范围：100-4096px，留空则根据宽度自适应
           </div>
+        </el-form-item>
+        <el-form-item label="最大大小(MB)">
+          <el-input-number
+            v-model="exportMaxSizeMB"
+            :min="0.5"
+            :max="10"
+            :step="0.5"
+            :precision="1"
+            placeholder="留空不压缩"
+            style="width: 100%"
+            controls-position="right"
+          />
+          <div class="text-xs text-gray-500 mt-1">
+            范围：0.5-10MB，留空则不限制大小（PNG 格式）
+          </div>
+        </el-form-item>
+        <el-form-item v-if="exportMaxSizeMB" label="优先 PNG">
+          <el-switch v-model="exportPreferPNG" />
+          <span class="text-xs text-gray-500 ml-2">
+            开启后优先尝试 PNG 压缩，PNG 无法压缩到目标大小时才使用 JPEG
+          </span>
         </el-form-item>
         <el-form-item label="导出数量">
           <span>{{ importedDataList.length }} 张图片</span>
