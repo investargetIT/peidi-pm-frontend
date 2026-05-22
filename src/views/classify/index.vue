@@ -253,7 +253,8 @@ const getCurrentPage = () => {
   getTaskPage({
     pageNo: Number(currentPageNum.value),
     pageSize: Number(pageSize.value),
-    userId: (ddUserInfo?.userid || "") === "01120001112921100107" ? "" : ddUserInfo?.userid, 
+    // userId: (ddUserInfo?.userid || "") === "01120001112921100107" ? "" : ddUserInfo?.userid, 
+    userId: ddUserInfo?.userid || "",
     searchStr: JSON.stringify(searchArr),
     sortStr: JSON.stringify(sortStr)
   }).then(res => {
