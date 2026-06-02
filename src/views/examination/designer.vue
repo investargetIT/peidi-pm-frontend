@@ -82,7 +82,7 @@ const fetchActiveDesigners = () => {
       if (res.code === 200) {
         console.log("活跃设计师数据:", res.data);
         activeDesignersData.value = (res.data || []).map(item => {
-          const requests = item.requests || [];
+          const requests = (item.requests || []).filter(request => request.status !== 'CLOSE');
           const totalCnt = requests.length;
           // 有endAt就算完成
           const completeCnt = requests.filter(request => {
@@ -157,8 +157,8 @@ watch(
     <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 mb-4 rounded">
       <div class="font-bold mb-2">📋 统计规则说明：</div>
       <div class="text-sm space-y-1">
-        <p>1. 逾期也算完成</p>
-        <p>2. 当月任务按截止日期算</p>
+        <!-- <p>1. 逾期也算完成</p> -->
+        <p>1. 当月任务按截止日期算</p>
       </div>
     </div>
     <div class="mt-[12px] mb-[12px] flex justify-between items-center">
