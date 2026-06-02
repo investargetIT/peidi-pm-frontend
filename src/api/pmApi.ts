@@ -269,6 +269,10 @@ export const getUploadExaminationPath = () => {
   return http.request("get", baseUrlApi("/kpi-examination/upload/examination"));
 };
 
+const testBaseUrlApi = (url: string) => {
+  return `http://12.18.1.36:8087/pm${url}`;
+};
+
 // 获取设计师考核记录结果
 export const getDesignerExaminationRecordResult = (params: {
   end: string;
@@ -277,4 +281,128 @@ export const getDesignerExaminationRecordResult = (params: {
   return http.request("get", baseUrlApi("/kpi-examination/design/list"), {
     params
   });
+};
+
+/**
+ * PmDesignRequest
+ */
+export interface PmDesignRequest {
+  /**
+   * 实际工时
+   */
+  actualHours?: number;
+  /**
+   * 负责设计师userID
+   */
+  assignedTo?: string;
+  /**
+   * 负责设计师名称
+   */
+  assignedToName?: string;
+  /**
+   * 设计类别
+   */
+  category?: string;
+  /**
+   * 创建日期
+   */
+  createAt?: string;
+  /**
+   * 提交人userID
+   */
+  createUserId?: string;
+  /**
+   * 提交人名称
+   */
+  createUserName?: string;
+  /**
+   * 截止时间
+   */
+  deadline?: string;
+  /**
+   * 需求描述
+   */
+  description?: string;
+  /**
+   * 结束日期
+   */
+  endAt?: string;
+  /**
+   * 预估工时
+   */
+  estimatedHours?: number;
+  /**
+   * 主键
+   */
+  id?: number;
+  /**
+   * 影响范围 (I1-I4)
+   */
+  impactRange?: string;
+  /**
+   * 是否为支援任务
+   */
+  isSupport?: boolean;
+  /**
+   * 自动计算的优先级
+   */
+  priority?: number;
+  /**
+   * 备注
+   */
+  remark?: string;
+  /**
+   * 开始日期
+   */
+  startAt?: string;
+  /**
+   * 需求状态
+   */
+  status?: string;
+  /**
+   * 二级任务类型
+   */
+  taskType?: string;
+  /**
+   * 需求标题
+   */
+  title?: string;
+  /**
+   * 使用场景 (S1-S4)
+   */
+  usageScenario?: string;
+  /**
+   * Ai响应验证结果
+   */
+  verificationResult?: string;
+  [property: string]: any;
+}
+
+/**
+ * PmDesignByUserVo
+ */
+export interface PmDesignByUserVo {
+  requests?: PmDesignRequest[];
+  userId?: string;
+  userName?: string;
+  [property: string]: any;
+}
+
+export interface GetActiveDesignersParams {
+  endDate?: string;
+  startDate?: string;
+  [property: string]: any;
+}
+
+// 获取活跃设计师及其设计需求列表
+export const getActiveDesignersWithRequests = (
+  params: GetActiveDesignersParams
+) => {
+  return http.request(
+    "get",
+    baseUrlApi("/design/designers/active-with-requests"),
+    {
+      params
+    }
+  );
 };

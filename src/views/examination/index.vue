@@ -50,14 +50,15 @@ const PERMISSION_ID_LIST = {
   evaluation: [...DEV_ID]
 };
 
-// const activeName = ref("evaluation");
-const activeName = ref("excamination");
+// 从localStorage读取上次保存的选项卡，没有则使用默认值
+const activeName = ref(storageLocal().getItem("examination-active-tab") || "excamination");
 
 const userInfo: any = storageLocal().getItem("user-check-info");
 const userId = ref(userInfo?.id ?? "");
 
 const handleClick = (tab: TabsPaneContext, event: Event) => {
-  // console.log(tab, event)
+  // 保存当前选项卡到localStorage
+  storageLocal().setItem("examination-active-tab", tab.props.name);
 };
 
 const checkPermission = (name: string) => {
