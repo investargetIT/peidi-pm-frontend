@@ -40,7 +40,7 @@ const fetchData = () => {
   })
     .then((res: any) => {
       if (res.code === 200) {
-        console.log("设计考核记录结果:", res.data);
+        // console.log("设计考核记录结果:", res.data);
         designerExaminationData.value = (res.data || []).map(item => {
           const taskList = item.taskList || [];
           const totalCnt = taskList.length;
@@ -82,7 +82,30 @@ const fetchActiveDesigners = () => {
       if (res.code === 200) {
         console.log("活跃设计师数据:", res.data);
         activeDesignersData.value = (res.data || []).map(item => {
-          const requests = (item.requests || []).filter(request => request.status !== 'CLOSE');
+          const monthStart = dayjs(selectedMonth.value).startOf("month");
+          const monthEnd = dayjs(selectedMonth.value).endOf("month");
+
+          const filteredRequests = (item.requests || []).filter(request => {
+            // 筛选掉状态为CLOSE的
+            if (request.status === "CLOSE") return false;
+
+            // 如果没有endAt，保留（未完成的任务）
+            if (!request.endAt) return true;
+
+            // 有endAt的，只保留在当前月份的
+            const endAtDate = dayjs(request.endAt);
+            return (
+              endAtDate.isAfter(monthStart) && endAtDate.isBefore(monthEnd)
+            );
+          });
+          // 按id去重
+          const requestMap = new Map();
+          filteredRequests.forEach(request => {
+            if (request.id !== undefined && request.id !== null) {
+              requestMap.set(request.id, request);
+            }
+          });
+          const requests = Array.from(requestMap.values());
           const totalCnt = requests.length;
           // 有endAt就算完成
           const completeCnt = requests.filter(request => {
@@ -154,11 +177,14 @@ watch(
 <template>
   <div>
     <!-- 规则说明 -->
-    <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 mb-4 rounded">
+    <div
+      class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 mb-4 rounded"
+    >
       <div class="font-bold mb-2">📋 统计规则说明：</div>
       <div class="text-sm space-y-1">
         <!-- <p>1. 逾期也算完成</p> -->
-        <p>1. 当月任务按截止日期算</p>
+         <p>1. PM系统当月任务数按截止日期算</p>
+         <p>2. 设计师系统以“确认完成日期”而非“需求截止日期”计入当月绩效。任务在哪个月确认完成，就算作哪个月的绩效（例如：截止日期为6月的任务，若在5月确认完成，则计入5月绩效）。</p>
       </div>
     </div>
     <div class="mt-[12px] mb-[12px] flex justify-between items-center">
