@@ -131,7 +131,7 @@ onUnmounted(() => {
         </template>
         <DrawingPro ref="drawingProTabRef" />
       </el-tab-pane>
-      <el-tab-pane label="Lovart" name="Lovart" lazy>
+      <el-tab-pane v-if="false" label="Lovart" name="Lovart" lazy>
         <AiDrawLovart ref="lovarTabRef" />
       </el-tab-pane>
     </el-tabs>

@@ -1,11 +1,11 @@
 export const AI_MODEL_OPTIONS_WITH_PARAMS = [
-  {
-    labelName: "阿里 wan2.7-image",
-    modelName: "wan2.7-image",
-    imageSize: ["1K", "2K"],
-    imageRatio: ["自动", "1:1", "16:9", "9:16"],
-    imageNumber: [4, 3, 2, 1]
-  },
+  // {
+  //   labelName: "阿里 wan2.7-image",
+  //   modelName: "wan2.7-image",
+  //   imageSize: ["1K", "2K"],
+  //   imageRatio: ["自动", "1:1", "16:9", "9:16"],
+  //   imageNumber: [4, 3, 2, 1]
+  // },
   {
     labelName: "阿里 wan2.7-image-pro",
     modelName: "wan2.7-image-pro",
