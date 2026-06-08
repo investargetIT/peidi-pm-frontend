@@ -9,8 +9,8 @@ const baseUrlApi = (url: string) => {
 export const getUserListApi = (params: { name: string }) => {
   return http.request(
     "get",
-    // "http://12.18.1.36:8080/user/user/list",
-    "https://user.peidigroup.cn/user/user/list",
+    "http://12.18.1.36:8080/user/user/list",
+    // "https://user.peidigroup.cn/user/user/list",
     {
       params
     }

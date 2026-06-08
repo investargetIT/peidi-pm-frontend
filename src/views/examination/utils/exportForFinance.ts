@@ -109,9 +109,9 @@ export const processAndExportOBMData = async (
       throw new Error("Excel 文件中没有工作表");
     }
 
-    // 先删除第 74 行和第 32 行（从下往上删除，避免行号变化）
+    // 先删除第 75 行和第 33 行（从下往上删除，避免行号变化）
     try {
-      const rowsToDelete = [74, 32].filter(
+      const rowsToDelete = [75, 33].filter(
         rowNum => rowNum <= worksheet.rowCount
       );
 
@@ -198,8 +198,24 @@ export const processAndExportOBMData = async (
       let valueO = 0; // O 列值
 
       // 根据不同行范围使用不同的计算逻辑
-      if ((rowNumber >= 3 && rowNumber <= 31) || rowNumber === 60) {
-        // 第 3-31 行：累计值计算（行号不变）
+      // 第 3 行：目标值累计 达成值当月
+      if (rowNumber === 3) {
+        // I 列：前 previousMonth 个月的目标值之和
+        // console.log("累计", findObjectByMonthIndex(targetData, previousMonth));
+        valueI = targetData
+          .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
+          .reduce((sum: number, item: any) => sum + item.value, 0);
+
+        // K 列：上个月的实际值（索引为 previousMonth）
+        valueK =
+          findObjectByMonthWithFirstDay(actualData, previousMonth)?.value || 0;
+
+        // O 列：前 currentMonth 个月的目标值之和
+        valueO = targetData
+          .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
+          .reduce((sum: number, item: any) => sum + item.value, 0);
+      } else if ((rowNumber >= 4 && rowNumber <= 32) || rowNumber === 61) {
+        // 第 4-32 行：累计值计算（行号不变）
         //#region 侯子洋 好适嘉项目净毛利20% 单独处理 取上上个月
         if (
           userName === "侯子洋" &&
@@ -234,12 +250,12 @@ export const processAndExportOBMData = async (
             .reduce((sum: number, item: any) => sum + item.value, 0);
         }
       } else if (
-        (rowNumber >= 32 && rowNumber <= 72) ||
-        (rowNumber >= 73 && rowNumber <= 83)
+        (rowNumber >= 33 && rowNumber <= 73) ||
+        (rowNumber >= 74 && rowNumber <= 84)
       ) {
-        // 第 32-72 行和第 73-83 行：当月值计算
-        // 原第 33-73 行 → 现第 32-72 行（删除第 32 行后前移 1 行）
-        // 原第 75-85 行 → 现第 73-83 行（删除第 32 和 74 行后前移 2 行）
+        // 第 33-73 行和第 74-84 行：当月值计算
+        // 原第 34-74 行 → 现第 33-73 行（删除第 33 行后前移 1 行）
+        // 原第 76-86 行 → 现第 74-84 行（删除第 33 和 75 行后前移 2 行）
 
         // I 列：上个月的目标值（索引为 previousMonth）
         // console.log(

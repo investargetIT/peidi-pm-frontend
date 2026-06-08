@@ -37,11 +37,12 @@ onMounted(() => {
 
 const handleDownload = (objectName: string) => {
   console.log(props.userId);
-  if (props.userId !== "1874711258007646210") {
-    if (!props.DEV_ID.includes(props.userId)) {
-      ElMessage.error("您没有权限下载文件");
-      return;
-    }
+  if (
+    !objectName.includes("天猫分店铺spu毛利(财务上传)") &&
+    !props.DEV_ID.includes(props.userId)
+  ) {
+    ElMessage.error("您没有权限下载文件");
+    return;
   }
   downloadFile({
     objectName: objectName
@@ -51,7 +52,7 @@ const handleDownload = (objectName: string) => {
       const url = window.URL.createObjectURL(new Blob([res]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", "天猫分店铺spu毛利文件.xlsx");
+      link.setAttribute("download", objectName);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -71,7 +72,10 @@ const handleDownload = (objectName: string) => {
       <ul>
         <li v-for="(item, index) in fileUrlList" :key="index">
           <span
-            v-if="item.includes('天猫分店铺spu毛利(财务上传)')"
+            v-if="
+              item.includes('天猫分店铺spu毛利(财务上传)') ||
+              props.DEV_ID.includes(props.userId)
+            "
             class="text-blue-500 cursor-pointer hover:underline"
             @click="handleDownload(item)"
           >

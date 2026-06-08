@@ -32,16 +32,16 @@ const handleChange = (value: number) => {
 
     <!-- 内容区域 -->
     <div class="content-area">
-      <div v-show="activeIndex === 0">
+      <div v-if="activeIndex === 0">
         <Organization />
       </div>
-      <div v-show="activeIndex === 1">
+      <div v-if="activeIndex === 1">
         <TmallRevenue />
       </div>
-      <div v-show="activeIndex === 2">
+      <div v-if="activeIndex === 2">
         <MonthlyIndicators />
       </div>
-      <div v-show="activeIndex === 3">
+      <div v-if="activeIndex === 3">
         <KpiMetricUser />
       </div>
     </div>

@@ -207,6 +207,8 @@ export const exportExaminationTable = async (
 };
 
 export function formatNumber(value: any) {
+  if (value === null || value === undefined) return "";
+
   const number = Number(value);
   if (isNaN(number)) return value;
   if (number === 0) return "0";
