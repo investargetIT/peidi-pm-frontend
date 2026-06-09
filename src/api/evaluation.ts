@@ -1,8 +1,8 @@
 import { http } from "@/utils/http";
 
 const baseUrlApi = (url: string) => {
-  return "http://12.18.1.36:8087" + url;
-  // return "https://api.peidigroup.cn" + url;
+  // return "http://12.18.1.36:8087" + url;
+  return "https://api.peidigroup.cn" + url;
 };
 
 // 调用用户服务
@@ -141,6 +141,45 @@ export const getPmKpiMonthMetricTargetPage = (params: {
   return http.request("get", baseUrlApi("/pm/kpi-month-metric-target/page"), {
     params
   });
+};
+
+// 更新月度指标目标（不存在则创建）
+export const updatePmKpiMonthMetricTargetApi = (data: {
+  id?: number | string;
+  /**
+   * 实际达成值
+   */
+  achieved?: number;
+  /**
+   * 指标用户ID
+   */
+  metricUserId: number | string;
+  /**
+   * 月份
+   */
+  month: string;
+  nodeId?: number | string;
+  nodeName?: string;
+  /**
+   * 目标值
+   */
+  target?: number;
+  targetName?: string;
+  treePath?: string;
+  treePathName?: string;
+  /**
+   * 实际用户ID
+   */
+  userId: number | string;
+  [property: string]: any;
+}) => {
+  return http.request(
+    "post",
+    baseUrlApi("/pm/kpi-month-metric-target/update"),
+    {
+      data
+    }
+  );
 };
 
 // 分页获取KPI指标用户

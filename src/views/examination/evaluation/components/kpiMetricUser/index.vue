@@ -1,7 +1,11 @@
 <script lang="ts" setup>
 import { ref, onMounted, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { getPmKpiMetricUserPage, deletePmKpiMetricUserApi } from "@/api/evaluation";
+import {
+  getPmKpiMetricUserPage,
+  deletePmKpiMetricUserApi,
+  getUserListApi
+} from "@/api/evaluation";
 import DetailDialog from "./components/detailDialog.vue";
 import RiAddLine from "@iconify-icons/ri/add-line";
 import RiEditLine from "@iconify-icons/ri/edit-line";
@@ -54,6 +58,12 @@ interface ApiResponse {
   };
 }
 
+interface UserItem {
+  id: number;
+  username: string;
+  jobNum?: string;
+}
+
 const loading = ref(false);
 const tableData = ref<RecordItem[]>([]);
 const total = ref(0);
@@ -63,15 +73,20 @@ const pageSize = ref(20);
 const dialogVisible = ref(false);
 const dialogMode = ref<"add" | "edit">("edit");
 const currentEditRecord = ref<RecordItem | null>(null);
+const userLoading = ref(false);
+const userList = ref<UserItem[]>([]);
 
 // 拍平数据用于表格展示（同一用户多条指标合并显示）
 const flatTableData = computed<FlatRow[]>(() => {
   const result: FlatRow[] = [];
-  tableData.value.forEach((record, idx) => {
-    const metrics =
-      record.metricList && record.metricList.length > 0
-        ? record.metricList
-        : [null];
+  let visibleUserIndex = 0;
+
+  tableData.value.forEach(record => {
+    // 关闭状态的指标不展示；若用户下没有开启的指标，则该用户整组不展示
+    const metrics = (record.metricList || []).filter(metric => metric.status !== 0);
+    if (!metrics.length) return;
+
+    visibleUserIndex += 1;
     metrics.forEach((metric, index) => {
       result.push({
         userId: record.userId,
@@ -81,8 +96,8 @@ const flatTableData = computed<FlatRow[]>(() => {
         nodeName: record.nodeName,
         rowSpan: metrics.length,
         isFirst: index === 0,
-        userIndex: idx + 1,
-        metric: metric as MetricItem | null
+        userIndex: visibleUserIndex,
+        metric
       });
     });
   });
@@ -166,10 +181,28 @@ const handleEdit = (row: FlatRow) => {
   }
 };
 
-const handleAdd = () => {
+const fetchUserList = async () => {
+  if (userList.value.length || userLoading.value) return;
+  userLoading.value = true;
+  try {
+    const res = (await getUserListApi({ name: "" })) as any;
+    if (res?.success && Array.isArray(res.data)) {
+      userList.value = res.data.sort((a: UserItem, b: UserItem) =>
+        (a.username || "").localeCompare(b.username || "", "zh-CN")
+      );
+    }
+  } catch (error) {
+    console.error("获取用户列表失败", error);
+  } finally {
+    userLoading.value = false;
+  }
+};
+
+const handleAdd = async () => {
   dialogMode.value = "add";
   currentEditRecord.value = null;
   dialogVisible.value = true;
+  fetchUserList();
 };
 
 const handleDialogSuccess = () => {
@@ -341,6 +374,8 @@ onMounted(() => {
       v-model="dialogVisible"
       :mode="dialogMode"
       :record-data="currentEditRecord"
+      :user-list="userList"
+      :user-loading="userLoading"
       @success="handleDialogSuccess"
     />
   </div>

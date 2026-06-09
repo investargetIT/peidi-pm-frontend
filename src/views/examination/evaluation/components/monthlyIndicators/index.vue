@@ -1,10 +1,15 @@
 <script lang="ts" setup>
-import { ref, onMounted } from "vue";
-import { getPmKpiMonthMetricTargetPage } from "@/api/evaluation";
+import { ref, onMounted, nextTick } from "vue";
+import {
+  getPmKpiMonthMetricTargetPage,
+  updatePmKpiMonthMetricTargetApi
+} from "@/api/evaluation";
+import { ElMessage } from "element-plus";
 import dayjs from "dayjs";
 
 interface MetricTargetItem {
   id: number | string;
+  metricUserId?: number | string;
   month: string;
   targetName: string;
   target: number;
@@ -50,6 +55,12 @@ const tableData = ref<RecordItem[]>([]);
 const total = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(20);
+const editingCell = ref<{
+  rowId: number | string;
+  field: "target" | "achieved";
+} | null>(null);
+const editingValue = ref<number | undefined>();
+const savingCellKey = ref("");
 
 // 搜索条件
 const searchParams = ref({
@@ -154,6 +165,106 @@ const getGroupIndex = (index: number) => {
     .slice(0, index + 1)
     .filter(item => item.groupIndex === 0).length;
   return pageOffset + currentPageGroupIndex;
+};
+
+const getCellKey = (row: RecordItem, field: "target" | "achieved") => {
+  return `${row.id}-${field}`;
+};
+
+const isEditing = (row: RecordItem, field: "target" | "achieved") => {
+  return editingCell.value?.rowId === row.id && editingCell.value?.field === field;
+};
+
+const isSaving = (row: RecordItem, field: "target" | "achieved") => {
+  return savingCellKey.value === getCellKey(row, field);
+};
+
+const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
+  if (savingCellKey.value) return;
+  editingCell.value = {
+    rowId: row.id,
+    field
+  };
+  editingValue.value = row[field];
+  await nextTick();
+  const input = document.querySelector(
+    `.editable-cell-input-${row.id}-${field} input`
+  ) as HTMLInputElement | null;
+  input?.focus();
+  input?.select();
+};
+
+const cancelEdit = () => {
+  editingCell.value = null;
+  editingValue.value = undefined;
+};
+
+const handleEditKeydown = (
+  event: KeyboardEvent,
+  row: RecordItem,
+  field: "target" | "achieved"
+) => {
+  if (event.key === "Enter") {
+    confirmEdit(row, field);
+  }
+  if (event.key === "Escape") {
+    cancelEdit();
+  }
+};
+
+const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
+  if (!isEditing(row, field)) return;
+
+  const newValue = editingValue.value;
+  const oldValue = row[field];
+
+  if (newValue === undefined || Number.isNaN(Number(newValue))) {
+    ElMessage.warning("请输入有效数值");
+    return;
+  }
+
+  if (Number(newValue) === Number(oldValue)) {
+    cancelEdit();
+    return;
+  }
+
+  if (!row.userId) {
+    ElMessage.error("缺少用户ID，无法保存");
+    return;
+  }
+
+  const metricUserId = row.metricUserId ?? row.id;
+  savingCellKey.value = getCellKey(row, field);
+  try {
+    const res = (await updatePmKpiMonthMetricTargetApi({
+      id: Number(row.id),
+      userId: row.userId,
+      metricUserId: Number(metricUserId),
+      month: row.month,
+      targetName: row.targetName,
+      nodeId: row.nodeId,
+      nodeName: row.nodeName,
+      treePath: row.treePath,
+      treePathName: row.treePathName,
+      target: row.target,
+      achieved: row.achieved,
+      [field]: Number(newValue)
+    })) as { success: boolean; msg?: string };
+
+    if (res.success) {
+      row[field] = Number(newValue);
+      ElMessage.success("保存成功");
+      cancelEdit();
+      fetchData();
+    } else {
+      ElMessage.error(res.msg || "保存失败");
+    }
+  } catch (error) {
+    console.error("保存月度指标目标失败", error);
+    ElMessage.error("保存失败");
+  } finally {
+    savingCellKey.value = "";
+  }
 };
 
 // 计算完成率
@@ -268,15 +379,59 @@ onMounted(() => {
         <el-table-column
           prop="target"
           label="目标值"
-          width="140"
+          width="160"
           align="right"
-        />
+        >
+          <template #default="{ row }">
+            <el-input-number
+              v-if="isEditing(row, 'target')"
+              v-model="editingValue"
+              :class="`editable-cell-input-${row.id}-target`"
+              :controls="false"
+              :precision="2"
+              style="width: 120px"
+              @blur="confirmEdit(row, 'target')"
+              @keydown="handleEditKeydown($event, row, 'target')"
+            />
+            <span
+              v-else
+              v-loading="isSaving(row, 'target')"
+              class="editable-cell"
+              title="双击修改"
+              @dblclick="startEdit(row, 'target')"
+            >
+              {{ row.target }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column
           prop="achieved"
-          label="实际值"
-          width="140"
+          label="完成值"
+          width="160"
           align="right"
-        />
+        >
+          <template #default="{ row }">
+            <el-input-number
+              v-if="isEditing(row, 'achieved')"
+              v-model="editingValue"
+              :class="`editable-cell-input-${row.id}-achieved`"
+              :controls="false"
+              :precision="2"
+              style="width: 120px"
+              @blur="confirmEdit(row, 'achieved')"
+              @keydown="handleEditKeydown($event, row, 'achieved')"
+            />
+            <span
+              v-else
+              v-loading="isSaving(row, 'achieved')"
+              class="editable-cell"
+              title="双击修改"
+              @dblclick="startEdit(row, 'achieved')"
+            >
+              {{ row.achieved }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column label="完成率" width="140" align="center">
           <template #default="{ row }">
             <span :class="getRateClass(row.target, row.achieved)">
@@ -342,6 +497,20 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+.editable-cell {
+  display: inline-block;
+  min-width: 80px;
+  min-height: 24px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.editable-cell:hover {
+  background: var(--el-fill-color-light);
+  color: var(--el-color-primary);
 }
 
 .rate-excellent {

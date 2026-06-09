@@ -3,8 +3,7 @@ import { ref, watch, computed } from "vue";
 import { ElMessage } from "element-plus";
 import {
   getPmKpiGroupNodeConfigGroupApi,
-  updatePmKpiMetricUserApi,
-  getUserListApi
+  updatePmKpiMetricUserApi
 } from "@/api/evaluation";
 
 type DialogMode = "add" | "edit";
@@ -63,6 +62,8 @@ interface Props {
   modelValue: boolean;
   mode?: DialogMode;
   recordData?: RecordItem | null;
+  userList?: UserItem[];
+  userLoading?: boolean;
 }
 
 interface Emits {
@@ -72,19 +73,19 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   mode: "edit",
-  recordData: null
+  recordData: null,
+  userList: () => [],
+  userLoading: false
 });
 
 const emit = defineEmits<Emits>();
 
 const loading = ref(false);
 const nodeLoading = ref(false);
-const userLoading = ref(false);
 const userJobNum = ref("");
 const selectedNodeId = ref<number>();
 const selectedNodeName = ref("");
 const nodeConfigGroups = ref<NodeConfigGroup[]>([]);
-const userList = ref<UserItem[]>([]);
 const selectedUserId = ref<number>();
 const selectedUserName = ref("");
 
@@ -141,22 +142,6 @@ const fetchNodeConfigGroups = async () => {
   }
 };
 
-const fetchUserList = async () => {
-  userLoading.value = true;
-  try {
-    const res = (await getUserListApi({ name: "" })) as any;
-    if (res?.success && Array.isArray(res.data)) {
-      userList.value = res.data.sort((a: UserItem, b: UserItem) =>
-        (a.username || "").localeCompare(b.username || "", "zh-CN")
-      );
-    }
-  } catch (error) {
-    console.error("获取用户列表失败", error);
-  } finally {
-    userLoading.value = false;
-  }
-};
-
 const resetState = () => {
   userJobNum.value = "";
   selectedNodeId.value = undefined;
@@ -189,14 +174,11 @@ watch(
     if (!nodeConfigGroups.value.length) {
       await fetchNodeConfigGroups();
     }
-    if (props.mode === "add" && !userList.value.length) {
-      await fetchUserList();
-    }
   }
 );
 
 const handleUserChange = (userId: number) => {
-  const user = userList.value.find(u => u.id === userId);
+  const user = props.userList.find(u => u.id === userId);
   if (user) {
     selectedUserName.value = user.username;
     userJobNum.value = user.jobNum || "";
@@ -299,12 +281,12 @@ const handleClose = () => {
                     v-model="selectedUserId"
                     placeholder="请搜索选择用户"
                     filterable
-                    :loading="userLoading"
+                    :loading="props.userLoading"
                     style="width: 100%"
                     @change="handleUserChange"
                   >
                     <el-option
-                      v-for="item in userList"
+                      v-for="item in props.userList"
                       :key="item.id"
                       :label="item.username"
                       :value="item.id"
