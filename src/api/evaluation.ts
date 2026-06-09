@@ -9,8 +9,8 @@ const baseUrlApi = (url: string) => {
 export const getUserListApi = (params: { name: string }) => {
   return http.request(
     "get",
-    "http://12.18.1.36:8080/user/user/list",
-    // "https://user.peidigroup.cn/user/user/list",
+    // "http://12.18.1.36:8080/user/user/list",
+    "https://user.peidigroup.cn/user/user/list",
     {
       params
     }
@@ -156,50 +156,96 @@ export const getPmKpiMetricUserPage = (params: {
 
 // 新增KPI指标用户
 export const addPmKpiMetricUserApi = (data: {
-  createdAt?: string;
-  id?: number;
-  metricConfigId?: number;
-  metricId?: string;
-  metricType?: number;
-  status?: number;
-  updatedAt?: string;
-  userId?: number;
+  /**
+   * 用户id
+   */
+  userId: number | string;
+  /**
+   * 工号
+   */
+  jobNum?: string;
+  /**
+   * 用户名
+   */
+  username?: string;
+  /**
+   * 节点id
+   */
+  nodeId?: number | string;
+  /**
+   * 节点名称
+   */
+  nodeName?: string;
+  /**
+   * 指标列表
+   */
+  metricList: Array<{
+    id?: number | string;
+    metricConfigId?: number | string;
+    metricType?: number;
+    targetName?: string;
+    metricId?: string;
+    kpiDepict?: string;
+    rate?: string;
+    nodeId?: number | string;
+    nodeName?: string;
+    status?: number;
+  }>;
 }) => {
   return http.request("post", baseUrlApi("/pm/kpi-metric-user/add"), {
     data
   });
 };
 
+// 删除KPI指标用户
+export const deletePmKpiMetricUserApi = (params: { userId: number }) => {
+  return http.request("post", baseUrlApi("/pm/kpi-metric-user/delete"), {
+    params
+  });
+};
+
+// 获取所有指标配置（按nodeId分组）
+export const getPmKpiGroupNodeConfigGroupApi = () => {
+  return http.request("get", baseUrlApi("/pm/kpi-group-node/config/group"));
+};
+
 // 修改KPI指标用户
 export const updatePmKpiMetricUserApi = (data: {
   /**
-   * pm_kpi_metric_user表主键id
+   * 用户id
    */
-  id: number;
+  userId: number | string;
   /**
    * 工号
    */
   jobNum?: string;
   /**
-   * 指标描述
+   * 用户名
    */
-  kpiDepict?: string;
+  username?: string;
   /**
-   * 指标配置id
+   * 节点id
    */
-  metricConfigId?: number;
+  nodeId?: number | string;
   /**
-   * 指标id
+   * 节点名称
    */
-  metricId?: string;
+  nodeName?: string;
   /**
-   * 比率
+   * 指标列表
    */
-  rate?: string;
-  /**
-   * 用户id（用于调用外部接口更新jobNum）
-   */
-  userId: number;
+  metricList: Array<{
+    id?: number | string;
+    metricConfigId?: number | string;
+    metricType?: number;
+    targetName?: string;
+    metricId?: string;
+    kpiDepict?: string;
+    rate?: string;
+    nodeId?: number | string;
+    nodeName?: string;
+    status?: number;
+  }>;
 }) => {
   return http.request("post", baseUrlApi("/pm/kpi-metric-user/update"), {
     data

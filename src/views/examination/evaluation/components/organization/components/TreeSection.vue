@@ -3,6 +3,7 @@ import { Search, Plus, Edit } from "@element-plus/icons-vue";
 import type { TreeInstance } from "element-plus";
 import type { TreeNode } from "./types";
 import { ref, computed } from "vue";
+import RiAddLine from "@iconify-icons/ri/add-line";
 
 interface Props {
   dataSource: TreeNode[];
@@ -83,7 +84,9 @@ const handleAddRootNode = () => {
       <h3>组织架构树</h3>
       <div class="header-actions">
         <el-button type="primary" size="small" @click="handleAddRootNode">
-          <el-icon><Plus /></el-icon>
+          <template #icon>
+            <IconifyIconOffline :icon="RiAddLine" />
+          </template>
           添加根节点
         </el-button>
         <el-input

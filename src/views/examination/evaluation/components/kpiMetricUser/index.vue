@@ -1,21 +1,44 @@
 <script lang="ts" setup>
-import { ref, onMounted } from "vue";
-import { getPmKpiMetricUserPage } from "@/api/evaluation";
+import { ref, onMounted, computed } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { getPmKpiMetricUserPage, deletePmKpiMetricUserApi } from "@/api/evaluation";
+import DetailDialog from "./components/detailDialog.vue";
 import RiAddLine from "@iconify-icons/ri/add-line";
 import RiEditLine from "@iconify-icons/ri/edit-line";
-import DetailDialog from "./components/detailDialog.vue";
+import RiDeleteBinLine from "@iconify-icons/ri/delete-bin-line";
 
-interface RecordItem {
+interface MetricItem {
   id: number;
-  userId: number;
-  jobNum: string;
   metricConfigId: number;
-  username: string;
   metricType: number;
   targetName: string;
   metricId: string;
   kpiDepict: string;
   rate: string;
+  nodeId: number;
+  nodeName: string;
+  status?: number;
+}
+
+interface RecordItem {
+  userId: number;
+  jobNum: string;
+  username: string;
+  nodeId: number;
+  nodeName: string;
+  metricList: MetricItem[];
+}
+
+interface FlatRow {
+  userId: number;
+  jobNum: string;
+  username: string;
+  nodeId: number;
+  nodeName: string;
+  rowSpan: number;
+  isFirst: boolean;
+  userIndex: number;
+  metric: MetricItem | null;
 }
 
 interface ApiResponse {
@@ -38,8 +61,50 @@ const currentPage = ref(1);
 const pageSize = ref(20);
 
 const dialogVisible = ref(false);
-const dialogType = ref<"add" | "edit">("add");
-const currentRowData = ref<RecordItem | null>(null);
+const dialogMode = ref<"add" | "edit">("edit");
+const currentEditRecord = ref<RecordItem | null>(null);
+
+// 拍平数据用于表格展示（同一用户多条指标合并显示）
+const flatTableData = computed<FlatRow[]>(() => {
+  const result: FlatRow[] = [];
+  tableData.value.forEach((record, idx) => {
+    const metrics =
+      record.metricList && record.metricList.length > 0
+        ? record.metricList
+        : [null];
+    metrics.forEach((metric, index) => {
+      result.push({
+        userId: record.userId,
+        jobNum: record.jobNum,
+        username: record.username,
+        nodeId: record.nodeId,
+        nodeName: record.nodeName,
+        rowSpan: metrics.length,
+        isFirst: index === 0,
+        userIndex: idx + 1,
+        metric: metric as MetricItem | null
+      });
+    });
+  });
+  return result;
+});
+
+// 合并单元格规则：序号、工号、用户名、考核组、操作 按用户合并
+const spanMethod = ({
+  row,
+  columnIndex
+}: {
+  row: FlatRow;
+  columnIndex: number;
+}) => {
+  if ([0, 1, 2, 3, 9].includes(columnIndex)) {
+    if (row.isFirst) {
+      return { rowspan: row.rowSpan, colspan: 1 };
+    }
+    return { rowspan: 0, colspan: 0 };
+  }
+  return { rowspan: 1, colspan: 1 };
+};
 
 // 搜索条件
 const searchParams = ref({
@@ -89,20 +154,49 @@ const handleSizeChange = (size: number) => {
   fetchData();
 };
 
-const handleAdd = () => {
-  dialogType.value = "add";
-  currentRowData.value = null;
-  dialogVisible.value = true;
+const handleEdit = (row: FlatRow) => {
+  const record = tableData.value.find(r => r.userId === row.userId);
+  if (record) {
+    dialogMode.value = "edit";
+    currentEditRecord.value = {
+      ...record,
+      metricList: record.metricList.map(m => ({ ...m }))
+    };
+    dialogVisible.value = true;
+  }
 };
 
-const handleEdit = (row: RecordItem) => {
-  dialogType.value = "edit";
-  currentRowData.value = row;
+const handleAdd = () => {
+  dialogMode.value = "add";
+  currentEditRecord.value = null;
   dialogVisible.value = true;
 };
 
 const handleDialogSuccess = () => {
   fetchData();
+};
+
+const handleDelete = (row: FlatRow) => {
+  ElMessageBox.confirm(`确定删除用户「${row.username}」的全部指标数据？`, "删除确认", {
+    confirmButtonText: "确定",
+    cancelButtonText: "取消",
+    type: "warning"
+  }).then(async () => {
+    try {
+      const res = (await deletePmKpiMetricUserApi({
+        userId: row.userId
+      })) as ApiResponse;
+      if (res?.code === 200) {
+        ElMessage.success("删除成功");
+        fetchData();
+      } else {
+        ElMessage.error(res?.msg || "删除失败");
+      }
+    } catch (error) {
+      console.error("删除失败", error);
+      ElMessage.error("删除失败");
+    }
+  }).catch(() => {});
 };
 
 onMounted(() => {
@@ -128,26 +222,30 @@ onMounted(() => {
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
-      <div class="action-section">
-        <el-button type="primary" @click="handleAdd">
-          <template #icon>
-            <IconifyIconOffline :icon="RiAddLine" />
-          </template>
-          新增
-        </el-button>
-      </div>
+
+      <el-button type="primary" @click="handleAdd">
+        <template #icon>
+          <IconifyIconOffline :icon="RiAddLine" />
+        </template>
+        新增
+      </el-button>
     </div>
 
     <!-- 表格区域 -->
     <div class="table-section">
       <el-table
         v-loading="loading"
-        :data="tableData"
+        :data="flatTableData"
+        :span-method="spanMethod"
         border
         stripe
         style="width: 100%"
       >
-        <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column label="序号" width="60" align="center">
+          <template #default="{ row }">
+            {{ row.isFirst ? row.userIndex : "" }}
+          </template>
+        </el-table-column>
         <el-table-column
           prop="jobNum"
           label="工号"
@@ -161,46 +259,66 @@ onMounted(() => {
           align="center"
         />
         <el-table-column
-          prop="metricId"
-          label="指标编号"
-          width="180"
+          prop="nodeName"
+          label="考核组"
+          width="160"
           align="center"
         />
-        <el-table-column
-          prop="metricType"
-          label="指标类型"
-          width="120"
-          align="center"
-        >
+        <el-table-column label="指标编号" width="180" align="center">
           <template #default="{ row }">
-            {{ row.metricType === 1 ? "定量考核" : row.metricType }}
+            {{ row.metric?.metricId }}
           </template>
         </el-table-column>
-        <el-table-column prop="targetName" label="指标名称" min-width="180" />
-        <el-table-column
-          prop="kpiDepict"
-          label="KPI描述"
-          min-width="250"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="rate"
-          label="系数规则"
-          min-width="250"
-          show-overflow-tooltip
-        />
-        <el-table-column fixed="right" label="操作" width="80" align="center">
-          <template #default="scope">
-            <el-button
-              link
-              type="primary"
-              size="small"
-              @click="handleEdit(scope.row)"
-            >
-              <template #icon>
-                <IconifyIconOffline :icon="RiEditLine" />
-              </template>
-            </el-button>
+        <el-table-column label="指标类型" width="120" align="center">
+          <template #default="{ row }">
+            <template v-if="row.metric">
+              {{
+                row.metric.metricType === 1
+                  ? "定量考核"
+                  : row.metric.metricType
+              }}
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="考核指标" min-width="180">
+          <template #default="{ row }">
+            {{ row.metric?.targetName }}
+          </template>
+        </el-table-column>
+        <el-table-column label="KPI描述" min-width="250" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.metric?.kpiDepict }}
+          </template>
+        </el-table-column>
+        <el-table-column label="系数规则" min-width="250" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.metric?.rate }}
+          </template>
+        </el-table-column>
+        <el-table-column fixed="right" label="操作" width="120" align="center">
+          <template #default="{ row }">
+            <template v-if="row.isFirst">
+              <el-button
+                link
+                type="primary"
+                size="small"
+                @click="handleEdit(row)"
+              >
+                <template #icon>
+                  <IconifyIconOffline :icon="RiEditLine" />
+                </template>
+              </el-button>
+              <el-button
+                link
+                type="danger"
+                size="small"
+                @click="handleDelete(row)"
+              >
+                <template #icon>
+                  <IconifyIconOffline :icon="RiDeleteBinLine" />
+                </template>
+              </el-button>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -221,8 +339,8 @@ onMounted(() => {
 
     <DetailDialog
       v-model="dialogVisible"
-      :type="dialogType"
-      :form-data="currentRowData || undefined"
+      :mode="dialogMode"
+      :record-data="currentEditRecord"
       @success="handleDialogSuccess"
     />
   </div>
@@ -241,15 +359,10 @@ onMounted(() => {
   border-radius: 8px;
   background: #fff;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
-}
-
-.action-section {
-  display: flex;
-  align-items: center;
 }
 
 .search-section :deep(.el-form) {
@@ -261,10 +374,6 @@ onMounted(() => {
 
 .search-section :deep(.el-form-item) {
   margin-bottom: 0;
-}
-
-.search-section :deep(.el-form-item:last-child) {
-  margin-left: auto;
 }
 
 .table-section {

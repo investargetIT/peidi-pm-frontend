@@ -203,7 +203,7 @@ const handleExportForFinance = async () => {
 <template>
   <div>
     <el-card shadow="never">
-      <el-form :model="searchForm" inline>
+      <el-form :model="searchForm" inline class="search-form">
         <el-form-item label="考核人" prop="userName">
           <el-input
             v-model="searchForm.userName"
@@ -312,7 +312,12 @@ const handleExportForFinance = async () => {
 </template>
 
 <style lang="scss" scoped>
-.el-form-item {
-  margin-bottom: 0;
+.search-form {
+  :deep(.el-form-item) {
+    margin-bottom: 18px;
+  }
+  :deep(.el-form-item:last-child) {
+    margin-bottom: 0;
+  }
 }
 </style>

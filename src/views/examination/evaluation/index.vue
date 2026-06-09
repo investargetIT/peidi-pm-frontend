@@ -1,12 +1,25 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import ReSegmented from "@/components/ReSegmented";
 import Organization from "./components/organization/index.vue";
 import TmallRevenue from "./components/tmallRevenue/index.vue";
 import MonthlyIndicators from "./components/monthlyIndicators/index.vue";
 import KpiMetricUser from "./components/kpiMetricUser/index.vue";
 
-const activeIndex = ref(0);
+const STORAGE_KEY = "evaluation-active-index";
+
+const getStoredIndex = (): number => {
+  const stored = sessionStorage.getItem(STORAGE_KEY);
+  if (stored !== null) {
+    const index = Number(stored);
+    if (!isNaN(index) && index >= 0 && index <= 3) {
+      return index;
+    }
+  }
+  return 0;
+};
+
+const activeIndex = ref(getStoredIndex());
 
 const options = [
   { label: "组织架构" },
@@ -15,8 +28,13 @@ const options = [
   { label: "KPI指标用户" }
 ];
 
+watch(activeIndex, val => {
+  sessionStorage.setItem(STORAGE_KEY, String(val));
+});
+
 const handleChange = (value: number) => {
   console.log("当前选中:", value);
+  sessionStorage.setItem(STORAGE_KEY, String(value));
 };
 </script>
 
