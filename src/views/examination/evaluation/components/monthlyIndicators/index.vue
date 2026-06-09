@@ -3,17 +3,33 @@ import { ref, onMounted } from "vue";
 import { getPmKpiMonthMetricTargetPage } from "@/api/evaluation";
 import dayjs from "dayjs";
 
-interface RecordItem {
-  id: number;
-  username: string;
+interface MetricTargetItem {
+  id: number | string;
   month: string;
   targetName: string;
   target: number;
   achieved: number;
-  nodeId: number;
+  nodeId: number | string;
   nodeName: string;
   treePath: string;
   treePathName: string;
+}
+
+interface RecordItem extends MetricTargetItem {
+  userId?: number | string;
+  jobNum?: string;
+  username: string;
+  metricTargetList?: MetricTargetItem[];
+  rowSpan?: number;
+  groupIndex?: number;
+}
+
+interface ApiRecordItem {
+  userId: number | string;
+  jobNum?: string;
+  username: string;
+  metricTargetList?: MetricTargetItem[];
+  month: string;
 }
 
 interface ApiResponse {
@@ -21,7 +37,7 @@ interface ApiResponse {
   msg: string;
   success: boolean;
   data: {
-    records: RecordItem[];
+    records: ApiRecordItem[];
     total: number;
     size: number;
     current: number;
@@ -55,7 +71,29 @@ const fetchData = async () => {
       pageSize: pageSize.value
     })) as ApiResponse;
     if (res.success && res.data) {
-      tableData.value = res.data.records;
+      // 新格式：records 中每项包含 user 信息 + metricTargetList
+      // 展开 metricTargetList，并标记 rowSpan 用于合并单元格
+      const flatRecords: RecordItem[] = [];
+      for (const record of res.data.records) {
+        const userInfo = {
+          userId: record.userId,
+          jobNum: record.jobNum,
+          username: record.username,
+          month: record.month
+        };
+        if (record.metricTargetList && record.metricTargetList.length > 0) {
+          for (let i = 0; i < record.metricTargetList.length; i++) {
+            const metric = record.metricTargetList[i];
+            flatRecords.push({
+              ...userInfo,
+              ...metric,
+              rowSpan: i === 0 ? record.metricTargetList.length : 0,
+              groupIndex: i
+            });
+          }
+        }
+      }
+      tableData.value = flatRecords;
       total.value = res.data.total;
     }
   } catch (error) {
@@ -90,6 +128,32 @@ const handleSizeChange = (size: number) => {
   pageSize.value = size;
   currentPage.value = 1;
   fetchData();
+};
+
+// 合并单元格
+const objectSpanMethod = ({
+  row,
+  columnIndex
+}: {
+  row: RecordItem;
+  columnIndex: number;
+}) => {
+  // 合并公共信息列：序号(0)、月份(1)、负责人(2)
+  if (columnIndex <= 2) {
+    if (row.rowSpan && row.rowSpan > 0) {
+      return { rowspan: row.rowSpan, colspan: 1 };
+    }
+    return { rowspan: 0, colspan: 0 };
+  }
+};
+
+// 获取分组序号
+const getGroupIndex = (index: number) => {
+  const pageOffset = (currentPage.value - 1) * pageSize.value;
+  const currentPageGroupIndex = tableData.value
+    .slice(0, index + 1)
+    .filter(item => item.groupIndex === 0).length;
+  return pageOffset + currentPageGroupIndex;
 };
 
 // 计算完成率
@@ -173,11 +237,16 @@ onMounted(() => {
         border
         stripe
         style="width: 100%"
+        :span-method="objectSpanMethod"
       >
-        <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column label="序号" width="60" align="center">
+          <template #default="{ $index }">
+            {{ getGroupIndex($index) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="month" label="月份" width="120" align="center">
           <template #default="{ row }">
-            {{ formatMonth(row.month) }}
+            {{ row.groupIndex === 0 ? formatMonth(row.month) : '' }}
           </template>
         </el-table-column>
         <el-table-column
@@ -185,14 +254,11 @@ onMounted(() => {
           label="负责人"
           width="100"
           align="center"
-        />
-        <el-table-column prop="nodeName" label="岗位" min-width="140" />
-        <el-table-column
-          prop="treePathName"
-          label="组织路径"
-          min-width="200"
-          show-overflow-tooltip
-        />
+        >
+          <template #default="{ row }">
+            {{ row.groupIndex === 0 ? row.username : '' }}
+          </template>
+        </el-table-column>
         <el-table-column
           prop="targetName"
           label="指标名称"
