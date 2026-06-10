@@ -14,7 +14,17 @@ import NProgress from "../progress";
 import { getToken, formatToken } from "@/utils/auth";
 import { useUserStoreHook } from "@/store/modules/user";
 import { router, remainingPaths } from "@/router";
-import { emitter } from "@/utils/mitt.ts";
+import { emitter } from "@/utils/mitt";
+
+// 自定义 JSON 解析器，将大整数转换为字符串
+const parseJSON = (text: string) => {
+  return JSON.parse(text, (key, value) => {
+    if (typeof value === "number" && !Number.isSafeInteger(value)) {
+      return String(value);
+    }
+    return value;
+  });
+};
 
 // 相关配置请参考：www.axios-js.com/zh-cn/docs/#axios-request-config-1
 const defaultConfig: AxiosRequestConfig = {
@@ -25,6 +35,19 @@ const defaultConfig: AxiosRequestConfig = {
     "Content-Type": "application/json",
     "X-Requested-With": "XMLHttpRequest"
   },
+  // 自定义响应转换，处理大整数
+  transformResponse: [
+    (data: any) => {
+      if (typeof data === "string") {
+        try {
+          return parseJSON(data);
+        } catch (e) {
+          return data;
+        }
+      }
+      return data;
+    }
+  ],
   // 数组格式参数序列化（https://github.com/axios/axios/issues/5142）
   paramsSerializer: {
     serialize: stringify as unknown as CustomParamsSerializer

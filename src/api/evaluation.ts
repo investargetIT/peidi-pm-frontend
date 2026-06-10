@@ -161,6 +161,13 @@ export const getPmKpiMonthMetricTargetPage = (params: {
   });
 };
 
+// 根据用户ID执行SQL更新指标数据
+export const execSqlByUserId = (params: { userId: number | string }) => {
+  return http.request("post", baseUrlApi("/pm/kpi-month-metric-target/execSqlByUserId"), {
+    params
+  });
+};
+
 // 更新月度指标目标（不存在则创建）
 export const updatePmKpiMonthMetricTargetApi = (data: {
   id?: number | string;
@@ -255,7 +262,7 @@ export const addPmKpiMetricUserApi = (data: {
 };
 
 // 删除KPI指标用户
-export const deletePmKpiMetricUserApi = (params: { userId: number }) => {
+export const deletePmKpiMetricUserApi = (params: { userId: number | string }) => {
   return http.request("post", baseUrlApi("/pm/kpi-metric-user/delete"), {
     params
   });
@@ -264,6 +271,11 @@ export const deletePmKpiMetricUserApi = (params: { userId: number }) => {
 // 获取所有指标配置（按nodeId分组）
 export const getPmKpiGroupNodeConfigGroupApi = () => {
   return http.request("get", baseUrlApi("/pm/kpi-group-node/config/group"));
+};
+
+// 获取执行SQL列表
+export const getPmExecSqlListApi = (params: { type: string; name?: string }) => {
+  return http.request("get", baseUrlApi("/pm/exec-sql/list"), { params });
 };
 
 // 修改KPI指标用户

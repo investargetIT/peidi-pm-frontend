@@ -4,12 +4,18 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import {
   getPmKpiMetricUserPage,
   deletePmKpiMetricUserApi,
-  getUserListApi
+  getUserListApi,
+  getPmExecSqlListApi
 } from "@/api/evaluation";
 import DetailDialog from "./components/detailDialog.vue";
 import RiAddLine from "@iconify-icons/ri/add-line";
 import RiEditLine from "@iconify-icons/ri/edit-line";
 import RiDeleteBinLine from "@iconify-icons/ri/delete-bin-line";
+
+interface SqlExecItem {
+  type: string;
+  sqlExecId: number | string | null;
+}
 
 interface MetricItem {
   id: number;
@@ -22,6 +28,7 @@ interface MetricItem {
   nodeId: number;
   nodeName: string;
   status?: number;
+  sqlExecConfig?: string | SqlExecItem[];
 }
 
 interface RecordItem {
@@ -68,13 +75,16 @@ const loading = ref(false);
 const tableData = ref<RecordItem[]>([]);
 const total = ref(0);
 const currentPage = ref(1);
-const pageSize = ref(20);
+const pageSize = ref(5);
 
 const dialogVisible = ref(false);
 const dialogMode = ref<"add" | "edit">("edit");
 const currentEditRecord = ref<RecordItem | null>(null);
 const userLoading = ref(false);
 const userList = ref<UserItem[]>([]);
+const sqlLoading = ref(false);
+const achievedSqlList = ref<{ id?: string; name?: string }[]>([]);
+const finishingRateSqlList = ref<{ id?: string; name?: string }[]>([]);
 
 // 拍平数据用于表格展示（同一用户多条指标合并显示）
 const flatTableData = computed<FlatRow[]>(() => {
@@ -198,15 +208,87 @@ const fetchUserList = async () => {
   }
 };
 
+const fetchSqlLists = async () => {
+  if (achievedSqlList.value.length && finishingRateSqlList.value.length) return;
+  sqlLoading.value = true;
+  try {
+    const [achievedRes, finishingRateRes] = await Promise.all([
+      getPmExecSqlListApi({ type: "1" }) as any,
+      getPmExecSqlListApi({ type: "2" }) as any
+    ]);
+    if (achievedRes?.code === 200 || achievedRes?.success) {
+      achievedSqlList.value = (achievedRes.data || []).map((item: any) => ({
+        id: String(item.id),
+        name: item.name
+      }));
+    }
+    if (finishingRateRes?.code === 200 || finishingRateRes?.success) {
+      finishingRateSqlList.value = (finishingRateRes.data || []).map((item: any) => ({
+        id: String(item.id),
+        name: item.name
+      }));
+    }
+  } catch (error) {
+    console.error("获取SQL列表失败", error);
+  } finally {
+    sqlLoading.value = false;
+  }
+};
+
 const handleAdd = async () => {
   dialogMode.value = "add";
   currentEditRecord.value = null;
   dialogVisible.value = true;
   fetchUserList();
+  fetchSqlLists();
 };
 
 const handleDialogSuccess = () => {
   fetchData();
+};
+
+const parseSqlExecConfig = (sqlExecConfig?: string | SqlExecItem[]): SqlExecItem[] => {
+  if (!sqlExecConfig || sqlExecConfig === "0") {
+    return [
+      { type: "achieved", sqlExecId: null },
+      { type: "finishingRate", sqlExecId: null }
+    ];
+  }
+  if (Array.isArray(sqlExecConfig)) {
+    return sqlExecConfig.map(item => ({
+      ...item,
+      sqlExecId: item.sqlExecId != null ? String(item.sqlExecId) : null
+    }));
+  }
+  try {
+    const parsed = JSON.parse(sqlExecConfig);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item: any) => ({
+        ...item,
+        sqlExecId: item.sqlExecId != null ? String(item.sqlExecId) : null
+      }));
+    }
+  } catch {}
+  return [
+    { type: "achieved", sqlExecId: null },
+    { type: "finishingRate", sqlExecId: null }
+  ];
+};
+
+const getSqlExecIdByType = (
+  sqlExecConfig: SqlExecItem[] | string | null | undefined,
+  type: string
+): number | string | null => {
+  const config = parseSqlExecConfig(sqlExecConfig);
+  const item = config.find(i => i.type === type);
+  return item?.sqlExecId ?? null;
+};
+
+const getSqlExecNameById = (list: { id?: string; name?: string }[], id: number | string | null): string => {
+  if (!id) return "";
+  const stringId = String(id);
+  const item = list.find(i => i.id === stringId);
+  return item?.name || "";
 };
 
 const handleDelete = (row: FlatRow) => {
@@ -234,6 +316,7 @@ const handleDelete = (row: FlatRow) => {
 
 onMounted(() => {
   fetchData();
+  fetchSqlLists();
 });
 </script>
 
@@ -318,14 +401,14 @@ onMounted(() => {
             {{ row.metric?.targetName }}
           </template>
         </el-table-column>
-        <el-table-column label="KPI描述" min-width="250" show-overflow-tooltip>
+        <el-table-column label="实际值" width="160">
           <template #default="{ row }">
-            {{ row.metric?.kpiDepict }}
+            {{ getSqlExecNameById(achievedSqlList, getSqlExecIdByType(row.metric?.sqlExecConfig, 'achieved')) }}
           </template>
         </el-table-column>
-        <el-table-column label="系数规则" min-width="250" show-overflow-tooltip>
+        <el-table-column label="达成率" width="160">
           <template #default="{ row }">
-            {{ row.metric?.rate }}
+            {{ getSqlExecNameById(finishingRateSqlList, getSqlExecIdByType(row.metric?.sqlExecConfig, 'finishingRate')) }}
           </template>
         </el-table-column>
         <el-table-column fixed="right" label="操作" width="120" align="center">
@@ -361,7 +444,7 @@ onMounted(() => {
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="[5, 10, 20]"
           :total="total"
           layout="total, sizes, prev, pager, next, jumper"
           @current-change="handleCurrentChange"
@@ -376,6 +459,8 @@ onMounted(() => {
       :record-data="currentEditRecord"
       :user-list="userList"
       :user-loading="userLoading"
+      :achieved-sql-list="achievedSqlList"
+      :finishing-rate-sql-list="finishingRateSqlList"
       @success="handleDialogSuccess"
     />
   </div>

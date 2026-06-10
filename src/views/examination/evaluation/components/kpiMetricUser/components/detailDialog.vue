@@ -36,6 +36,11 @@ interface NodeConfigGroup {
   nodeName?: string;
 }
 
+interface SqlExecItem {
+  type: string;
+  sqlExecId: number | string | null;
+}
+
 interface MetricItem {
   id?: number;
   metricConfigId: number;
@@ -47,6 +52,7 @@ interface MetricItem {
   nodeId: number;
   nodeName: string;
   status?: number;
+  sqlExecConfig?: string | SqlExecItem[];
 }
 
 interface RecordItem {
@@ -64,6 +70,8 @@ interface Props {
   recordData?: RecordItem | null;
   userList?: UserItem[];
   userLoading?: boolean;
+  achievedSqlList?: { id?: string; name?: string }[];
+  finishingRateSqlList?: { id?: string; name?: string }[];
 }
 
 interface Emits {
@@ -96,6 +104,58 @@ const dialogTitle = computed(() =>
   props.mode === "add" ? "新增KPI指标用户" : "修改KPI指标用户"
 );
 
+const parseSqlExecConfig = (sqlExecConfig?: string | SqlExecItem[]): SqlExecItem[] => {
+  if (!sqlExecConfig || sqlExecConfig === "0") {
+    return [
+      { type: "achieved", sqlExecId: null },
+      { type: "finishingRate", sqlExecId: null }
+    ];
+  }
+  if (Array.isArray(sqlExecConfig)) {
+    return sqlExecConfig.map(item => ({
+      ...item,
+      sqlExecId: item.sqlExecId != null ? String(item.sqlExecId) : null
+    }));
+  }
+  try {
+    const parsed = JSON.parse(sqlExecConfig);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item: any) => ({
+        ...item,
+        sqlExecId: item.sqlExecId != null ? String(item.sqlExecId) : null
+      }));
+    }
+  } catch {}
+  return [
+    { type: "achieved", sqlExecId: null },
+    { type: "finishingRate", sqlExecId: null }
+  ];
+};
+
+const getSqlExecIdByType = (
+  sqlExecConfig: SqlExecItem[] | string | null | undefined,
+  type: string
+): number | string | null => {
+  const config = parseSqlExecConfig(sqlExecConfig);
+  const item = config.find(i => i.type === type);
+  return item?.sqlExecId ?? null;
+};
+
+const setSqlExecIdByType = (
+  row: MetricItem,
+  type: string,
+  id: number | string | null
+) => {
+  let config = parseSqlExecConfig(row.sqlExecConfig);
+  const item = config.find(i => i.type === type);
+  if (item) {
+    item.sqlExecId = id;
+  } else {
+    config.push({ type, sqlExecId: id });
+  }
+  row.sqlExecConfig = config;
+};
+
 const buildMetricsByNode = (
   nodeConfig?: NodeConfigGroup,
   oldMetrics: MetricItem[] = []
@@ -107,8 +167,13 @@ const buildMetricsByNode = (
 
   return (nodeConfig.configList || []).map(config => {
     const oldMetric = config.id ? oldMetricMap.get(config.id) : undefined;
+    const sqlExecConfig = oldMetric?.sqlExecConfig
+      ? parseSqlExecConfig(oldMetric.sqlExecConfig)
+      : [
+          { type: "achieved", sqlExecId: null },
+          { type: "finishingRate", sqlExecId: null }
+        ];
     return {
-      // 考核组未变更时保留原指标用户明细 id；考核组变更时不带旧 id，避免旧指标被错误复用
       id: oldMetric?.id,
       metricConfigId: config.id || 0,
       metricType: oldMetric?.metricType ?? 1,
@@ -118,7 +183,8 @@ const buildMetricsByNode = (
       rate: config.rate || "",
       nodeId: nodeConfig.nodeId || 0,
       nodeName: nodeConfig.nodeName || "",
-      status: oldMetric?.status ?? 1
+      status: oldMetric?.status ?? 1,
+      sqlExecConfig
     };
   });
 };
@@ -228,7 +294,10 @@ const handleSubmit = async () => {
         rate: m.rate,
         nodeId: selectedNodeId.value,
         nodeName: selectedNodeName.value,
-        status: m.status ?? 1
+        status: m.status ?? 1,
+        sqlExecConfig: Array.isArray(m.sqlExecConfig)
+          ? JSON.stringify(m.sqlExecConfig)
+          : m.sqlExecConfig || ""
       }))
     };
 
@@ -346,14 +415,44 @@ const handleClose = () => {
               />
             </template>
           </el-table-column>
-          <el-table-column label="KPI描述" min-width="220">
+          <el-table-column label="实际值" width="160">
             <template #default="{ row }">
-              <span class="readonly-text">{{ row.kpiDepict }}</span>
+              <el-select
+                :model-value="getSqlExecIdByType(row.sqlExecConfig, 'achieved')"
+                placeholder="请选择"
+                filterable
+                clearable
+                size="small"
+                style="width: 100%"
+                @update:model-value="val => setSqlExecIdByType(row, 'achieved', val)"
+              >
+                <el-option
+                  v-for="item in props.achievedSqlList"
+                  :key="item.id"
+                  :label="item.name || ''"
+                  :value="item.id"
+                />
+              </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="系数规则" min-width="220">
+          <el-table-column label="达成率" width="160">
             <template #default="{ row }">
-              <span class="readonly-text">{{ row.rate }}</span>
+              <el-select
+                :model-value="getSqlExecIdByType(row.sqlExecConfig, 'finishingRate')"
+                placeholder="请选择"
+                filterable
+                clearable
+                size="small"
+                style="width: 100%"
+                @update:model-value="val => setSqlExecIdByType(row, 'finishingRate', val)"
+              >
+                <el-option
+                  v-for="item in props.finishingRateSqlList"
+                  :key="item.id"
+                  :label="item.name || ''"
+                  :value="item.id"
+                />
+              </el-select>
             </template>
           </el-table-column>
           <el-table-column label="状态" width="100" align="center">

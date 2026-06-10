@@ -2,9 +2,10 @@
 import { ref, onMounted, nextTick } from "vue";
 import {
   getPmKpiMonthMetricTargetPage,
-  updatePmKpiMonthMetricTargetApi
+  updatePmKpiMonthMetricTargetApi,
+  execSqlByUserId
 } from "@/api/evaluation";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import dayjs from "dayjs";
 
 interface MetricTargetItem {
@@ -18,6 +19,7 @@ interface MetricTargetItem {
   nodeName: string;
   treePath: string;
   treePathName: string;
+  status?: number;
 }
 
 interface RecordItem extends MetricTargetItem {
@@ -54,13 +56,18 @@ const loading = ref(false);
 const tableData = ref<RecordItem[]>([]);
 const total = ref(0);
 const currentPage = ref(1);
-const pageSize = ref(20);
+const pageSize = ref(5);
 const editingCell = ref<{
   rowId: number | string;
   field: "target" | "achieved";
 } | null>(null);
 const editingValue = ref<number | undefined>();
 const savingCellKey = ref("");
+const updatingUserId = ref<string | null>(null);
+
+const isUpdating = (userId: string | number) => {
+  return updatingUserId.value === String(userId);
+};
 
 // 搜索条件
 const searchParams = ref({
@@ -92,13 +99,17 @@ const fetchData = async () => {
           username: record.username,
           month: record.month
         };
-        if (record.metricTargetList && record.metricTargetList.length > 0) {
-          for (let i = 0; i < record.metricTargetList.length; i++) {
-            const metric = record.metricTargetList[i];
+        // 过滤掉 status 为 0 的指标
+        const filteredMetrics = (record.metricTargetList || []).filter(
+          metric => metric.status !== 0
+        );
+        if (filteredMetrics.length > 0) {
+          for (let i = 0; i < filteredMetrics.length; i++) {
+            const metric = filteredMetrics[i];
             flatRecords.push({
               ...userInfo,
               ...metric,
-              rowSpan: i === 0 ? record.metricTargetList.length : 0,
+              rowSpan: i === 0 ? filteredMetrics.length : 0,
               groupIndex: i
             });
           }
@@ -141,6 +152,36 @@ const handleSizeChange = (size: number) => {
   fetchData();
 };
 
+const handleUpdateMetricData = async (row: RecordItem) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定更新用户「${row.username}」的指标数据吗？`,
+      "更新确认",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      }
+    );
+    if (!row.userId) return;
+    updatingUserId.value = String(row.userId);
+    const res = (await execSqlByUserId({ userId: row.userId })) as any;
+    if (res?.code === 200 || res?.success) {
+      ElMessage.success("更新指标数据成功");
+      fetchData();
+    } else {
+      ElMessage.error(res?.msg || "更新指标数据失败");
+    }
+  } catch (error) {
+    if (error !== "cancel" && error !== "close") {
+      console.error("更新指标数据失败", error);
+      ElMessage.error("更新指标数据失败");
+    }
+  } finally {
+    updatingUserId.value = null;
+  }
+};
+
 // 合并单元格
 const objectSpanMethod = ({
   row,
@@ -149,8 +190,8 @@ const objectSpanMethod = ({
   row: RecordItem;
   columnIndex: number;
 }) => {
-  // 合并公共信息列：序号(0)、月份(1)、负责人(2)
-  if (columnIndex <= 2) {
+  // 合并公共信息列：序号(0)、月份(1)、负责人(2)、操作列(最后一列)
+  if (columnIndex <= 2 || columnIndex === 7) {
     if (row.rowSpan && row.rowSpan > 0) {
       return { rowspan: row.rowSpan, colspan: 1 };
     }
@@ -172,7 +213,9 @@ const getCellKey = (row: RecordItem, field: "target" | "achieved") => {
 };
 
 const isEditing = (row: RecordItem, field: "target" | "achieved") => {
-  return editingCell.value?.rowId === row.id && editingCell.value?.field === field;
+  return (
+    editingCell.value?.rowId === row.id && editingCell.value?.field === field
+  );
 };
 
 const isSaving = (row: RecordItem, field: "target" | "achieved") => {
@@ -237,9 +280,9 @@ const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
   savingCellKey.value = getCellKey(row, field);
   try {
     const res = (await updatePmKpiMonthMetricTargetApi({
-      id: Number(row.id),
+      id: row.id,
       userId: row.userId,
-      metricUserId: Number(metricUserId),
+      metricUserId: metricUserId,
       month: row.month,
       targetName: row.targetName,
       nodeId: row.nodeId,
@@ -357,7 +400,7 @@ onMounted(() => {
         </el-table-column>
         <el-table-column prop="month" label="月份" width="120" align="center">
           <template #default="{ row }">
-            {{ row.groupIndex === 0 ? formatMonth(row.month) : '' }}
+            {{ row.groupIndex === 0 ? formatMonth(row.month) : "" }}
           </template>
         </el-table-column>
         <el-table-column
@@ -367,7 +410,7 @@ onMounted(() => {
           align="center"
         >
           <template #default="{ row }">
-            {{ row.groupIndex === 0 ? row.username : '' }}
+            {{ row.groupIndex === 0 ? row.username : "" }}
           </template>
         </el-table-column>
         <el-table-column
@@ -376,12 +419,7 @@ onMounted(() => {
           min-width="200"
           show-overflow-tooltip
         />
-        <el-table-column
-          prop="target"
-          label="目标值"
-          width="160"
-          align="right"
-        >
+        <el-table-column prop="target" label="目标值" width="160" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="isEditing(row, 'target')"
@@ -439,6 +477,20 @@ onMounted(() => {
             </span>
           </template>
         </el-table-column>
+        <el-table-column fixed="right" label="操作" width="160" align="center">
+          <template #default="{ row }">
+            <template v-if="row.groupIndex === 0">
+              <el-button
+                type="primary"
+                size="small"
+                :loading="isUpdating(row.userId || '')"
+                @click="handleUpdateMetricData(row)"
+              >
+                更新指标数据
+              </el-button>
+            </template>
+          </template>
+        </el-table-column>
       </el-table>
 
       <!-- 分页 -->
@@ -446,7 +498,7 @@ onMounted(() => {
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="[5, 10, 20]"
           :total="total"
           layout="total, sizes, prev, pager, next, jumper"
           @current-change="handleCurrentChange"
