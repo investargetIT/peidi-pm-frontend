@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { Search, Plus, Edit } from "@element-plus/icons-vue";
+import { Search, Plus, Edit, Delete } from "@element-plus/icons-vue";
 import type { TreeInstance } from "element-plus";
 import type { TreeNode } from "./types";
 import { ref, computed } from "vue";
@@ -16,10 +16,12 @@ const emit = defineEmits<{
   "node-click": [node: TreeNode];
   "add-node": [node: TreeNode | null];
   "edit-node": [node: TreeNode];
+  "delete-node": [node: TreeNode];
 }>();
 
 const treeRef = ref<TreeInstance>();
 const searchKeyword = ref("");
+const tooltipShowAfter = 800;
 
 const getNodeTypeLabel = (type: string) => {
   const map: Record<string, string> = {
@@ -145,6 +147,7 @@ const handleAddRootNode = () => {
               <el-tooltip
                 :content="`添加${getNodeTypeLabel(data.nodeType)}子节点`"
                 placement="top"
+                :show-after="tooltipShowAfter"
               >
                 <el-icon
                   class="action-icon add-icon"
@@ -154,12 +157,20 @@ const handleAddRootNode = () => {
                   <Plus />
                 </el-icon>
               </el-tooltip>
-              <el-tooltip content="编辑节点" placement="top">
+              <el-tooltip content="编辑节点" placement="top" :show-after="tooltipShowAfter">
                 <el-icon
                   class="action-icon edit-icon"
                   @click.stop="emit('edit-node', data)"
                 >
                   <Edit />
+                </el-icon>
+              </el-tooltip>
+              <el-tooltip content="删除节点（递归删除子节点）" placement="top" :show-after="tooltipShowAfter">
+                <el-icon
+                  class="action-icon delete-icon"
+                  @click.stop="emit('delete-node', data)"
+                >
+                  <Delete />
                 </el-icon>
               </el-tooltip>
             </span>
@@ -294,6 +305,10 @@ const handleAddRootNode = () => {
 
 .edit-icon {
   color: var(--el-color-primary);
+}
+
+.delete-icon {
+  color: var(--el-color-danger);
 }
 
 .tree-content::-webkit-scrollbar {

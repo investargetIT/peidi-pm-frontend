@@ -51,6 +51,13 @@ export const addPmKpiGroupNodeApi = (data: {
   });
 };
 
+// 删除节点（递归删除子节点）
+export const deletePmKpiGroupNodeApi = (params: { id: number }) => {
+  return http.request("post", baseUrlApi("/pm/kpi-group-node/delete"), {
+    params
+  });
+};
+
 // 更新节点
 export const updatePmKpiGroupNodeApi = (data: {
   createdAt?: string;
@@ -88,6 +95,17 @@ export const addPmKpiGroupNodeNodeConfigApi = (data: {
     baseUrlApi("/pm/kpi-group-node/node/config/add"),
     {
       data
+    }
+  );
+};
+
+// 删除节点指标配置
+export const deletePmKpiGroupNodeNodeConfigApi = (params: { id: number }) => {
+  return http.request(
+    "post",
+    baseUrlApi("/pm/kpi-group-node/node/config/delete"),
+    {
+      params
     }
   );
 };

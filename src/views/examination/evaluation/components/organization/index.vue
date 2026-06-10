@@ -1,12 +1,10 @@
 <script lang="ts" setup>
 import { ref, onMounted } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
   getPmKpiGroupNodePage,
-  addPmKpiGroupNodeApi,
-  updatePmKpiGroupNodeApi,
-  addPmKpiGroupNodeNodeConfigApi,
-  updatePmKpiGroupNodeNodeConfigApi
+  deletePmKpiGroupNodeApi,
+  deletePmKpiGroupNodeNodeConfigApi
 } from "@/api/evaluation";
 import TreeSection from "./components/TreeSection.vue";
 import DetailSection from "./components/DetailSection.vue";
@@ -75,6 +73,54 @@ const handleEditNode = (node: TreeNode) => {
   nodeDialogVisible.value = true;
 };
 
+const handleDeleteNode = async (node: TreeNode) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除节点「${node.nodeName}」吗？该操作会递归删除所有子节点。`,
+      "删除节点确认",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      }
+    );
+
+    await ElMessageBox.confirm(
+      "删除后不可恢复，节点下的子节点和指标配置也会被删除，请再次确认是否删除？",
+      "二次确认",
+      {
+        confirmButtonText: "确认删除",
+        cancelButtonText: "取消",
+        type: "error",
+        confirmButtonClass: "el-button--danger"
+      }
+    );
+
+    const currentNodeId = selectedNode.value?.id;
+    const res = (await deletePmKpiGroupNodeApi({
+      id: node.id
+    })) as { success?: boolean; msg?: string };
+
+    if (res?.success === false) {
+      ElMessage.error(res.msg || "删除节点失败");
+      return;
+    }
+
+    ElMessage.success("删除节点成功");
+    await fetchPmKpiGroupNodePage();
+
+    if (currentNodeId) {
+      const restoredNode = findNodeById(dataSource.value, currentNodeId);
+      selectedNode.value = restoredNode || null;
+    }
+  } catch (error) {
+    if (error !== "cancel" && error !== "close") {
+      console.error("删除节点失败", error);
+      ElMessage.error("删除节点失败");
+    }
+  }
+};
+
 const handleNodeDialogSuccess = async () => {
   const currentNodeId = selectedNode.value?.id;
   await fetchPmKpiGroupNodePage();
@@ -95,6 +141,48 @@ const handleAddMetric = () => {
 const handleEditMetric = (metric: MetricConfig) => {
   editingMetric.value = metric;
   metricDialogVisible.value = true;
+};
+
+const handleDeleteMetric = async (metric: MetricConfig) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除指标配置「${metric.targetName}」吗？`,
+      "删除确认",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      }
+    );
+
+    await ElMessageBox.confirm(
+      "删除后不可恢复，请再次确认是否删除该节点指标配置？",
+      "二次确认",
+      {
+        confirmButtonText: "确认删除",
+        cancelButtonText: "取消",
+        type: "error",
+        confirmButtonClass: "el-button--danger"
+      }
+    );
+
+    const res = (await deletePmKpiGroupNodeNodeConfigApi({
+      id: metric.id
+    })) as { success?: boolean; msg?: string };
+
+    if (res?.success === false) {
+      ElMessage.error(res.msg || "删除节点指标配置失败");
+      return;
+    }
+
+    ElMessage.success("删除节点指标配置成功");
+    await handleMetricDialogSuccess();
+  } catch (error) {
+    if (error !== "cancel" && error !== "close") {
+      console.error("删除节点指标配置失败", error);
+      ElMessage.error("删除节点指标配置失败");
+    }
+  }
 };
 
 const handleMetricDialogSuccess = async () => {
@@ -121,12 +209,15 @@ onMounted(() => {
       @node-click="handleNodeClick"
       @add-node="handleAddNode"
       @edit-node="handleEditNode"
+      @delete-node="handleDeleteNode"
     />
     <DetailSection
       :selected-node="selectedNode"
       @edit-node="handleEditNode"
+      @delete-node="handleDeleteNode"
       @add-metric="handleAddMetric"
       @edit-metric="handleEditMetric"
+      @delete-metric="handleDeleteMetric"
     />
     <NodeEditDialog
       v-model:visible="nodeDialogVisible"

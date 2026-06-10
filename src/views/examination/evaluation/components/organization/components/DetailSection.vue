@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { Edit, Delete } from "@element-plus/icons-vue";
 import type { TreeNode, MetricConfig } from "./types";
 
 interface Props {
@@ -6,11 +7,14 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const tooltipShowAfter = 800;
 
 const emit = defineEmits<{
   "edit-node": [node: TreeNode];
+  "delete-node": [node: TreeNode];
   "add-metric": [];
   "edit-metric": [metric: MetricConfig];
+  "delete-metric": [metric: MetricConfig];
 }>();
 
 // ... existing code ...
@@ -41,14 +45,24 @@ const getNodeTypeTagType = (type: string): any => {
       <el-tag :type="getNodeTypeTagType(selectedNode.nodeType)">
         {{ getNodeTypeLabel(selectedNode.nodeType) }}
       </el-tag>
-      <el-button
-        type="primary"
-        link
-        size="small"
-        @click="emit('edit-node', selectedNode)"
-      >
-        编辑节点
-      </el-button>
+      <div class="detail-actions">
+        <el-tooltip content="编辑节点" placement="top" :show-after="tooltipShowAfter">
+          <el-button
+            type="primary"
+            link
+            :icon="Edit"
+            @click="emit('edit-node', selectedNode)"
+          />
+        </el-tooltip>
+        <el-tooltip content="删除节点（递归删除子节点）" placement="top" :show-after="tooltipShowAfter">
+          <el-button
+            type="danger"
+            link
+            :icon="Delete"
+            @click="emit('delete-node', selectedNode)"
+          />
+        </el-tooltip>
+      </div>
     </div>
     <div class="detail-info">
       <p><span class="label">节点ID:</span> {{ selectedNode.id }}</p>
@@ -98,14 +112,22 @@ const getNodeTypeTagType = (type: string): any => {
             </p>
           </div>
           <div class="metric-actions">
-            <el-button
-              type="primary"
-              link
-              size="small"
-              @click="emit('edit-metric', metric)"
-            >
-              编辑
-            </el-button>
+            <el-tooltip content="编辑指标" placement="top" :show-after="tooltipShowAfter">
+              <el-button
+                type="primary"
+                link
+                :icon="Edit"
+                @click="emit('edit-metric', metric)"
+              />
+            </el-tooltip>
+            <el-tooltip content="删除指标配置" placement="top" :show-after="tooltipShowAfter">
+              <el-button
+                type="danger"
+                link
+                :icon="Delete"
+                @click="emit('delete-metric', metric)"
+              />
+            </el-tooltip>
           </div>
         </div>
       </div>
@@ -137,6 +159,12 @@ const getNodeTypeTagType = (type: string): any => {
 .detail-header h3 {
   margin: 0;
   font-size: 16px;
+}
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .detail-info {
@@ -213,8 +241,19 @@ const getNodeTypeTagType = (type: string): any => {
 
 .metric-actions {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   flex-shrink: 0;
+  min-height: 32px;
+}
+
+.metric-actions :deep(.el-button) {
+  margin-left: 0;
+  padding: 4px;
+}
+
+.metric-actions :deep(.el-button .el-icon) {
+  font-size: 16px;
 }
 </style>
