@@ -3,7 +3,8 @@ import { ref, onMounted, nextTick } from "vue";
 import {
   getPmKpiMonthMetricTargetPage,
   updatePmKpiMonthMetricTargetApi,
-  execSqlByUserId
+  execSqlByUserId,
+  getDingAllDepartmentUsersApi
 } from "@/api/evaluation";
 import { ElMessage, ElMessageBox } from "element-plus";
 import dayjs from "dayjs";
@@ -52,11 +53,69 @@ interface ApiResponse {
   };
 }
 
+interface DingDepartmentUser {
+  leader: boolean;
+  name: string;
+  userid: string;
+  job_number?: string;
+  dept_id_list?: number[];
+}
+
+interface DingDepartmentUsersResponse {
+  code: number;
+  msg: string;
+  success: boolean;
+  data: {
+    list: DingDepartmentUser[];
+    has_more: boolean;
+  };
+}
+
 const loading = ref(false);
 const tableData = ref<RecordItem[]>([]);
+const allRecords = ref<ApiRecordItem[]>([]);
+const visibleRecords = ref<ApiRecordItem[]>([]);
+const visibleUsernameSet = ref<Set<string> | null>(new Set());
+let visibleUsernameSetPromise: Promise<Set<string> | null> | null = null;
 const total = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(5);
+const ALL_PAGE_SIZE = 99999;
+const DEVELOPER_USER_IDS = [
+  "1846392647319093250", // Summer
+  "1926449443739600965", // 沈皓钰
+  "1850741012504838145", // 张思宇
+  "1926449443739601629" // 杨世豪
+];
+const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
+  邓苏: ["邓苏", "王永蝶", "夏立明", "潘明旺", "缪欣瑶", "黄文豪"],
+  孙舒欣: ["孙舒欣"],
+  方云: [
+    "邓苏",
+    "潘磊",
+    "孙舒欣",
+    "王永蝶",
+    "夏立明",
+    "潘明旺",
+    "缪欣瑶",
+    "黄向前",
+    "侯子洋",
+    "王琳"
+  ]
+};
+const DEPARTMENT_LIST = [
+  { name: "零食", deptId: 992836831 },
+  { name: "天猫业务单元", deptId: 854017879 },
+  { name: "京东业务单元", deptId: 854710068 },
+  { name: "运营支持", deptId: 1062696513 },
+  { name: "抖音电商组", deptId: 854033863 },
+  { name: "内容创作运营支持组", deptId: 1062707956 },
+  { name: "销售一组", deptId: 854405501 },
+  { name: "销售二组", deptId: 854421521 },
+  { name: "销售三组", deptId: 1062713961 },
+  { name: "销售管理部", deptId: 1062560603 },
+  { name: "好适佳项目组", deptId: 1063100245 }
+];
 const editingCell = ref<{
   rowId: number | string;
   field: "target" | "achieved";
@@ -79,6 +138,111 @@ const searchParams = ref({
   startDate: getDefaultMonth()
 });
 
+const getCurrentUserInfo = () => {
+  try {
+    return JSON.parse(localStorage.getItem("user-check-info") || "{}");
+  } catch (error) {
+    console.error("读取当前登录用户失败", error);
+    return {};
+  }
+};
+
+const getCurrentUsername = () => {
+  const userInfo = getCurrentUserInfo();
+  return String(userInfo?.username || userInfo?.name || "").trim();
+};
+
+const getCurrentUserIds = () => {
+  const userInfo = getCurrentUserInfo();
+  return [userInfo?.userid, userInfo?.userId, userInfo?.id]
+    .filter(Boolean)
+    .map((id: string | number) => String(id).trim())
+    .filter(Boolean);
+};
+
+const isDeveloper = () =>
+  getCurrentUserIds().some(userId => DEVELOPER_USER_IDS.includes(userId));
+
+const fetchVisibleUsernameSet = async () => {
+  if (isDeveloper()) return null;
+
+  const currentUsername = getCurrentUsername();
+  if (!currentUsername) return new Set<string>();
+
+  const responses = (await Promise.all(
+    DEPARTMENT_LIST.map(dept =>
+      getDingAllDepartmentUsersApi({ deptId: dept.deptId }).catch(error => {
+        console.error(`获取${dept.name}部门用户失败`, error);
+        return null;
+      })
+    )
+  )) as Array<DingDepartmentUsersResponse | null>;
+
+  const usernameSet = new Set<string>(
+    MANUAL_VISIBLE_USERNAME_MAP[currentUsername] || []
+  );
+
+  responses.forEach(res => {
+    if (!res?.success || !res.data?.list?.length) return;
+
+    const currentUser = res.data.list.find(
+      user => String(user.name || "").trim() === currentUsername
+    );
+    if (currentUser?.leader) {
+      res.data.list.forEach(user => {
+        const username = String(user.name || "").trim();
+        if (username) usernameSet.add(username);
+      });
+    }
+  });
+
+  return usernameSet;
+};
+
+const getVisibleUsernameSet = () => {
+  if (!visibleUsernameSetPromise) {
+    visibleUsernameSetPromise = fetchVisibleUsernameSet().then(usernameSet => {
+      visibleUsernameSet.value = usernameSet;
+      return usernameSet;
+    });
+  }
+  return visibleUsernameSetPromise;
+};
+
+const flattenRecords = (records: ApiRecordItem[]) => {
+  const flatRecords: RecordItem[] = [];
+  for (const record of records) {
+    const userInfo = {
+      userId: record.userId,
+      jobNum: record.jobNum,
+      username: record.username,
+      month: record.month
+    };
+    // 过滤掉 status 为 0 的指标
+    const filteredMetrics = (record.metricTargetList || []).filter(
+      metric => metric.status !== 0
+    );
+    if (filteredMetrics.length > 0) {
+      for (let i = 0; i < filteredMetrics.length; i++) {
+        const metric = filteredMetrics[i];
+        flatRecords.push({
+          ...userInfo,
+          ...metric,
+          rowSpan: i === 0 ? filteredMetrics.length : 0,
+          groupIndex: i
+        });
+      }
+    }
+  }
+  return flatRecords;
+};
+
+const updateTableDataByPage = () => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  const end = start + pageSize.value;
+  tableData.value = flattenRecords(visibleRecords.value.slice(start, end));
+};
+
 const fetchData = async () => {
   loading.value = true;
   try {
@@ -87,38 +251,22 @@ const fetchData = async () => {
       treePathName: searchParams.value.treePathName || undefined,
       startDate: searchParams.value.startDate || undefined,
       endDate: searchParams.value.startDate || undefined,
-      pageNo: currentPage.value,
-      pageSize: pageSize.value
+      pageNo: 1,
+      pageSize: ALL_PAGE_SIZE
     })) as ApiResponse;
     if (res.success && res.data) {
-      // 新格式：records 中每项包含 user 信息 + metricTargetList
-      // 展开 metricTargetList，并标记 rowSpan 用于合并单元格
-      const flatRecords: RecordItem[] = [];
-      for (const record of res.data.records) {
-        const userInfo = {
-          userId: record.userId,
-          jobNum: record.jobNum,
-          username: record.username,
-          month: record.month
-        };
-        // 过滤掉 status 为 0 的指标
-        const filteredMetrics = (record.metricTargetList || []).filter(
-          metric => metric.status !== 0
-        );
-        if (filteredMetrics.length > 0) {
-          for (let i = 0; i < filteredMetrics.length; i++) {
-            const metric = filteredMetrics[i];
-            flatRecords.push({
-              ...userInfo,
-              ...metric,
-              rowSpan: i === 0 ? filteredMetrics.length : 0,
-              groupIndex: i
-            });
-          }
-        }
-      }
-      tableData.value = flatRecords;
-      total.value = res.data.total;
+      const usernameSet = await getVisibleUsernameSet();
+      // 指标全部请求回来，先按部门负责人权限过滤，再由前端按人员维度分页
+      allRecords.value = (res.data.records || []).filter(record =>
+        (record.metricTargetList || []).some(metric => metric.status !== 0)
+      );
+      visibleRecords.value = usernameSet
+        ? allRecords.value.filter(record =>
+            usernameSet.has(String(record.username || "").trim())
+          )
+        : allRecords.value;
+      total.value = visibleRecords.value.length;
+      updateTableDataByPage();
     }
   } catch (error) {
     console.error("获取月度指标数据失败", error);
@@ -144,13 +292,13 @@ const handleReset = () => {
 
 const handleCurrentChange = (page: number) => {
   currentPage.value = page;
-  fetchData();
+  updateTableDataByPage();
 };
 
 const handleSizeChange = (size: number) => {
   pageSize.value = size;
   currentPage.value = 1;
-  fetchData();
+  updateTableDataByPage();
 };
 
 const handleUpdateMetricData = async (row: RecordItem) => {

@@ -17,6 +17,17 @@ export const getUserListApi = (params: { name: string }) => {
   );
 };
 
+// 获取钉钉部门下所有用户
+export const getDingAllDepartmentUsersApi = (params: { deptId: number }) => {
+  return http.request(
+    "get",
+    "https://user.peidigroup.cn/ding/allDepartmentUsers",
+    {
+      params
+    }
+  );
+};
+
 // 分页获取节点列表(含父节点名称和递归子节点)
 export const getPmKpiGroupNodePage = (params: {
   nodeName?: string;
