@@ -47,11 +47,25 @@ const PERMISSION_ID_LIST = {
     "1874713377599172609", // 熊玉葵
     "1874741663670775810" // 廖佳晨
   ],
-  evaluation: [...DEV_ID]
+  evaluation: [
+    ...DEV_ID,
+    "1870023775338692610", // 任琪琳
+    "1874711258007646210", // 范振吉
+    "1874730426438299649", // 付阳
+    "1879443024278761474", // 邓苏
+    "1874004550054621185", // 孙舒欣
+    "1926449443739598911", // 梁钰
+    "1896774351940268034", // 黄向前
+    "1894225776978997250", // 张震西
+    "1877650921123000321", // 周环寰
+    "1874806470939815937" // 王小龙
+  ]
 };
 
 // 从localStorage读取上次保存的选项卡，没有则使用默认值
-const activeName = ref(storageLocal().getItem("examination-active-tab") || "excamination");
+const activeName = ref<string>(
+  storageLocal().getItem("examination-active-tab") || "excamination"
+);
 
 const userInfo: any = storageLocal().getItem("user-check-info");
 const userId = ref(userInfo?.id ?? "");

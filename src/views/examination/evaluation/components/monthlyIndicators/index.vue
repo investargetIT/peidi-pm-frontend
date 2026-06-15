@@ -69,7 +69,8 @@ const isUpdating = (userId: string | number) => {
   return updatingUserId.value === String(userId);
 };
 
-const getDefaultMonth = () => dayjs().subtract(1, "month").format("YYYY-MM-DD");
+const getDefaultMonth = () =>
+  dayjs().subtract(1, "month").startOf("month").format("YYYY-MM-DD");
 
 // 搜索条件
 const searchParams = ref({
@@ -85,6 +86,7 @@ const fetchData = async () => {
       username: searchParams.value.username || undefined,
       treePathName: searchParams.value.treePathName || undefined,
       startDate: searchParams.value.startDate || undefined,
+      endDate: searchParams.value.startDate || undefined,
       pageNo: currentPage.value,
       pageSize: pageSize.value
     })) as ApiResponse;
