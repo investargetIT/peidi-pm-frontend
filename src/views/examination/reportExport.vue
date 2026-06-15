@@ -155,7 +155,8 @@ const fetchResultList = () => {
               ...item,
               ...examinationItem,
               dataSum: examinationItem.data.reduce(
-                (acc: number, cur: any) => acc + cur.value,
+                (acc: number, cur: any) =>
+                  (Number(acc) || 0) + (Number(cur.value) || 0),
                 0
               ),
               ...monthData

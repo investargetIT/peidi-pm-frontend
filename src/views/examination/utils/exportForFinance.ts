@@ -204,7 +204,7 @@ export const processAndExportOBMData = async (
         // console.log("累计", findObjectByMonthIndex(targetData, previousMonth));
         valueI = targetData
           .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
-          .reduce((sum: number, item: any) => sum + item.value, 0);
+          .reduce(sumDataValue, 0);
 
         // K 列：上个月的实际值（索引为 previousMonth）
         valueK =
@@ -213,7 +213,7 @@ export const processAndExportOBMData = async (
         // O 列：前 currentMonth 个月的目标值之和
         valueO = targetData
           .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
-          .reduce((sum: number, item: any) => sum + item.value, 0);
+          .reduce(sumDataValue, 0);
       } else if ((rowNumber >= 4 && rowNumber <= 32) || rowNumber === 61) {
         // 第 4-32 行：累计值计算（行号不变）
         //#region 侯子洋 好适嘉项目净毛利20% 单独处理 取上上个月
@@ -223,31 +223,31 @@ export const processAndExportOBMData = async (
         ) {
           valueI = targetData
             .slice(0, findObjectByMonthIndex(targetData, previousMonth - 1) + 1)
-            .reduce((sum: number, item: any) => sum + item.value, 0);
+            .reduce(sumDataValue, 0);
 
           valueK = actualData
             .slice(0, findObjectByMonthIndex(actualData, previousMonth - 1) + 1)
-            .reduce((sum: number, item: any) => sum + item.value, 0);
+            .reduce(sumDataValue, 0);
 
           valueO = targetData
             .slice(0, findObjectByMonthIndex(targetData, currentMonth - 1) + 1)
-            .reduce((sum: number, item: any) => sum + item.value, 0);
+            .reduce(sumDataValue, 0);
         } else {
           // I 列：前 previousMonth 个月的目标值之和
           // console.log("累计", findObjectByMonthIndex(targetData, previousMonth));
           valueI = targetData
             .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
-            .reduce((sum: number, item: any) => sum + item.value, 0);
+            .reduce(sumDataValue, 0);
 
           // K 列：前 previousMonth 个月的实际值之和
           valueK = actualData
             .slice(0, findObjectByMonthIndex(actualData, previousMonth) + 1)
-            .reduce((sum: number, item: any) => sum + item.value, 0);
+            .reduce(sumDataValue, 0);
 
           // O 列：前 currentMonth 个月的目标值之和
           valueO = targetData
             .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
-            .reduce((sum: number, item: any) => sum + item.value, 0);
+            .reduce(sumDataValue, 0);
         }
       } else if (
         (rowNumber >= 33 && rowNumber <= 73) ||
@@ -273,6 +273,11 @@ export const processAndExportOBMData = async (
         valueO =
           findObjectByMonthWithFirstDay(targetData, currentMonth)?.value || 0;
       }
+
+      // 统一转成 number，避免接口返回字符串/null 导致 toFixed 报错
+      valueI = toNumber(valueI);
+      valueK = toNumber(valueK);
+      valueO = toNumber(valueO);
 
       // 计算 M 列：完成率 (K/I*100)
       let valueM = 0;
@@ -314,6 +319,14 @@ export const processAndExportOBMData = async (
 };
 
 //#region 辅助函数
+const toNumber = (value: any) => {
+  const num = Number(value ?? 0);
+  return Number.isFinite(num) ? num : 0;
+};
+
+const sumDataValue = (sum: any, item: any) =>
+  toNumber(sum) + toNumber(item?.value);
+
 // 获取指定月份的第一天
 const getFirstDayOfMonth = (year: number, month: number) => {
   return dayjs(`${year}-${month}`).startOf("month").format("YYYY-MM-DD");
@@ -384,10 +397,7 @@ export const fetchOBMPerformanceData = async () => {
         tableData.push({
           ...item,
           ...examinationItem,
-          dataSum: examinationItem.data.reduce(
-            (acc: number, cur: any) => acc + cur.value,
-            0
-          ),
+          dataSum: examinationItem.data.reduce(sumDataValue, 0),
           ...monthData
         });
       });

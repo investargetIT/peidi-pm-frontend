@@ -69,12 +69,13 @@ const isUpdating = (userId: string | number) => {
   return updatingUserId.value === String(userId);
 };
 
+const getDefaultMonth = () => dayjs().subtract(1, "month").format("YYYY-MM-DD");
+
 // 搜索条件
 const searchParams = ref({
   username: "",
   treePathName: "",
-  startDate: "",
-  endDate: ""
+  startDate: getDefaultMonth()
 });
 
 const fetchData = async () => {
@@ -84,7 +85,6 @@ const fetchData = async () => {
       username: searchParams.value.username || undefined,
       treePathName: searchParams.value.treePathName || undefined,
       startDate: searchParams.value.startDate || undefined,
-      endDate: searchParams.value.endDate || undefined,
       pageNo: currentPage.value,
       pageSize: pageSize.value
     })) as ApiResponse;
@@ -134,8 +134,7 @@ const handleReset = () => {
   searchParams.value = {
     username: "",
     treePathName: "",
-    startDate: "",
-    endDate: ""
+    startDate: getDefaultMonth()
   };
   currentPage.value = 1;
   fetchData();
@@ -358,20 +357,11 @@ onMounted(() => {
             style="width: 200px"
           />
         </el-form-item>
-        <el-form-item label="开始月份">
+        <el-form-item label="月度">
           <el-date-picker
             v-model="searchParams.startDate"
             type="month"
-            placeholder="选择开始月份"
-            value-format="YYYY-MM-DD"
-            style="width: 200px"
-          />
-        </el-form-item>
-        <el-form-item label="结束月份">
-          <el-date-picker
-            v-model="searchParams.endDate"
-            type="month"
-            placeholder="选择结束月份"
+            placeholder="选择月度"
             value-format="YYYY-MM-DD"
             style="width: 200px"
           />
