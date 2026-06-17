@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, provide, ref, watch, nextTick } from "vue";
+import {
+  onMounted,
+  onUnmounted,
+  provide,
+  ref,
+  watch,
+  nextTick,
+  computed
+} from "vue";
 
 import { ElMessage } from "element-plus";
 
@@ -26,6 +34,11 @@ import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
 const router = useRouter();
+
+// 判断是否为开发环境
+const isDev = computed(() => {
+  return import.meta.env.DEV;
+});
 
 // 自定义缓存图片类型
 export interface ImageCacheData {
@@ -131,7 +144,7 @@ onUnmounted(() => {
         </template>
         <DrawingPro ref="drawingProTabRef" />
       </el-tab-pane>
-      <el-tab-pane v-if="false" label="Lovart" name="Lovart" lazy>
+      <el-tab-pane v-if="isDev" label="Lovart" name="Lovart" lazy>
         <AiDrawLovart ref="lovarTabRef" />
       </el-tab-pane>
     </el-tabs>
