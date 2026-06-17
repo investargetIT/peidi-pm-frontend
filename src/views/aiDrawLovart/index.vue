@@ -366,6 +366,8 @@ const handleUploadImage = () => {
                     size="small"
                     :min="-10000"
                     :max="10000"
+                    :precision="1"
+                    :step="1"
                     style="width: 100%"
                     @change="handlePropertyChange"
                   />
@@ -378,6 +380,8 @@ const handleUploadImage = () => {
                     size="small"
                     :min="-10000"
                     :max="10000"
+                    :precision="1"
+                    :step="1"
                     style="width: 100%"
                     @change="handlePropertyChange"
                   />
@@ -393,6 +397,8 @@ const handleUploadImage = () => {
                     size="small"
                     :min="1"
                     :max="10000"
+                    :precision="0"
+                    :step="1"
                     style="width: 100%"
                     @change="handlePropertyChange"
                   />
@@ -405,6 +411,8 @@ const handleUploadImage = () => {
                     size="small"
                     :min="1"
                     :max="10000"
+                    :precision="0"
+                    :step="1"
                     style="width: 100%"
                     @change="handlePropertyChange"
                   />
@@ -420,6 +428,8 @@ const handleUploadImage = () => {
                     size="small"
                     :min="0"
                     :max="360"
+                    :precision="1"
+                    :step="1"
                     style="width: 100%"
                     @change="handlePropertyChange"
                   />
@@ -432,7 +442,8 @@ const handleUploadImage = () => {
                     size="small"
                     :min="0"
                     :max="1"
-                    :step="0.1"
+                    :precision="2"
+                    :step="0.01"
                     style="width: 100%"
                     @change="handlePropertyChange"
                   />
@@ -450,6 +461,8 @@ const handleUploadImage = () => {
                     size="small"
                     :min="8"
                     :max="500"
+                    :precision="0"
+                    :step="1"
                     style="width: 100%"
                     @change="handlePropertyChange"
                   />

@@ -18,7 +18,7 @@ const inputValue = ref("");
 const messagesContainer = ref<HTMLDivElement | null>(null);
 const mode = ref<"chat" | "generate">("generate"); // 默认是生图模式
 const negativePrompt = ref("");
-const imageSize = ref("1024x1024");
+const imageSize = ref("1K");
 const imageCount = ref(1);
 const isAdvancedSettingsOpen = ref(false);
 
@@ -35,39 +35,214 @@ const formatTime = (timestamp: number) => {
   return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 };
 
-// 解析指令 - 用于聊天模式
-const parseInstruction = (text: string) => {
+// 解析用户指令，执行相应操作
+const executeInstruction = async (text: string) => {
   const lowerText = text.toLowerCase();
 
-  if (lowerText.includes("颜色") || lowerText.includes("红色") || lowerText.includes("蓝色") || lowerText.includes("绿色")) {
-    let color = "#409eff";
-    if (lowerText.includes("红色")) color = "#ff4444";
-    if (lowerText.includes("蓝色")) color = "#409eff";
-    if (lowerText.includes("绿色")) color = "#67c23a";
-    if (lowerText.includes("黄色")) color = "#e6a23c";
-    if (lowerText.includes("橙色")) color = "#ff9800";
-    if (lowerText.includes("紫色")) color = "#9c27b0";
-    if (lowerText.includes("黑色")) color = "#000000";
-    if (lowerText.includes("白色")) color = "#ffffff";
-    return { type: "color", color };
-  }
+  // 1. 如果选中了图层
+  if (selectedLayer.value) {
+    // 文本相关操作
+    if (selectedLayer.value.type === "text") {
+      // 修改文字内容
+      if (lowerText.includes("改成") || lowerText.includes("改为")) {
+        const match = text.match(/(?:改成|改为)[：:]\s*(.+)/);
+        if (match && match[1]) {
+          store.updateLayer(selectedLayer.value.id, { text: match[1] });
+          emit("refreshCanvas");
+          return `已将文字修改为：${match[1]}`;
+        }
+      }
 
-  if (lowerText.includes("改成") || lowerText.includes("改为") || lowerText.includes("修改文字")) {
-    const match = text.match(/(?:改成|改为|修改文字)[：:]\s*(.+)/);
-    if (match && match[1]) {
-      return { type: "text", text: match[1] };
+      // AI 润色文字
+      if (lowerText.includes("润色") || lowerText.includes("优化") || lowerText.includes("改写")) {
+        const prompt = `请帮我润色这段文字，使其更有吸引力：${selectedLayer.value.text}`;
+        const aiResponse = await store.chatWithGemini(prompt);
+        store.updateLayer(selectedLayer.value.id, { text: aiResponse });
+        emit("refreshCanvas");
+        return `已润色文字：${aiResponse}`;
+      }
+
+      // 修改文字颜色 - 混合方案
+      if (lowerText.includes("颜色") || lowerText.includes("色")) {
+        // 简单颜色用硬编码（快速响应）
+        const simpleColors: Record<string, string> = {
+          "红色": "#ff4444",
+          "蓝色": "#409eff",
+          "绿色": "#67c23a",
+          "黄色": "#e6a23c",
+          "橙色": "#ff9800",
+          "紫色": "#9c27b0",
+          "黑色": "#000000",
+          "白色": "#ffffff",
+          "灰色": "#909399",
+          "粉色": "#ffc0cb",
+          "青色": "#00bcd4",
+          "棕色": "#795548"
+        };
+
+        let color = "";
+        // 先检查是否是简单颜色
+        for (const [name, hex] of Object.entries(simpleColors)) {
+          if (lowerText.includes(name)) {
+            color = hex;
+            break;
+          }
+        }
+
+        // 如果不是简单颜色，用AI识别
+        if (!color) {
+          const prompt = `用户想要把颜色改成：${text}。请只返回一个十六进制颜色代码，不要其他任何文字，比如"#ff0000"。如果用户只说了"红色"、"蓝色"等，请返回对应的颜色代码。`;
+          const aiColor = await store.chatWithGemini(prompt);
+          const colorMatch = aiColor.match(/#[0-9a-fA-F]{6}/);
+          color = colorMatch ? colorMatch[0] : "#409eff";
+        }
+
+        store.updateLayer(selectedLayer.value.id, { fill: color });
+        emit("refreshCanvas");
+        return `已将颜色修改为：${color}`;
+      }
+    }
+
+    // 图片相关操作
+    if (selectedLayer.value.type === "image") {
+      // 重新生成图片
+      if (lowerText.includes("重新生成") || lowerText.includes("换一张")) {
+        const match = text.match(/(?:重新生成|换一张)[：:]\s*(.+)/);
+        const prompt = match ? match[1] : "精美设计";
+
+        const images = await store.generateImage(prompt);
+        if (images.length > 0) {
+          store.updateLayer(selectedLayer.value.id, { src: images[0] });
+          emit("refreshCanvas");
+          return "已重新生成图片";
+        }
+      }
+    }
+
+    // 通用图层操作
+    // 删除
+    if (lowerText.includes("删除")) {
+      const layerName = selectedLayer.value.name;
+      store.deleteLayer(selectedLayer.value.id);
+      emit("refreshCanvas");
+      return `已删除图层：${layerName}`;
+    }
+
+    // 复制
+    if (lowerText.includes("复制")) {
+      store.duplicateLayer(selectedLayer.value.id);
+      emit("refreshCanvas");
+      return `已复制图层：${selectedLayer.value.name}`;
+    }
+
+    // 锁定/解锁
+    if (lowerText.includes("锁定")) {
+      store.toggleLayerLock(selectedLayer.value.id);
+      emit("refreshCanvas");
+      return `${selectedLayer.value.locked ? "已解锁" : "已锁定"}图层`;
+    }
+
+    // 隐藏/显示
+    if (lowerText.includes("隐藏")) {
+      store.toggleLayerVisibility(selectedLayer.value.id);
+      emit("refreshCanvas");
+      return `${selectedLayer.value.visible ? "已隐藏" : "已显示"}图层`;
+    }
+
+    // 置顶
+    if (lowerText.includes("置顶") || lowerText.includes("最上层")) {
+      store.moveLayerToTop(selectedLayer.value.id);
+      emit("refreshCanvas");
+      return "已将图层置顶";
+    }
+
+    // 置底
+    if (lowerText.includes("置底") || lowerText.includes("最下层")) {
+      store.moveLayerToBottom(selectedLayer.value.id);
+      emit("refreshCanvas");
+      return "已将图层置底";
+    }
+
+    // 移动位置
+    const moveMatch = text.match(/(?:向左|向右|向上|向下)\s*(\d+)/);
+    if (moveMatch) {
+      const distance = parseInt(moveMatch[1]);
+      let newX = selectedLayer.value.x;
+      let newY = selectedLayer.value.y;
+
+      if (lowerText.includes("向左")) newX -= distance;
+      if (lowerText.includes("向右")) newX += distance;
+      if (lowerText.includes("向上")) newY -= distance;
+      if (lowerText.includes("向下")) newY += distance;
+
+      store.updateLayer(selectedLayer.value.id, { x: newX, y: newY });
+      emit("refreshCanvas");
+      return `已移动图层到 (${newX}, ${newY})`;
+    }
+
+    // 缩放
+    const scaleMatch = text.match(/(?:放大|缩小)\s*(\d+)/);
+    if (scaleMatch) {
+      const scale = parseInt(scaleMatch[1]) / 100;
+      const isEnlarge = lowerText.includes("放大");
+      const newWidth = selectedLayer.value.width * (isEnlarge ? (1 + scale) : (1 - scale));
+      const newHeight = selectedLayer.value.height * (isEnlarge ? (1 + scale) : (1 - scale));
+
+      store.updateLayer(selectedLayer.value.id, { width: newWidth, height: newHeight });
+      emit("refreshCanvas");
+      return `已将图层${isEnlarge ? "放大" : "缩小"}`;
+    }
+
+    // 旋转
+    const rotateMatch = text.match(/旋转\s*(\d+)/);
+    if (rotateMatch) {
+      const angle = parseInt(rotateMatch[1]);
+      const newAngle = (selectedLayer.value.angle + angle) % 360;
+
+      store.updateLayer(selectedLayer.value.id, { angle: newAngle });
+      emit("refreshCanvas");
+      return `已将图层旋转 ${angle} 度`;
+    }
+  } else {
+    // 没有选中图层时的操作
+    // 添加文字
+    if (lowerText.includes("添加文字") || lowerText.includes("添加文本")) {
+      const match = text.match(/(?:添加文字|添加文本)[：:]\s*(.+)/);
+      const textContent = match ? match[1] : "新文字";
+
+      store.addLayer({
+        type: "text",
+        name: textContent,
+        visible: true,
+        locked: false,
+        x: 200, y: 300, width: 200, height: 50,
+        angle: 0, scaleX: 1, scaleY: 1, zIndex: 999,
+        opacity: 1,
+        text: textContent,
+        fontSize: 24,
+        fontFamily: "Arial",
+        fill: "#333333"
+      });
+      emit("refreshCanvas");
+      return "已添加文字图层";
     }
   }
 
-  if (lowerText.includes("添加文字") || lowerText.includes("添加文本")) {
-    const match = text.match(/(?:添加文字|添加文本)[：:]\s*(.+)/);
-    if (match && match[1]) {
-      return { type: "new_text", text: match[1] };
-    }
-    return { type: "new_text", text: "新文字" };
+  // 画布操作
+  if (lowerText.includes("撤销")) {
+    store.undo();
+    emit("refreshCanvas");
+    return "已撤销";
   }
 
-  return { type: "unknown" };
+  if (lowerText.includes("重置视图")) {
+    store.resetCanvas();
+    return "视图已重置";
+  }
+
+  // 如果没有匹配任何指令，调用 AI 自由回复
+  const aiResponse = await store.chatWithGemini(text);
+  return aiResponse;
 };
 
 // 发送消息/生图
@@ -138,50 +313,8 @@ const handleChat = async (userContent: string) => {
 
   await nextTick();
 
-  let responseContent = "已收到您的指令，正在处理...";
-
-  if (selectedLayer.value) {
-    const instruction = parseInstruction(userContent);
-    if (instruction.type === "color") {
-      store.updateLayer(selectedLayer.value.id, {
-        fill: instruction.color
-      });
-      responseContent = `已将选中图层「${selectedLayer.value.name}」的颜色修改为 ${instruction.color}`;
-    } else if (instruction.type === "text" && selectedLayer.value.type === "text") {
-      store.updateLayer(selectedLayer.value.id, {
-        text: instruction.text
-      });
-      responseContent = `已将选中图层「${selectedLayer.value.name}」的文字修改为「${instruction.text}」`;
-    } else {
-      responseContent = `已接收对图层「${selectedLayer.value.name}」的调整指令，尝试优化中...`;
-    }
-  } else {
-    const instruction = parseInstruction(userContent);
-    if (instruction.type === "new_text") {
-      const newLayer = store.addLayer({
-        type: "text",
-        name: "AI生成文本",
-        visible: true,
-        locked: false,
-        x: 200,
-        y: 300,
-        width: 200,
-        height: 40,
-        angle: 0,
-        scaleX: 1,
-        scaleY: 1,
-        zIndex: 99,
-        opacity: 1,
-        text: instruction.text,
-        fontSize: 28,
-        fontFamily: "Arial",
-        fill: "#409eff"
-      });
-      responseContent = `已在画布上添加新的文字图层「${newLayer.name}」`;
-    } else {
-      responseContent = "请先在画布上选中一个图层，然后告诉我想要如何调整它。";
-    }
-  }
+  // 执行指令并获取响应
+  const responseContent = await executeInstruction(userContent);
 
   store.addMessage({
     role: "assistant",
@@ -227,77 +360,78 @@ onMounted(() => {
 
 <template>
   <div class="chat-panel">
-    <!-- 顶部模式切换 -->
-    <div class="mode-tabs">
-      <div
-        class="mode-tab"
-        :class="{ active: mode === 'generate' }"
-        @click="mode = 'generate'"
-      >
-        <MagicStick />
-        <span>生图</span>
+    <!-- 顶部模式切换和模型选择 -->
+    <div class="top-controls">
+      <div class="mode-tabs">
+        <div
+          class="mode-tab"
+          :class="{ active: mode === 'generate' }"
+          @click="mode = 'generate'"
+        >
+          <el-icon :size="14"><MagicStick /></el-icon>
+          <span>生图</span>
+        </div>
+        <div
+          class="mode-tab"
+          :class="{ active: mode === 'chat' }"
+          @click="mode = 'chat'"
+        >
+          <el-icon :size="14"><ChatDotRound /></el-icon>
+          <span>聊天</span>
+        </div>
       </div>
-      <div
-        class="mode-tab"
-        :class="{ active: mode === 'chat' }"
-        @click="mode = 'chat'"
-      >
-        <ChatDotRound />
-        <span>聊天</span>
+
+      <!-- 生图模式的模型选择 -->
+      <div v-if="mode === 'generate'" class="model-selector">
+        <el-select v-model="currentModel" size="small" @change="handleModelChange">
+          <el-option label="阿里云" value="aliyun" />
+          <el-option label="Gemini" value="gemini" />
+          <el-option label="七牛云GPT" value="qnaigc" />
+        </el-select>
+        <el-button
+          type="text"
+          size="small"
+          class="advanced-btn"
+          @click="isAdvancedSettingsOpen = !isAdvancedSettingsOpen"
+        >
+          {{ isAdvancedSettingsOpen ? '收起' : '高级' }}
+        </el-button>
       </div>
     </div>
 
-    <!-- 生图模式的模型选择和高级设置 -->
-    <div v-if="mode === 'generate'" class="model-selector">
-      <div class="model-buttons">
-        <button
-          v-for="m in ['aliyun', 'qnaigc', 'default'] as AiModelType[]"
-          :key="m"
-          class="model-btn"
-          :class="{ active: currentModel === m }"
-          @click="handleModelChange(m)"
-        >
-          {{ m === 'aliyun' ? '阿里云' : m === 'qnaigc' ? 'Qnaigc' : '默认' }}
-        </button>
+    <!-- 生图模式的高级设置 -->
+    <div v-if="mode === 'generate' && isAdvancedSettingsOpen" class="advanced-settings">
+      <div class="setting-item">
+        <label>尺寸</label>
+        <el-select v-model="imageSize" size="small">
+          <el-option label="512" value="512" />
+          <el-option label="1K" value="1K" />
+          <el-option label="2K" value="2K" />
+          <el-option label="4K" value="4K" />
+        </el-select>
       </div>
-      <div class="advanced-toggle" @click="isAdvancedSettingsOpen = !isAdvancedSettingsOpen">
-        <span>高级设置</span>
-        <span class="arrow" :class="{ open: isAdvancedSettingsOpen }">▼</span>
+      <div class="setting-item">
+        <label>数量</label>
+        <el-select v-model="imageCount" size="small">
+          <el-option label="1" :value="1" />
+          <el-option label="2" :value="2" />
+          <el-option label="4" :value="4" />
+        </el-select>
       </div>
-      <div v-if="isAdvancedSettingsOpen" class="advanced-settings">
-        <div class="setting-item">
-          <label>尺寸</label>
-          <select v-model="imageSize">
-            <option value="512x512">512x512</option>
-            <option value="768x768">768x768</option>
-            <option value="1024x1024">1024x1024</option>
-            <option value="1024x768">1024x768</option>
-            <option value="768x1024">768x1024</option>
-          </select>
-        </div>
-        <div class="setting-item">
-          <label>数量</label>
-          <select v-model="imageCount">
-            <option :value="1">1</option>
-            <option :value="2">2</option>
-            <option :value="4">4</option>
-          </select>
-        </div>
-        <div class="setting-item">
-          <label>负面提示词</label>
-          <input v-model="negativePrompt" type="text" placeholder="不想出现的元素..." />
-        </div>
+      <div class="setting-item">
+        <label>负面提示</label>
+        <el-input v-model="negativePrompt" type="text" size="small" placeholder="不想出现的元素..." />
       </div>
     </div>
 
     <!-- 聊天模式的选中图层提示 -->
     <div v-if="mode === 'chat'" class="layer-info-bar">
       <div v-if="selectedLayer" class="selected-layer-info">
-        <ChatRound />
+        <el-icon :size="14"><ChatRound /></el-icon>
         <span>已选中：{{ selectedLayer.name }}</span>
       </div>
       <div v-else class="no-selection-info">
-        <Warning />
+        <el-icon :size="14"><Warning /></el-icon>
         <span>请在画布上选中一个元素</span>
       </div>
     </div>
@@ -306,7 +440,9 @@ onMounted(() => {
     <div ref="messagesContainer" class="messages-container">
       <div v-if="messages.length === 0" class="empty-chat">
         <div class="empty-icon">
-          <MagicStick />
+          <el-icon :size="48">
+            <MagicStick />
+          </el-icon>
         </div>
         <p>开始与 AI 对话</p>
       </div>
@@ -314,8 +450,8 @@ onMounted(() => {
       <div v-else class="messages-list">
         <div v-for="msg in messages" :key="msg.id" class="message-item" :class="msg.role">
           <div class="avatar">
-            <el-icon v-if="msg.role === 'user'"><User /></el-icon>
-            <el-icon v-else><MagicStick /></el-icon>
+            <el-icon v-if="msg.role === 'user'" :size="18"><User /></el-icon>
+            <el-icon v-else :size="18"><MagicStick /></el-icon>
           </div>
           <div class="content">
             <div class="bubble">
@@ -342,7 +478,9 @@ onMounted(() => {
         <!-- 加载状态 -->
         <div v-if="isGenerating" class="message-item assistant">
           <div class="avatar">
-            <MagicStick />
+            <el-icon :size="18">
+              <MagicStick />
+            </el-icon>
           </div>
           <div class="content">
             <div class="bubble loading">
@@ -405,135 +543,98 @@ export default {
   background: #fff;
 }
 
-.mode-tabs {
-  display: flex;
+.top-controls {
   border-bottom: 1px solid #e4e7ed;
-  padding: 8px 16px;
-  gap: 8px;
+  padding: 8px 12px;
 
-  .mode-tab {
-    flex: 1;
+  .mode-tabs {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 14px;
-    color: #606266;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:hover {
-      background: #f5f7fa;
-    }
-
-    &.active {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff;
-    }
-  }
-}
-
-.model-selector {
-  padding: 12px 16px;
-  border-bottom: 1px solid #e4e7ed;
-
-  .model-buttons {
-    display: flex;
-    gap: 8px;
+    gap: 4px;
     margin-bottom: 8px;
 
-    .model-btn {
+    .mode-tab {
       flex: 1;
-      padding: 6px 12px;
-      border: 1px solid #dcdfe6;
-      border-radius: 6px;
-      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 6px 10px;
+      border-radius: 5px;
       font-size: 13px;
       color: #606266;
       cursor: pointer;
       transition: all 0.2s;
 
       &:hover {
-        border-color: #667eea;
-        color: #667eea;
+        background: #f5f7fa;
       }
 
       &.active {
-        background: #667eea;
-        border-color: #667eea;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: #fff;
       }
     }
   }
 
-  .advanced-toggle {
+  .model-selector {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 4px;
-    padding: 4px;
-    font-size: 12px;
-    color: #909399;
-    cursor: pointer;
+    gap: 8px;
 
-    .arrow {
-      font-size: 10px;
-      transition: transform 0.2s;
-
-      &.open {
-        transform: rotate(180deg);
-      }
+    .el-select {
+      flex: 1;
     }
-  }
 
-  .advanced-settings {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #f0f0f0;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    .advanced-btn {
+      padding: 4px 8px;
+      color: #909399;
+      font-size: 12px;
 
-    .setting-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 13px;
-
-      label {
-        width: 70px;
-        color: #606266;
-      }
-
-      select,
-      input {
-        flex: 1;
-        padding: 6px 10px;
-        border: 1px solid #dcdfe6;
-        border-radius: 4px;
-        font-size: 13px;
-        outline: none;
-
-        &:focus {
-          border-color: #667eea;
-        }
+      &:hover {
+        color: #667eea;
       }
     }
   }
 }
 
+.advanced-settings {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e4e7ed;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fafafa;
+
+  .setting-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+
+    label {
+      width: 60px;
+      color: #606266;
+      flex-shrink: 0;
+    }
+
+    .el-select,
+    .el-input {
+      flex: 1;
+    }
+  }
+}
+
 .layer-info-bar {
-  padding: 10px 16px;
+  padding: 5px 12px;
   border-bottom: 1px solid #e4e7ed;
 
   .selected-layer-info,
   .no-selection-info {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
+    gap: 5px;
+    font-size: 12px;
+    line-height: 1.5;
   }
 
   .selected-layer-info {
@@ -596,6 +697,12 @@ export default {
     flex-shrink: 0;
     color: #fff;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+    .el-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
   }
 
   &.user .avatar {
@@ -718,18 +825,18 @@ export default {
 
 .quick-commands {
   display: flex;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: 6px;
+  padding: 8px 12px;
   overflow-x: auto;
   border-top: 1px solid #e4e7ed;
   border-bottom: 1px solid #e4e7ed;
 
   .quick-tag {
-    padding: 4px 10px;
+    padding: 3px 8px;
     background: #f5f7fa;
     border: 1px solid #e4e7ed;
-    border-radius: 12px;
-    font-size: 12px;
+    border-radius: 10px;
+    font-size: 11px;
     color: #606266;
     cursor: pointer;
     white-space: nowrap;
@@ -744,17 +851,17 @@ export default {
 }
 
 .input-area {
-  padding: 12px 16px;
+  padding: 10px 12px;
   background: #fff;
 
   .input-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 8px;
+    margin-top: 6px;
 
     .hint {
-      font-size: 12px;
+      font-size: 11px;
       color: #c0c4cc;
     }
   }

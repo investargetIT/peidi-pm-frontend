@@ -64,6 +64,17 @@ export const useLovartStore = defineStore("lovart", () => {
     }
   };
 
+  // 重做
+  const redo = () => {
+    if (historyIndex.value < history.value.length - 1) {
+      historyIndex.value++;
+      const snapshot = history.value[historyIndex.value];
+      if (snapshot) {
+        layers.value = JSON.parse(JSON.stringify(snapshot.layers));
+      }
+    }
+  };
+
   // 初始化图层
   const initLayers = () => {
     layers.value = JSON.parse(JSON.stringify(mockInitialLayers));
@@ -119,6 +130,21 @@ export const useLovartStore = defineStore("lovart", () => {
         selectedLayerId.value = null;
       }
       saveSnapshot();
+    }
+  };
+
+  // 复制图层
+  const duplicateLayer = (layerId: string) => {
+    const layer = layers.value.find((l) => l.id === layerId);
+    if (layer) {
+      const newLayer = addLayer({
+        ...layer,
+        id: generateId(),
+        name: `${layer.name} (副本)`,
+        x: layer.x + 20,
+        y: layer.y + 20
+      });
+      return newLayer;
     }
   };
 
@@ -247,56 +273,95 @@ export const useLovartStore = defineStore("lovart", () => {
   ): Promise<string[]> => {
     isGenerating.value = true;
     try {
-      const { model = currentModel.value, size = "1024x1024", n = 1, negativePrompt = "" } = options;
+      const { model = currentModel.value, size = "1K", n = 1, negativePrompt = "" } = options;
 
       // 构建参数
-      const params: AiTransferParams = {
-        prompt,
-        negative_prompt: negativePrompt,
-        size,
-        n
-      };
+      let params: any;
+      if (model === "aliyun") {
+        // 阿里云模型参数格式
+        params = {
+          model: "wan2.7-image-pro",
+          input: {
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { text: prompt }
+                ]
+              }
+            ]
+          },
+          parameters: {
+            size: size,
+            n: 1,
+            watermark: false,
+            thinking_mode: true
+          }
+        };
+      } else if (model === "gemini") {
+        // Gemini 模型参数格式
+        params = {
+          model: "gemini-3.1-flash-image-preview",
+          prompt,
+          image: [],
+          image_config: {
+            aspect_ratio: "1:1",
+            image_size: size
+          }
+        };
+      } else {
+        // Qnaigc 模型参数格式
+        params = {
+          model: "openai/gpt-image-2",
+          prompt,
+          image: [],
+          image_config: {
+            aspect_ratio: "1:1",
+            image_size: size
+          }
+        };
+      }
 
       // 根据模型选择不同的中转接口
       let response: any;
       const urlParam = JSON.stringify(params);
 
-      switch (model) {
-        case "aliyun":
-          response = await transferDrawAliyun({ urlParam });
-          break;
-        case "qnaigc":
-          response = await transferDrawQnaigc({ urlParam });
-          break;
-        case "gemini":
-          response = await transferGemini({ urlParam });
-          break;
-        default:
-          response = await transferDraw({ urlParam });
+      if (model === "aliyun") {
+        response = await transferDrawAliyun({ urlParam });
+      } else {
+        response = await transferDrawQnaigc({ urlParam });
       }
 
-      // 解析响应结果
-      const images: string[] = [];
-      if (response?.success) {
-        if (response.data?.images) {
-          images.push(...response.data.images);
-        } else if (response.data?.image) {
-          images.push(response.data.image);
-        } else if (Array.isArray(response.data)) {
-          response.data.forEach((item: any) => {
-            if (item.url || item.image) {
-              images.push(item.url || item.image);
-            }
-          });
+      // 解析响应结果 - 参考创意工作室的实现
+      const validImages: string[] = [];
+      if (response?.code === 200 && response.data) {
+        let imageUrl = null;
+
+        if (model === "aliyun") {
+          // 阿里云模型：res.data 直接是图片 URL
+          imageUrl = response.data;
+        } else {
+          // Qnaigc/Gemini 模型：需要解析 base64
+          const dataArray = typeof response.data === "string"
+            ? JSON.parse(response.data)
+            : response.data;
+
+          if (dataArray?.[0]?.b64_json) {
+            imageUrl = "data:image/png;base64," + dataArray[0].b64_json;
+          }
+        }
+
+        if (imageUrl) {
+          validImages.push(imageUrl);
         }
       }
 
       // 如果没有获取到图片，抛出错误
-      if (images.length === 0) {
+      if (validImages.length === 0) {
         throw new Error(response?.message || "生成图片失败，请稍后重试");
       }
 
-      return images;
+      return validImages;
     } finally {
       isGenerating.value = false;
     }
@@ -322,6 +387,37 @@ export const useLovartStore = defineStore("lovart", () => {
     });
   };
 
+  // 调用 GPT 聊天接口
+  const chatWithGemini = async (prompt: string) => {
+    isGenerating.value = true;
+    try {
+      const params = {
+        model: "gpt-5.4",
+        stream: false,
+        messages: [
+          {
+            role: "system",
+            content: "你是一个专业的智能画布助手，帮助用户编辑画布和内容。你的回复要友好、简洁。"
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      };
+
+      const res = await transferGemini({ urlParam: JSON.stringify(params) });
+
+      if (res.code === 200) {
+        return res.data;
+      } else {
+        throw new Error(res.message || "AI 对话失败");
+      }
+    } finally {
+      isGenerating.value = false;
+    }
+  };
+
   return {
     // 状态
     layers,
@@ -345,6 +441,7 @@ export const useLovartStore = defineStore("lovart", () => {
     toggleLayerSelection,
     addLayer,
     deleteLayer,
+    duplicateLayer,
     updateLayer,
     updateLayerWithoutSnapshot,
     batchSaveSnapshot,
@@ -359,10 +456,12 @@ export const useLovartStore = defineStore("lovart", () => {
     setCanvasPan,
     resetCanvas,
     undo,
+    redo,
     saveSnapshot,
     // AI 相关
     generateImage,
     addImageToCanvas,
-    setCurrentModel
+    setCurrentModel,
+    chatWithGemini
   };
 });

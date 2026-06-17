@@ -13,7 +13,8 @@ import {
   Picture,
   Document,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  More
 } from "@element-plus/icons-vue";
 import type { Layer } from "../types";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -189,7 +190,7 @@ const handleEditText = (evt: Event, layerId: string) => {
 
             <el-dropdown trigger="click" @click.stop>
               <el-icon :size="16" class="action-icon more-icon">
-                <el-icon-more />
+                <More />
               </el-icon>
               <template #dropdown>
                 <el-dropdown-menu>

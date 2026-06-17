@@ -217,6 +217,19 @@ const handleGenerateClick = async () => {
     });
 };
 
+// 生成空白图片的 base64
+const generateBlankImageBase64 = (width = 512, height = 512) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+  }
+  return canvas.toDataURL("image/png");
+};
+
 const formatParams = async () => {
   let base64Urls = [];
   if (fileList.value && fileList.value.length > 0) {
@@ -236,6 +249,9 @@ const formatParams = async () => {
       console.error("转换图片为 base64 失败:", error);
       ElMessage.error("图片转换失败:" + error.message);
     }
+  } else if (aiModel.value === "openai/gpt-image-2") {
+    // 如果是七牛云 gpt-image-2 且没有上传图片，生成空白图片
+    base64Urls = [generateBlankImageBase64()];
   }
 
   // 图片配置
@@ -268,7 +284,23 @@ const formatParams = async () => {
         thinking_mode: true
       }
     };
+  } else if (aiModel.value === "openai/gpt-image-2") {
+    // 七牛云 gpt-image-2 独立参数格式（仅支持图生图）
+    const processedImageList = base64Urls.map(url => {
+      return url.replace(
+        "data:application/json;base64,",
+        "data:image/png;base64,"
+      );
+    });
+
+    return {
+      model: aiModel.value,
+      prompt: configForm.prompt,
+      image: processedImageList, // 数组格式
+      quality: "low" // 可以改为 "low", "standard", "high"
+    };
   } else {
+    // 其他七牛云模型（如 nano-banana-2）
     const processedImageList = base64Urls.map(url => {
       return url.replace(
         "data:application/json;base64,",

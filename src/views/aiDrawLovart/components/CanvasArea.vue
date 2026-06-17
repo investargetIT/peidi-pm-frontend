@@ -77,20 +77,11 @@ const initCanvas = () => {
     debouncedSaveSnapshot();
   });
 
-  // 实时缩放更新（用于显示）
+  // 缩放过程中 - 不做任何 store 更新，避免重新渲染
   canvas.on("object:scaling", (opt: any) => {
-    const obj = opt.target;
-    if (!obj || !obj.layerId || isUpdatingFromStore) return;
-
-    const layerId = obj.layerId;
-    const newWidth = (obj.width || 0) * (obj.scaleX || 1);
-    const newHeight = (obj.height || 0) * (obj.scaleY || 1);
-
-    store.updateLayerWithoutSnapshot(layerId, {
-      width: newWidth,
-      height: newHeight
-    });
+    // 什么都不做，让 Fabric.js 自己处理
   });
+
 
   // 双击编辑文本
   canvas.on("mouse:dblclick", (opt: any) => {
@@ -191,19 +182,19 @@ const handleZoom = (evt: WheelEvent) => {
   // 计算理论上的新缩放值
   let newZoom = zoom * zoomFactor;
 
-  // 限制缩放范围
-  const minZoom = 0.05;
-  const maxZoom = 20;
+  // 限制缩放范围（与 store 保持一致）
+  const minZoom = 0.1;
+  const maxZoom = 5;
 
   // 【关键修复】提前检查边界 - 在 preventDefault 之前检查
   // 如果当前已经在最小值且试图缩小，或者在最大值且试图放大，直接返回
-  if (newZoom <= minZoom && zoom <= minZoom) {
+  if ((newZoom <= minZoom && zoom <= minZoom) || (newZoom < minZoom && zoom === minZoom)) {
     // 已经达到最小值，阻止所有操作
     evt.preventDefault();
     evt.stopPropagation();
     return;
   }
-  if (newZoom >= maxZoom && zoom >= maxZoom) {
+  if ((newZoom >= maxZoom && zoom >= maxZoom) || (newZoom > maxZoom && zoom === maxZoom)) {
     // 已经达到最大值，阻止所有操作
     evt.preventDefault();
     evt.stopPropagation();
@@ -214,7 +205,7 @@ const handleZoom = (evt: WheelEvent) => {
   evt.preventDefault();
   evt.stopPropagation();
 
-  // 钳制最终的缩放值
+  // 钳制最终的缩放值（与 store 保持一致）
   newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
 
   // 2. 获取鼠标相对于 Canvas 元素的原始像素坐标
@@ -344,9 +335,32 @@ const updateLayerFromObject = (obj: any) => {
   const layerId = obj.layerId;
   if (!layerId) return;
 
-  const actualWidth = (obj.width || 0) * (obj.scaleX || 1);
-  const actualHeight = (obj.height || 0) * (obj.scaleY || 1);
+  // 计算实际尺寸（仿 PS 模式）
+  let actualWidth: number;
+  let actualHeight: number;
 
+  if (obj.type === "image") {
+    // 图片类型：实际尺寸 = 原始尺寸 × scale
+    actualWidth = (obj.width || 0) * (obj.scaleX || 1);
+    actualHeight = (obj.height || 0) * (obj.scaleY || 1);
+  } else {
+    // 其他类型（文字、矩形）：把 scale 应用到宽高，然后重置 scale 为 1
+    actualWidth = (obj.width || 0) * (obj.scaleX || 1);
+    actualHeight = (obj.height || 0) * (obj.scaleY || 1);
+
+    // 直接修改 Fabric 对象，把 scale 应用到宽高上
+    obj.set({
+      width: actualWidth,
+      height: actualHeight,
+      scaleX: 1,
+      scaleY: 1
+    });
+  }
+
+  // 设置标志，防止 watcher 触发重新渲染
+  isUpdatingFromStore = true;
+
+  // 更新 store
   store.updateLayerWithoutSnapshot(layerId, {
     x: obj.left || 0,
     y: obj.top || 0,
@@ -357,13 +371,11 @@ const updateLayerFromObject = (obj: any) => {
     scaleY: 1
   });
 
-  // 重置对象的 scale，使用实际尺寸
-  obj.set({
-    width: actualWidth,
-    height: actualHeight,
-    scaleX: 1,
-    scaleY: 1
-  });
+  // 重新计算对象坐标
+  obj.setCoords();
+
+  // 重置标志
+  isUpdatingFromStore = false;
 };
 
 // 窗口 resize 处理
@@ -457,14 +469,16 @@ const addLayerToCanvas = async (layer: Layer, index: number) => {
         crossOrigin: "anonymous"
       });
 
+      // 计算缩放比例，使图片缩放到目标尺寸，避免裁剪
+      const scaleX = layer.width / img.width!;
+      const scaleY = layer.height / img.height!;
+
       img.set({
         left: layer.x,
         top: layer.y,
-        width: layer.width,
-        height: layer.height,
         angle: layer.angle,
-        scaleX: 1,
-        scaleY: 1,
+        scaleX: scaleX,
+        scaleY: scaleY,
         opacity: layer.opacity,
         selectable: !layer.locked,
         evented: !layer.locked,
@@ -484,6 +498,7 @@ const addLayerToCanvas = async (layer: Layer, index: number) => {
       left: layer.x,
       top: layer.y,
       width: layer.width,
+      height: layer.height,
       fontSize: layer.fontSize || 24,
       fontFamily: layer.fontFamily || "Arial",
       fill: layer.fill || "#333",
@@ -493,7 +508,10 @@ const addLayerToCanvas = async (layer: Layer, index: number) => {
       opacity: layer.opacity,
       selectable: !layer.locked,
       evented: !layer.locked,
-      visible: layer.visible
+      visible: layer.visible,
+      // 让 Textbox 的行为更像普通元素
+      splitByGrapheme: true, // 更好的换行处理
+      uniScaleTransform: false // 允许非等比缩放
     });
   }
 
