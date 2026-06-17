@@ -1,8 +1,20 @@
 import { defineStore } from "pinia";
 import { ref, computed, nextTick } from "vue";
-import type { Layer, HistorySnapshot, ChatMessage, LovartState, AiModelType } from "../types";
+import type {
+  Layer,
+  HistorySnapshot,
+  ChatMessage,
+  LovartState,
+  AiModelType
+} from "../types";
 import { mockInitialLayers, generateId } from "../mock";
-import { transferDraw, transferDrawAliyun, transferDrawQnaigc, transferGemini, type AiTransferParams } from "@/api/aiDraw";
+import {
+  transferDraw,
+  transferDrawAliyun,
+  transferDrawQnaigc,
+  transferGemini,
+  type AiTransferParams
+} from "@/api/aiDraw";
 
 const MAX_HISTORY_LENGTH = 50;
 
@@ -18,10 +30,14 @@ export const useLovartStore = defineStore("lovart", () => {
   const canvasPan = ref({ x: 0, y: 0 });
   const isGenerating = ref(false);
   const currentModel = ref<AiModelType>("aliyun");
+  const aiMode = ref<"chat" | "generate">("generate"); // AI 助手的模式：生图或聊天
+  const hasShownWelcome = ref(false); // 是否已显示欢迎语
 
   // 计算属性
   const selectedLayer = computed(() => {
-    return layers.value.find((layer) => layer.id === selectedLayerId.value) || null;
+    return (
+      layers.value.find(layer => layer.id === selectedLayerId.value) || null
+    );
   });
 
   const sortedLayers = computed(() => {
@@ -123,7 +139,7 @@ export const useLovartStore = defineStore("lovart", () => {
 
   // 删除图层
   const deleteLayer = (layerId: string) => {
-    const index = layers.value.findIndex((l) => l.id === layerId);
+    const index = layers.value.findIndex(l => l.id === layerId);
     if (index !== -1) {
       layers.value.splice(index, 1);
       if (selectedLayerId.value === layerId) {
@@ -135,11 +151,11 @@ export const useLovartStore = defineStore("lovart", () => {
 
   // 复制图层
   const duplicateLayer = (layerId: string) => {
-    const layer = layers.value.find((l) => l.id === layerId);
+    const layer = layers.value.find(l => l.id === layerId);
     if (layer) {
+      const { id, ...layerWithoutId } = layer;
       const newLayer = addLayer({
-        ...layer,
-        id: generateId(),
+        ...layerWithoutId,
         name: `${layer.name} (副本)`,
         x: layer.x + 20,
         y: layer.y + 20
@@ -150,7 +166,7 @@ export const useLovartStore = defineStore("lovart", () => {
 
   // 更新图层
   const updateLayer = (layerId: string, updates: Partial<Layer>) => {
-    const layer = layers.value.find((l) => l.id === layerId);
+    const layer = layers.value.find(l => l.id === layerId);
     if (layer) {
       Object.assign(layer, updates);
       saveSnapshot();
@@ -158,8 +174,11 @@ export const useLovartStore = defineStore("lovart", () => {
   };
 
   // 批量更新图层（不保存快照，用于画布拖拽等连续操作）
-  const updateLayerWithoutSnapshot = (layerId: string, updates: Partial<Layer>) => {
-    const layer = layers.value.find((l) => l.id === layerId);
+  const updateLayerWithoutSnapshot = (
+    layerId: string,
+    updates: Partial<Layer>
+  ) => {
+    const layer = layers.value.find(l => l.id === layerId);
     if (layer) {
       Object.assign(layer, updates);
     }
@@ -172,7 +191,7 @@ export const useLovartStore = defineStore("lovart", () => {
 
   // 切换图层可见性
   const toggleLayerVisibility = (layerId: string) => {
-    const layer = layers.value.find((l) => l.id === layerId);
+    const layer = layers.value.find(l => l.id === layerId);
     if (layer) {
       layer.visible = !layer.visible;
       saveSnapshot();
@@ -181,7 +200,7 @@ export const useLovartStore = defineStore("lovart", () => {
 
   // 切换图层锁定
   const toggleLayerLock = (layerId: string) => {
-    const layer = layers.value.find((l) => l.id === layerId);
+    const layer = layers.value.find(l => l.id === layerId);
     if (layer) {
       layer.locked = !layer.locked;
       saveSnapshot();
@@ -206,20 +225,20 @@ export const useLovartStore = defineStore("lovart", () => {
 
   // 移动图层到顶部
   const moveLayerToTop = (layerId: string) => {
-    const layer = layers.value.find((l) => l.id === layerId);
+    const layer = layers.value.find(l => l.id === layerId);
     if (!layer) return;
 
-    const maxZ = Math.max(...layers.value.map((l) => l.zIndex));
+    const maxZ = Math.max(...layers.value.map(l => l.zIndex));
     layer.zIndex = maxZ + 1;
     saveSnapshot();
   };
 
   // 移动图层到底部
   const moveLayerToBottom = (layerId: string) => {
-    const layer = layers.value.find((l) => l.id === layerId);
+    const layer = layers.value.find(l => l.id === layerId);
     if (!layer) return;
 
-    const minZ = Math.min(...layers.value.map((l) => l.zIndex));
+    const minZ = Math.min(...layers.value.map(l => l.zIndex));
     layer.zIndex = minZ - 1;
     saveSnapshot();
   };
@@ -255,10 +274,19 @@ export const useLovartStore = defineStore("lovart", () => {
     canvasPan.value = { x: 0, y: 0 };
   };
 
-
   // 设置当前模型
   const setCurrentModel = (model: AiModelType) => {
     currentModel.value = model;
+  };
+
+  // 设置 AI 模式
+  const setAiMode = (mode: "chat" | "generate") => {
+    aiMode.value = mode;
+  };
+
+  // 设置是否已显示欢迎语
+  const setHasShownWelcome = (shown: boolean) => {
+    hasShownWelcome.value = shown;
   };
 
   // 调用 AI 生图 API
@@ -273,7 +301,12 @@ export const useLovartStore = defineStore("lovart", () => {
   ): Promise<string[]> => {
     isGenerating.value = true;
     try {
-      const { model = currentModel.value, size = "1K", n = 1, negativePrompt = "" } = options;
+      const {
+        model = currentModel.value,
+        size = "1K",
+        n = 1,
+        negativePrompt = ""
+      } = options;
 
       // 构建参数
       let params: any;
@@ -285,9 +318,7 @@ export const useLovartStore = defineStore("lovart", () => {
             messages: [
               {
                 role: "user",
-                content: [
-                  { text: prompt }
-                ]
+                content: [{ text: prompt }]
               }
             ]
           },
@@ -342,9 +373,10 @@ export const useLovartStore = defineStore("lovart", () => {
           imageUrl = response.data;
         } else {
           // Qnaigc/Gemini 模型：需要解析 base64
-          const dataArray = typeof response.data === "string"
-            ? JSON.parse(response.data)
-            : response.data;
+          const dataArray =
+            typeof response.data === "string"
+              ? JSON.parse(response.data)
+              : response.data;
 
           if (dataArray?.[0]?.b64_json) {
             imageUrl = "data:image/png;base64," + dataArray[0].b64_json;
@@ -392,12 +424,13 @@ export const useLovartStore = defineStore("lovart", () => {
     isGenerating.value = true;
     try {
       const params = {
-        model: "gpt-5.4",
-        stream: false,
+        model: "gemini-3.1-pro",
+        stream: true,
         messages: [
           {
             role: "system",
-            content: "你是一个专业的智能画布助手，帮助用户编辑画布和内容。你的回复要友好、简洁。"
+            content:
+              "你是一个专业的智能画布助手，帮助用户编辑画布和内容。你的回复要友好、简洁。"
           },
           {
             role: "user",
@@ -406,7 +439,7 @@ export const useLovartStore = defineStore("lovart", () => {
         ]
       };
 
-      const res = await transferGemini({ urlParam: JSON.stringify(params) });
+      const res = await transferGemini({ urlParam: JSON.stringify(params) }) as { code: number; data: string; message?: string };
 
       if (res.code === 200) {
         return res.data;
@@ -430,6 +463,8 @@ export const useLovartStore = defineStore("lovart", () => {
     canvasPan,
     isGenerating,
     currentModel,
+    aiMode,
+    hasShownWelcome,
     // 计算属性
     selectedLayer,
     sortedLayers,
@@ -462,6 +497,8 @@ export const useLovartStore = defineStore("lovart", () => {
     generateImage,
     addImageToCanvas,
     setCurrentModel,
-    chatWithGemini
+    chatWithGemini,
+    setAiMode,
+    setHasShownWelcome
   };
 });

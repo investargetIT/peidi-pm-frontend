@@ -128,9 +128,21 @@ const handleExport = async () => {
       let exportDesc: string;
 
       if (hasSelection) {
-        // 计算选中对象的边界
-        const group = new fabric.Group(activeObjects);
-        const bounds = group.getBoundingRect();
+        // 计算选中对象的边界（不修改原对象）
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        activeObjects.forEach(obj => {
+          const rect = obj.getBoundingRect();
+          minX = Math.min(minX, rect.left);
+          minY = Math.min(minY, rect.top);
+          maxX = Math.max(maxX, rect.left + rect.width);
+          maxY = Math.max(maxY, rect.top + rect.height);
+        });
+        const bounds = {
+          left: minX,
+          top: minY,
+          width: maxX - minX,
+          height: maxY - minY
+        };
 
         // 临时隐藏未选中的对象
         allObjects.forEach(obj => {
@@ -145,6 +157,7 @@ const handleExport = async () => {
           format: "png",
           quality: 1,
           multiplier: 1,
+          backgroundColor: null,
           left: bounds.left,
           top: bounds.top,
           width: bounds.width,
@@ -161,14 +174,26 @@ const handleExport = async () => {
 
         exportDesc = `选中区域 (${Math.round(bounds.width)} × ${Math.round(bounds.height)})`;
       } else {
-        // 计算所有对象的边界
+        // 计算所有对象的边界（不修改原对象）
         if (allObjects.length === 0) {
           ElMessage.warning("画布为空，无法导出");
           return;
         }
 
-        const allGroup = new fabric.Group(allObjects);
-        const bounds = allGroup.getBoundingRect();
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        allObjects.forEach(obj => {
+          const rect = obj.getBoundingRect();
+          minX = Math.min(minX, rect.left);
+          minY = Math.min(minY, rect.top);
+          maxX = Math.max(maxX, rect.left + rect.width);
+          maxY = Math.max(maxY, rect.top + rect.height);
+        });
+        const bounds = {
+          left: minX,
+          top: minY,
+          width: maxX - minX,
+          height: maxY - minY
+        };
 
         // 添加一些边距
         const padding = 20;
@@ -176,6 +201,7 @@ const handleExport = async () => {
           format: "png",
           quality: 1,
           multiplier: 1,
+          backgroundColor: null,
           left: bounds.left - padding,
           top: bounds.top - padding,
           width: bounds.width + padding * 2,

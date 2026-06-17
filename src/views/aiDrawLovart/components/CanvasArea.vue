@@ -43,7 +43,7 @@ const initCanvas = () => {
   canvas = new fabric.Canvas("lovart-canvas", {
     width: containerRect.width,
     height: containerRect.height,
-    backgroundColor: "#ffffff",
+    backgroundColor: null,
     selection: true,
     preserveObjectStacking: true,
     uniScaleTransform: false,
@@ -374,8 +374,10 @@ const updateLayerFromObject = (obj: any) => {
   // 重新计算对象坐标
   obj.setCoords();
 
-  // 重置标志
-  isUpdatingFromStore = false;
+  // 延迟重置标志，确保 watch 已经跳过
+  setTimeout(() => {
+    isUpdatingFromStore = false;
+  }, 0);
 };
 
 // 窗口 resize 处理

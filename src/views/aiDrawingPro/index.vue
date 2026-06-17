@@ -31,13 +31,25 @@ import "./style/reset.scss";
 import "./style/element-plus.scss";
 
 import { useRoute, useRouter } from "vue-router";
+import { storageLocal } from "@pureadmin/utils";
 
 const route = useRoute();
 const router = useRouter();
 
-// 判断是否为开发环境
-const isDev = computed(() => {
-  return import.meta.env.DEV;
+const DEV_ID = [
+  "1846392647319093250", // Summer
+  "1926449443739600965", // 沈皓钰
+  "1850741012504838145", // 张思宇
+  "1887377779519434753", // 王家琦
+  "1926449443739601629" // 杨世豪
+];
+
+const userInfo: any = storageLocal().getItem("user-check-info");
+const userId = ref(userInfo?.id ?? "");
+
+// 判断是否有权限访问 Lovart
+const hasLovartPermission = computed(() => {
+  return userId.value ? DEV_ID.includes(userId.value) : false;
 });
 
 // 自定义缓存图片类型
@@ -144,7 +156,7 @@ onUnmounted(() => {
         </template>
         <DrawingPro ref="drawingProTabRef" />
       </el-tab-pane>
-      <el-tab-pane v-if="isDev" label="Lovart" name="Lovart" lazy>
+      <el-tab-pane v-if="hasLovartPermission" label="Lovart" name="Lovart" lazy>
         <AiDrawLovart ref="lovarTabRef" />
       </el-tab-pane>
     </el-tabs>

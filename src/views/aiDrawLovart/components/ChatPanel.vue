@@ -12,11 +12,10 @@ const emit = defineEmits<{
 }>();
 
 const store = useLovartStore();
-const { messages, selectedLayer, selectedLayerId, isGenerating, currentModel } = storeToRefs(store);
+const { messages, selectedLayer, selectedLayerId, isGenerating, currentModel, aiMode, hasShownWelcome } = storeToRefs(store);
 
 const inputValue = ref("");
 const messagesContainer = ref<HTMLDivElement | null>(null);
-const mode = ref<"chat" | "generate">("generate"); // 默认是生图模式
 const negativePrompt = ref("");
 const imageSize = ref("1K");
 const imageCount = ref(1);
@@ -252,7 +251,7 @@ const handleSend = async () => {
   const userContent = inputValue.value.trim();
   inputValue.value = "";
 
-  if (mode.value === "generate") {
+  if (aiMode.value === "generate") {
     // 生图模式
     await handleGenerateImage(userContent);
   } else {
@@ -350,11 +349,15 @@ const handleClearChat = async () => {
 };
 
 onMounted(() => {
-  store.addMessage({
-    role: "assistant",
-    content: "你好！我是 SmartCanvas AI。在「生图」模式中输入提示词来生成图片，或切换到「聊天」模式来编辑画布上的元素。",
-    messageType: "text"
-  });
+  // 只在第一次显示欢迎语
+  if (!hasShownWelcome.value) {
+    store.addMessage({
+      role: "assistant",
+      content: "你好！我是 SmartCanvas AI。在「生图」模式中输入提示词来生成图片，或切换到「聊天」模式来编辑画布上的元素。",
+      messageType: "text"
+    });
+    store.setHasShownWelcome(true);
+  }
 });
 </script>
 
@@ -365,16 +368,16 @@ onMounted(() => {
       <div class="mode-tabs">
         <div
           class="mode-tab"
-          :class="{ active: mode === 'generate' }"
-          @click="mode = 'generate'"
+          :class="{ active: aiMode === 'generate' }"
+          @click="store.setAiMode('generate')"
         >
           <el-icon :size="14"><MagicStick /></el-icon>
           <span>生图</span>
         </div>
         <div
           class="mode-tab"
-          :class="{ active: mode === 'chat' }"
-          @click="mode = 'chat'"
+          :class="{ active: aiMode === 'chat' }"
+          @click="store.setAiMode('chat')"
         >
           <el-icon :size="14"><ChatDotRound /></el-icon>
           <span>聊天</span>
@@ -382,7 +385,7 @@ onMounted(() => {
       </div>
 
       <!-- 生图模式的模型选择 -->
-      <div v-if="mode === 'generate'" class="model-selector">
+      <div v-if="aiMode === 'generate'" class="model-selector">
         <el-select v-model="currentModel" size="small" @change="handleModelChange">
           <el-option label="阿里云" value="aliyun" />
           <el-option label="Gemini" value="gemini" />
@@ -400,7 +403,7 @@ onMounted(() => {
     </div>
 
     <!-- 生图模式的高级设置 -->
-    <div v-if="mode === 'generate' && isAdvancedSettingsOpen" class="advanced-settings">
+    <div v-if="aiMode === 'generate' && isAdvancedSettingsOpen" class="advanced-settings">
       <div class="setting-item">
         <label>尺寸</label>
         <el-select v-model="imageSize" size="small">
@@ -425,7 +428,7 @@ onMounted(() => {
     </div>
 
     <!-- 聊天模式的选中图层提示 -->
-    <div v-if="mode === 'chat'" class="layer-info-bar">
+    <div v-if="aiMode === 'chat'" class="layer-info-bar">
       <div v-if="selectedLayer" class="selected-layer-info">
         <el-icon :size="14"><ChatRound /></el-icon>
         <span>已选中：{{ selectedLayer.name }}</span>
@@ -441,17 +444,18 @@ onMounted(() => {
       <div v-if="messages.length === 0" class="empty-chat">
         <div class="empty-icon">
           <el-icon :size="48">
-            <MagicStick />
+            <component :is="aiMode === 'generate' ? MagicStick : ChatDotRound" />
           </el-icon>
         </div>
-        <p>开始与 AI 对话</p>
+        <p>{{ aiMode === 'generate' ? '描述你想要生成的图片' : '选中元素，输入指令' }}</p>
       </div>
 
       <div v-else class="messages-list">
         <div v-for="msg in messages" :key="msg.id" class="message-item" :class="msg.role">
           <div class="avatar">
             <el-icon v-if="msg.role === 'user'" :size="18"><User /></el-icon>
-            <el-icon v-else :size="18"><MagicStick /></el-icon>
+            <el-icon v-else-if="msg.messageType === 'image_result'" :size="18"><MagicStick /></el-icon>
+            <el-icon v-else :size="18"><ChatDotRound /></el-icon>
           </div>
           <div class="content">
             <div class="bubble">
@@ -479,12 +483,12 @@ onMounted(() => {
         <div v-if="isGenerating" class="message-item assistant">
           <div class="avatar">
             <el-icon :size="18">
-              <MagicStick />
+              <component :is="aiMode === 'generate' ? MagicStick : ChatDotRound" />
             </el-icon>
           </div>
           <div class="content">
             <div class="bubble loading">
-              <span class="text">正在生成图片中</span>
+              <span class="text">{{ aiMode === 'generate' ? '正在生成图片中' : '正在思考中' }}</span>
               <div class="dots">
                 <span class="dot"></span>
                 <span class="dot"></span>
@@ -497,7 +501,7 @@ onMounted(() => {
     </div>
 
     <!-- 快捷提示词（生图模式） -->
-    <div v-if="mode === 'generate'" class="quick-commands">
+    <div v-if="aiMode === 'generate'" class="quick-commands">
       <span
         v-for="cmd in ['可爱的猫咪', '未来城市', '梦幻风景', '科技产品']"
         :key="cmd"
@@ -514,14 +518,14 @@ onMounted(() => {
         v-model="inputValue"
         type="textarea"
         :rows="3"
-        :placeholder="mode === 'generate' ? '描述你想要生成的图片...' : '输入指令，如「把颜色改成红色」'"
+        :placeholder="aiMode === 'generate' ? '描述你想要生成的图片...' : '输入指令，如「把颜色改成红色」'"
         :disabled="isGenerating"
         @keydown="handleKeyDown"
       />
       <div class="input-footer">
         <span class="hint">按 Enter 发送</span>
         <el-button type="primary" :loading="isGenerating" :disabled="!inputValue.trim()" @click="handleSend">
-          {{ mode === 'generate' ? '生成' : '发送' }}
+          {{ aiMode === 'generate' ? '生成' : '发送' }}
         </el-button>
       </div>
     </div>
