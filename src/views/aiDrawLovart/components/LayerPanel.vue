@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, nextTick } from "vue";
 import { useLovartStore } from "../store";
 import { storeToRefs } from "pinia";
 import {
@@ -14,24 +14,75 @@ import {
   Document,
   ArrowUp,
   ArrowDown,
-  More
+  More,
+  FolderOpened,
+  Fold,
+  Expand
 } from "@element-plus/icons-vue";
 import type { Layer } from "../types";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 const emit = defineEmits<{
   (e: "edit:text", layerId: string): void;
+  (e: "refreshCanvas"): void;
 }>();
 
 const store = useLovartStore();
 const { sortedLayers, selectedLayerId, selectedLayerIds } = storeToRefs(store);
 
+// 组合选中的图层
+const handleGroupLayers = async () => {
+  if (selectedLayerIds.value.length < 2) {
+    ElMessage.warning("请至少选择 2 个元素进行组合");
+    return;
+  }
+  const group = store.groupLayers(selectedLayerIds.value, "图层组");
+  if (group) {
+    emit("refreshCanvas");
+    ElMessage.success("已创建图层组");
+  }
+};
+
+// 取消组合
+const handleUngroupLayers = () => {
+  if (selectedLayerIds.value.length === 0) {
+    ElMessage.warning("请选择一个图层组");
+    return;
+  }
+  const groupLayer = store.layers.find(
+    l => l.type === "group" && selectedLayerIds.value.includes(l.id)
+  );
+  if (groupLayer) {
+    store.ungroupLayers(groupLayer.id);
+    emit("refreshCanvas");
+    ElMessage.success("已取消图层组合");
+  } else {
+    ElMessage.warning("请选择一个图层组");
+  }
+};
+
 const dragIndex = ref<number | null>(null);
 const dropIndex = ref<number | null>(null);
 
 const getLayerIcon = (layer: Layer) => {
-  return layer.type === "image" ? Picture : Document;
+  if (layer.type === "group") return FolderOpened;
+  if (layer.type === "image") return Picture;
+  if (layer.type === "shape") return Document;
+  return Document;
 };
+
+// 只显示顶层图层（排除组内的子图层）
+const displayLayers = computed(() => {
+  return sortedLayers.value.filter(layer => !layer.parentId);
+});
+
+// 检查是否选中了组
+const hasSelectedGroup = computed(() => {
+  return selectedLayerIds.value.some(id => {
+    const layer = store.layers.find(l => l.id === id);
+    return layer?.type === "group";
+  });
+});
 
 const handleSelectLayer = (evt: MouseEvent, layerId: string) => {
   if (evt.ctrlKey || evt.metaKey) {
@@ -126,22 +177,42 @@ const handleEditText = (evt: Event, layerId: string) => {
   <div class="layer-panel">
     <div class="panel-header">
       <h3>图层</h3>
-      <span class="layer-count">{{ sortedLayers.length }}</span>
+      <div class="panel-header-actions">
+        <el-tooltip content="组合图层" placement="top" :show-after="500">
+          <el-button
+            size="small"
+            :icon="Fold"
+            circle
+            @click="handleGroupLayers"
+            :disabled="selectedLayerIds.length < 2"
+          />
+        </el-tooltip>
+        <el-tooltip content="取消组合" placement="top" :show-after="500">
+          <el-button
+            size="small"
+            :icon="Expand"
+            circle
+            @click="handleUngroupLayers"
+            :disabled="!hasSelectedGroup"
+          />
+        </el-tooltip>
+      </div>
     </div>
 
     <div class="panel-content">
-      <div v-if="sortedLayers.length === 0" class="empty-state">
+      <div v-if="displayLayers.length === 0" class="empty-state">
         <el-empty description="暂无图层" :image-size="60" />
       </div>
 
       <div v-else class="layer-list">
         <div
-          v-for="(layer, index) in sortedLayers"
+          v-for="(layer, index) in displayLayers"
           :key="layer.id"
           class="layer-item"
           :class="{
             selected: selectedLayerIds.includes(layer.id),
-            'drag-over': dropIndex === index
+            'drag-over': dropIndex === index,
+            'group-layer': layer.type === 'group'
           }"
           draggable="true"
           @click="handleSelectLayer($event, layer.id)"
@@ -163,6 +234,7 @@ const handleEditText = (evt: Event, layerId: string) => {
             <el-tooltip
               :content="layer.visible ? '隐藏' : '显示'"
               placement="top"
+              :show-after="500"
             >
               <el-icon
                 :size="16"
@@ -177,6 +249,7 @@ const handleEditText = (evt: Event, layerId: string) => {
             <el-tooltip
               :content="layer.locked ? '解锁' : '锁定'"
               placement="top"
+              :show-after="500"
             >
               <el-icon
                 :size="16"
@@ -243,26 +316,41 @@ const handleEditText = (evt: Event, layerId: string) => {
 </template>
 
 <style scoped lang="scss">
+* {
+  box-sizing: border-box;
+}
+
 .layer-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
   background: #fff;
-  border-left: 1px solid #e4e7ed;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 8px 12px;
   border-bottom: 1px solid #e4e7ed;
+  flex-shrink: 0;
+  gap: 8px;
 
   h3 {
     margin: 0;
     font-size: 14px;
     font-weight: 600;
     color: #303133;
+    flex-shrink: 0;
+  }
+
+  .panel-header-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
   }
 
   .layer-count {
@@ -271,16 +359,19 @@ const handleEditText = (evt: Event, layerId: string) => {
     background: #f5f7fa;
     padding: 2px 8px;
     border-radius: 10px;
+    flex-shrink: 0;
   }
 }
 
 .panel-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 8px;
+  min-height: 0;
 
   .empty-state {
-    padding: 40px 0;
+    padding: 30px 0;
   }
 }
 
@@ -294,7 +385,7 @@ const handleEditText = (evt: Event, layerId: string) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
@@ -343,6 +434,7 @@ const handleEditText = (evt: Event, layerId: string) => {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 
   .action-icon {
     padding: 4px;

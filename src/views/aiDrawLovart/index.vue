@@ -14,7 +14,8 @@ import {
   Edit,
   Download,
   Upload,
-  Setting
+  Setting,
+  Document
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import * as fabric from "fabric";
@@ -371,24 +372,6 @@ onUnmounted(() => {
         <div class="canvas-info">
           <span class="canvas-zoom">{{ Math.round(canvasZoom * 100) }}%</span>
         </div>
-        <el-button :icon="Upload" @click="handleUploadImage">
-          上传图片
-        </el-button>
-        <el-button :icon="Edit" @click="handleAddTextLayer">
-          添加文本
-        </el-button>
-        <el-dropdown @command="handleAddShape" trigger="click">
-          <el-button>
-            添加形状
-            <el-icon class="el-icon--right"><arrow-down /></el-icon>
-          </el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="rect">矩形</el-dropdown-item>
-              <el-dropdown-item command="triangle">三角形</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
         <el-button type="primary" :icon="Download" @click="handleExport">
           导出图片
         </el-button>
@@ -398,6 +381,29 @@ onUnmounted(() => {
     <main class="page-main">
       <div class="canvas-wrapper">
         <CanvasArea ref="canvasAreaRef" @layer:dblclick="handleEditText" />
+
+        <!-- 画布下方悬浮操作栏 -->
+        <div class="canvas-toolbar">
+          <el-tooltip content="上传图片" placement="top" :show-after="500">
+            <el-button :icon="Upload" circle @click="handleUploadImage" />
+          </el-tooltip>
+          <el-tooltip content="添加文本" placement="top" :show-after="500">
+            <el-button :icon="Edit" circle @click="handleAddTextLayer" />
+          </el-tooltip>
+          <el-tooltip content="添加形状" placement="top" :show-after="500">
+            <el-dropdown @command="handleAddShape" trigger="click">
+              <el-button circle>
+                <el-icon><Document /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="rect">矩形</el-dropdown-item>
+                  <el-dropdown-item command="triangle">三角形</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </el-tooltip>
+        </div>
       </div>
 
       <div class="right-panel">
@@ -437,6 +443,7 @@ onUnmounted(() => {
           <LayerPanel
             v-else-if="rightPanelTab === 'layers'"
             @edit:text="handleEditText"
+            @refreshCanvas="canvasAreaRef.value?.refreshCanvas()"
           />
           <div v-else class="properties-panel">
             <div v-if="selectedLayerIds.length === 0" class="no-selection">
@@ -644,23 +651,66 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
+:global(html),
+:global(body) {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+:global(#app) {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 .lovart-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
+  width: 100%;
   background: #f0f2f5;
   overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+:global(.main-content) {
+  margin: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+:global(.app-main) {
+  height: calc(100vh - 48px) !important;
+  overflow: hidden !important;
+}
+
+:global(.app-main .el-scrollbar__wrap) {
+  overflow: hidden !important;
+}
+
+:global(.app-main .grow) {
+  height: 100% !important;
+  overflow: hidden !important;
 }
 
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px;
+  padding: 10px 20px;
   background: #fff;
   border-bottom: 1px solid #e4e7ed;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   z-index: 10;
+  flex-shrink: 0;
 
   .header-left {
     display: flex;
@@ -669,7 +719,7 @@ onUnmounted(() => {
 
     h1 {
       margin: 0;
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 600;
       color: #303133;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -690,7 +740,7 @@ onUnmounted(() => {
   .header-right {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 
     .canvas-info {
       display: flex;
@@ -720,25 +770,48 @@ onUnmounted(() => {
   flex: 1;
   display: flex;
   overflow: hidden;
+  min-height: 0;
+  height: 0;
 }
 
 .canvas-wrapper {
   flex: 1;
   overflow: hidden;
   position: relative;
+  min-height: 0;
+
+  .canvas-toolbar {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 50px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    z-index: 20;
+    border: 1px solid rgba(228, 233, 242, 0.8);
+  }
 }
 
 .right-panel {
-  width: 360px;
+  width: 340px;
   display: flex;
   flex-direction: column;
   background: #fff;
   border-left: 1px solid #e4e7ed;
+  flex-shrink: 0;
+  min-height: 0;
 }
 
 .panel-tabs {
   display: flex;
   border-bottom: 1px solid #e4e7ed;
+  flex-shrink: 0;
 
   .tab-item {
     flex: 1;
@@ -746,7 +819,7 @@ onUnmounted(() => {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 12px 16px;
+    padding: 10px 14px;
     font-size: 13px;
     color: #606266;
     cursor: pointer;
@@ -769,18 +842,22 @@ onUnmounted(() => {
 .panel-content-wrapper {
   flex: 1;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .properties-panel {
-  height: 100%;
+  flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 14px;
+  min-height: 0;
 
   .no-selection {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100%;
+    flex: 1;
   }
 
   .properties-content {
@@ -788,15 +865,15 @@ onUnmounted(() => {
       font-size: 14px;
       font-weight: 600;
       color: #303133;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
       padding-bottom: 8px;
       border-bottom: 1px solid #e4e7ed;
     }
 
     .property-group {
       display: flex;
-      gap: 12px;
-      margin-bottom: 16px;
+      gap: 10px;
+      margin-bottom: 14px;
 
       .form-item {
         flex: 1;

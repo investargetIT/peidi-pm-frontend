@@ -550,16 +550,24 @@ export default {
 </script>
 
 <style scoped lang="scss">
+* {
+  box-sizing: border-box;
+}
+
 .chat-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
   background: #fff;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .top-controls {
   border-bottom: 1px solid #e4e7ed;
   padding: 8px 12px;
+  flex-shrink: 0;
 
   .mode-tabs {
     display: flex;
@@ -603,6 +611,7 @@ export default {
       padding: 4px 8px;
       color: #909399;
       font-size: 12px;
+      flex-shrink: 0;
 
       &:hover {
         color: #667eea;
@@ -618,6 +627,7 @@ export default {
   flex-direction: column;
   gap: 8px;
   background: #fafafa;
+  flex-shrink: 0;
 
   .setting-item {
     display: flex;
@@ -641,6 +651,7 @@ export default {
 .layer-info-bar {
   padding: 5px 12px;
   border-bottom: 1px solid #e4e7ed;
+  flex-shrink: 0;
 
   .selected-layer-info,
   .no-selection-info {
@@ -663,8 +674,10 @@ export default {
 .messages-container {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  overflow-x: hidden;
+  padding: 14px;
   background: #f5f7fa;
+  min-height: 0;
 }
 
 .empty-chat {
@@ -690,7 +703,7 @@ export default {
 .messages-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .message-item {
@@ -702,8 +715,8 @@ export default {
   }
 
   .avatar {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -713,9 +726,9 @@ export default {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 
     .el-icon {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
     }
   }
 
@@ -729,17 +742,17 @@ export default {
     flex-direction: column;
 
     .bubble {
-      padding: 10px 14px;
-      border-radius: 12px;
+      padding: 8px 12px;
+      border-radius: 10px;
       background: #fff;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
       white-space: pre-wrap;
       word-break: break-word;
 
       .text {
-        font-size: 14px;
+        font-size: 13px;
         color: #303133;
-        line-height: 1.6;
+        line-height: 1.5;
       }
 
       &.loading {
@@ -747,7 +760,7 @@ export default {
         flex-direction: column;
         align-items: flex-start;
         gap: 8px;
-        padding: 16px 20px;
+        padding: 14px 16px;
 
         .dots {
           display: flex;
@@ -792,7 +805,7 @@ export default {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 
   .result-image-item {
     position: relative;
@@ -844,6 +857,7 @@ export default {
   overflow-x: auto;
   border-top: 1px solid #e4e7ed;
   border-bottom: 1px solid #e4e7ed;
+  flex-shrink: 0;
 
   .quick-tag {
     padding: 3px 8px;
@@ -855,6 +869,7 @@ export default {
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.2s;
+    flex-shrink: 0;
 
     &:hover {
       background: #ecf5ff;
@@ -867,6 +882,7 @@ export default {
 .input-area {
   padding: 10px 12px;
   background: #fff;
+  flex-shrink: 0;
 
   .input-footer {
     display: flex;

@@ -1,8 +1,8 @@
 import { http } from "@/utils/http";
 
 const baseUrlApi = (url: string) => {
-  // return "http://12.18.1.36:8087" + url;
-  return "https://api.peidigroup.cn" + url;
+  return "http://12.18.1.36:8087" + url;
+  // return "https://api.peidigroup.cn" + url;
 };
 
 // 调用用户服务

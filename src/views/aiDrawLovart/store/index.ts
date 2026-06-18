@@ -303,6 +303,100 @@ export const useLovartStore = defineStore("lovart", () => {
     saveSnapshot();
   };
 
+  // 组合图层
+  const groupLayers = (layerIds: string[], groupName = "图层组") => {
+    if (layerIds.length < 2) return null;
+
+    const selectedLayers = layerIds.map(id => layers.value.find(l => l.id === id)).filter(Boolean) as Layer[];
+    if (selectedLayers.length < 2) return null;
+
+    // 计算包围盒
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const maxZ = Math.max(...layers.value.map(l => l.zIndex)) + 1;
+
+    // 检查是否有锁定的元素
+    let hasLocked = false;
+    selectedLayers.forEach(layer => {
+      if (layer.locked) hasLocked = true;
+      if (layer.x < minX) minX = layer.x;
+      if (layer.y < minY) minY = layer.y;
+      if (layer.x + layer.width > maxX) maxX = layer.x + layer.width;
+      if (layer.y + layer.height > maxY) maxY = layer.y + layer.height;
+    });
+
+    // 创建组图层 - 如果有锁定的子元素，组也设为锁定
+    const groupId = generateId();
+    const groupLayer: Layer = {
+      id: groupId,
+      type: "group",
+      name: groupName,
+      visible: true,
+      locked: hasLocked, // 继承锁定状态
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+      angle: 0,
+      scaleX: 1,
+      scaleY: 1,
+      zIndex: maxZ,
+      opacity: 1,
+      children: layerIds
+    };
+
+    // 更新子图层
+    selectedLayers.forEach(layer => {
+      layer.parentId = groupId;
+    });
+
+    layers.value.push(groupLayer);
+    selectedLayerId.value = groupId;
+    selectedLayerIds.value = [groupId];
+    saveSnapshot();
+
+    return groupLayer;
+  };
+
+  // 取消组合图层
+  const ungroupLayers = (groupId: string) => {
+    const groupIndex = layers.value.findIndex(l => l.id === groupId && l.type === "group");
+    if (groupIndex === -1) return;
+
+    const groupLayer = layers.value[groupIndex];
+    if (!groupLayer.children || groupLayer.children.length === 0) {
+      layers.value.splice(groupIndex, 1);
+      saveSnapshot();
+      return;
+    }
+
+    // 更新子图层，移除 parentId
+    groupLayer.children.forEach(childId => {
+      const childLayer = layers.value.find(l => l.id === childId);
+      if (childLayer) {
+        childLayer.parentId = undefined;
+      }
+    });
+
+    // 删除组图层
+    layers.value.splice(groupIndex, 1);
+    selectedLayerId.value = null;
+    selectedLayerIds.value = [];
+    saveSnapshot();
+  };
+
+  // 获取图层的所有子图层
+  const getLayerChildren = (layerId: string): Layer[] => {
+    const layer = layers.value.find(l => l.id === layerId);
+    if (!layer || !layer.children) return [];
+    return layer.children.map(id => layers.value.find(l => l.id === id)).filter(Boolean) as Layer[];
+  };
+
+  // 判断图层是否在组中
+  const isLayerInGroup = (layerId: string): boolean => {
+    const layer = layers.value.find(l => l.id === layerId);
+    return !!layer?.parentId;
+  };
+
   // 添加聊天消息
   const addMessage = (message: Omit<ChatMessage, "id" | "timestamp">) => {
     const newMessage: ChatMessage = {
@@ -645,6 +739,10 @@ export const useLovartStore = defineStore("lovart", () => {
     moveLayer,
     moveLayerToTop,
     moveLayerToBottom,
+    groupLayers,
+    ungroupLayers,
+    getLayerChildren,
+    isLayerInGroup,
     addMessage,
     clearMessages,
     setCanvasZoom,

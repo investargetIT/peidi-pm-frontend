@@ -1,4 +1,4 @@
-export type LayerType = 'image' | 'text' | 'shape';
+export type LayerType = 'image' | 'text' | 'shape' | 'group';
 
 export type ShapeType = 'rect' | 'triangle';
 
@@ -32,6 +32,9 @@ export interface Layer {
   // 圆形/椭圆专用
   rx?: number;
   ry?: number;
+  // 图层组专用
+  children?: string[]; // 子图层 ID 列表
+  parentId?: string; // 父图层组 ID
 }
 
 export interface HistorySnapshot {
