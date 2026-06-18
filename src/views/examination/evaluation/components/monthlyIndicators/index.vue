@@ -4,6 +4,7 @@ import {
   getPmKpiMonthMetricTargetPage,
   updatePmKpiMonthMetricTargetApi,
   execSqlByUserId,
+  execSqlByMonth,
   getDingAllDepartmentUsersApi
 } from "@/api/evaluation";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -112,6 +113,21 @@ const editingCell = ref<{
 const editingValue = ref<string | number | undefined>();
 const savingCellKey = ref("");
 const updatingUserId = ref<string | null>(null);
+// 批量更新相关
+const batchUpdating = ref(false);
+const execResultDialogVisible = ref(false);
+const execResult = ref<{
+  totalCount?: number;
+  successCount?: number;
+  failCount?: number;
+  execDetails?: Array<{
+    username?: string;
+    jobNum?: string;
+    status?: string;
+    failReason?: string;
+    metricCount?: number;
+  }>;
+}>({});
 
 const isUpdating = (userId: string | number) => {
   return updatingUserId.value === String(userId);
@@ -323,6 +339,44 @@ const handleUpdateMetricData = async (row: RecordItem) => {
   }
 };
 
+const handleBatchUpdateMetricData = async () => {
+  try {
+    const selectedMonth = searchParams.value.startDate;
+    if (!selectedMonth) {
+      ElMessage.warning("请先选择月份");
+      return;
+    }
+
+    await ElMessageBox.confirm(
+      `确定批量更新「${formatMonth(selectedMonth)}」的指标数据吗？`,
+      "批量更新确认",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      }
+    );
+
+    batchUpdating.value = true;
+    const formattedMonth = dayjs(selectedMonth).format("YYYY-MM");
+    const res = (await execSqlByMonth({ month: formattedMonth })) as any;
+    if (res?.code === 200 || res?.success) {
+      execResult.value = res.data || {};
+      execResultDialogVisible.value = true;
+      fetchData();
+    } else {
+      ElMessage.error(res?.msg || "批量更新指标数据失败");
+    }
+  } catch (error) {
+    if (error !== "cancel" && error !== "close") {
+      console.error("批量更新指标数据失败", error);
+      ElMessage.error("批量更新指标数据失败");
+    }
+  } finally {
+    batchUpdating.value = false;
+  }
+};
+
 // 合并单元格
 const objectSpanMethod = ({
   row,
@@ -393,15 +447,18 @@ const cancelEdit = () => {
 };
 
 const handleEditKeydown = (
-  event: KeyboardEvent,
+  event: KeyboardEvent | Event,
   row: RecordItem,
   field: "target" | "achieved"
 ) => {
-  if (event.key === "Enter") {
-    confirmEdit(row, field);
-  }
-  if (event.key === "Escape") {
-    cancelEdit();
+  // 类型守卫，确保是 KeyboardEvent
+  if ("key" in event) {
+    if (event.key === "Enter") {
+      confirmEdit(row, field);
+    }
+    if (event.key === "Escape") {
+      cancelEdit();
+    }
   }
 };
 
@@ -455,8 +512,8 @@ const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
       nodeName: row.nodeName,
       treePath: row.treePath,
       treePathName: row.treePathName,
-      target: row.target,
-      achieved: row.achieved,
+      target: Number(row.target),
+      achieved: Number(row.achieved),
       [field]: numValue
     })) as { success: boolean; msg?: string };
 
@@ -571,6 +628,9 @@ onMounted(() => {
         <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
+          <el-button type="success" :loading="batchUpdating" @click="handleBatchUpdateMetricData">
+            批量更新指标数据
+          </el-button>
         </el-form-item>
       </el-form>
     </div>
@@ -694,6 +754,48 @@ onMounted(() => {
         />
       </div>
     </div>
+
+    <!-- 执行结果对话框 -->
+    <el-dialog
+      v-model="execResultDialogVisible"
+      title="批量更新结果"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="result-summary">
+        <el-descriptions :column="4" border>
+          <el-descriptions-item label="总用户数">
+            <span class="total-count">{{ execResult.totalCount || 0 }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="成功数量">
+            <span class="success-count">{{ execResult.successCount || 0 }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="失败数量">
+            <span class="fail-count">{{ execResult.failCount || 0 }}</span>
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+
+      <div class="result-details" v-if="execResult.execDetails?.length">
+        <el-table :data="execResult.execDetails" border stripe max-height="400">
+          <el-table-column prop="username" label="用户名" width="120" />
+          <el-table-column prop="jobNum" label="工号" width="120" />
+          <el-table-column prop="metricCount" label="执行指标数" width="100" align="center" />
+          <el-table-column label="执行状态" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.status === 'success' ? 'success' : 'danger'">
+                {{ row.status === 'success' ? '成功' : '失败' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="failReason" label="失败原因" show-overflow-tooltip />
+        </el-table>
+      </div>
+
+      <template #footer>
+        <el-button type="primary" @click="execResultDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -702,6 +804,34 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.result-summary {
+  margin-bottom: 20px;
+}
+
+.result-summary :deep(.el-descriptions__label) {
+  background-color: #f5f7fa;
+  font-weight: 500;
+}
+
+.total-count {
+  font-weight: 600;
+  color: #303133;
+}
+
+.success-count {
+  font-weight: 600;
+  color: #67c23a;
+}
+
+.fail-count {
+  font-weight: 600;
+  color: #f56c6c;
+}
+
+.result-details {
+  margin-top: 20px;
 }
 
 .search-section {

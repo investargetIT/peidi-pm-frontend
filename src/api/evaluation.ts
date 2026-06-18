@@ -1,8 +1,8 @@
 import { http } from "@/utils/http";
 
 const baseUrlApi = (url: string) => {
-  return "http://12.18.1.36:8087" + url;
-  // return "https://api.peidigroup.cn" + url;
+  // return "http://12.18.1.36:8087" + url;
+  return "https://api.peidigroup.cn" + url;
 };
 
 // 调用用户服务
@@ -174,9 +174,25 @@ export const getPmKpiMonthMetricTargetPage = (params: {
 
 // 根据用户ID执行SQL更新指标数据
 export const execSqlByUserId = (params: { userId: number | string }) => {
-  return http.request("post", baseUrlApi("/pm/kpi-month-metric-target/execSqlByUserId"), {
-    params
-  });
+  return http.request(
+    "post",
+    baseUrlApi("/pm/kpi-month-metric-target/execSqlByUserId"),
+    {
+      params
+    }
+  );
+};
+
+// 根据月份批量执行SQL更新指标数据
+export const execSqlByMonth = (params: { month: string }) => {
+  return http.request(
+    "post",
+    baseUrlApi("/pm/kpi-month-metric-target/execSqlByMonth"),
+    {
+      params,
+      timeout: 0
+    }
+  );
 };
 
 // 更新月度指标目标（不存在则创建）
@@ -273,7 +289,9 @@ export const addPmKpiMetricUserApi = (data: {
 };
 
 // 删除KPI指标用户
-export const deletePmKpiMetricUserApi = (params: { userId: number | string }) => {
+export const deletePmKpiMetricUserApi = (params: {
+  userId: number | string;
+}) => {
   return http.request("post", baseUrlApi("/pm/kpi-metric-user/delete"), {
     params
   });
@@ -285,7 +303,10 @@ export const getPmKpiGroupNodeConfigGroupApi = () => {
 };
 
 // 获取执行SQL列表
-export const getPmExecSqlListApi = (params: { type: string; name?: string }) => {
+export const getPmExecSqlListApi = (params: {
+  type: string;
+  name?: string;
+}) => {
   return http.request("get", baseUrlApi("/pm/exec-sql/list"), { params });
 };
 

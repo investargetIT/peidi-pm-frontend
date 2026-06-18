@@ -17,6 +17,11 @@ interface SqlExecItem {
   sqlExecId: number | string | null;
 }
 
+interface OtherConfig {
+  calculationType?: number;
+  notifyUserList?: number[];
+}
+
 interface MetricItem {
   id: number;
   metricConfigId: number;
@@ -29,6 +34,7 @@ interface MetricItem {
   nodeName: string;
   status?: number;
   sqlExecConfig?: string | SqlExecItem[];
+  otherConfig?: string | null;
 }
 
 interface RecordItem {
@@ -50,6 +56,7 @@ interface FlatRow {
   isFirst: boolean;
   userIndex: number;
   metric: MetricItem | null;
+  notifyUserList?: number[];
 }
 
 interface ApiResponse {
@@ -86,6 +93,59 @@ const sqlLoading = ref(false);
 const achievedSqlList = ref<{ id?: string; name?: string }[]>([]);
 const finishingRateSqlList = ref<{ id?: string; name?: string }[]>([]);
 
+// 解析otherConfig字符串为对象
+const parseOtherConfig = (otherConfig?: string | null): OtherConfig => {
+  if (!otherConfig || otherConfig.trim() === "") {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(otherConfig);
+    return parsed || {};
+  } catch (error) {
+    console.error("解析otherConfig失败", error);
+    return {};
+  }
+};
+
+// 获取计算类型文本
+const getCalculationTypeText = (calculationType?: number): string => {
+  if (calculationType === 1) return "混合模式";
+  if (calculationType === 2) return "累计模式";
+  if (calculationType === 3) return "当月模式";
+  return "";
+};
+
+// 获取计算类型对应的TAG类型
+const getCalculationTypeTag = (calculationType?: number): "primary" | "success" | "warning" | "info" | "danger" => {
+  if (calculationType === 1) return "primary";    // 蓝色
+  if (calculationType === 2) return "success";    // 绿色
+  if (calculationType === 3) return "warning";    // 橙色
+  return "info";
+};
+
+// 从用户的指标列表中获取统一的通知人列表（从第一条获取）
+const getNotifyUserListFromRecord = (record?: any): number[] => {
+  if (!record) return [];
+  const metrics = record.metricList || [];
+  if (!metrics.length) return [];
+  const firstMetric = metrics.find((m: any) => m.otherConfig) || metrics[0];
+  if (!firstMetric) return [];
+  const config = parseOtherConfig(firstMetric.otherConfig);
+  return config.notifyUserList || [];
+};
+
+// 获取通知人名称列表
+const getNotifyUserNames = (notifyUserList?: number[]): string => {
+  if (!notifyUserList || !notifyUserList.length || !userList.value) return "";
+  return notifyUserList
+    .map(id => {
+      const user = userList.value.find(u => u.id === id);
+      return user?.username || "";
+    })
+    .filter(Boolean)
+    .join(", ");
+};
+
 // 拍平数据用于表格展示（同一用户多条指标合并显示）
 const flatTableData = computed<FlatRow[]>(() => {
   const result: FlatRow[] = [];
@@ -95,6 +155,9 @@ const flatTableData = computed<FlatRow[]>(() => {
     // 关闭状态的指标不展示；若用户下没有开启的指标，则该用户整组不展示
     const metrics = (record.metricList || []).filter(metric => metric.status !== 0);
     if (!metrics.length) return;
+
+    // 获取该用户的统一通知人列表
+    const notifyList = getNotifyUserListFromRecord(record);
 
     visibleUserIndex += 1;
     metrics.forEach((metric, index) => {
@@ -107,14 +170,15 @@ const flatTableData = computed<FlatRow[]>(() => {
         rowSpan: metrics.length,
         isFirst: index === 0,
         userIndex: visibleUserIndex,
-        metric
+        metric,
+        notifyUserList: notifyList
       });
     });
   });
   return result;
 });
 
-// 合并单元格规则：序号、工号、用户名、考核组、操作 按用户合并
+// 合并单元格规则：序号、工号、用户名、考核组、通知人、操作 按用户合并；计算类型不合并
 const spanMethod = ({
   row,
   columnIndex
@@ -122,7 +186,7 @@ const spanMethod = ({
   row: FlatRow;
   columnIndex: number;
 }) => {
-  if ([0, 1, 2, 3, 9].includes(columnIndex)) {
+  if ([0, 1, 2, 3, 10, 11].includes(columnIndex)) {
     if (row.isFirst) {
       return { rowspan: row.rowSpan, colspan: 1 };
     }
@@ -188,6 +252,8 @@ const handleEdit = (row: FlatRow) => {
       metricList: record.metricList.map(m => ({ ...m }))
     };
     dialogVisible.value = true;
+    fetchUserList();
+    fetchSqlLists();
   }
 };
 
@@ -291,6 +357,42 @@ const getSqlExecNameById = (list: { id?: string; name?: string }[], id: number |
   return item?.name || "";
 };
 
+// 判断 sqlExecConfig 是否为空或空字符串
+const isManualRow = (row: FlatRow): boolean => {
+  if (!row.metric) return false;
+  if (!row.metric.sqlExecConfig) return true;
+
+  const config = row.metric.sqlExecConfig;
+
+  if (typeof config === "string") {
+    return config === "" || config === "0" || config === "[]";
+  }
+
+  // 数组类型的检查
+  if (Array.isArray(config)) {
+    return config.length === 0 || config.every(item => !item.sqlExecId);
+  }
+
+  return false;
+};
+
+// 表格单元格样式
+const tableCellStyle = ({ row, columnIndex }: { row: FlatRow; columnIndex: number }) => {
+  // 前4列（序号、工号、用户名、考核组）、通知人、操作列保持白色
+  if (columnIndex < 4 || [10, 11].includes(columnIndex)) {
+    return {
+      backgroundColor: '#ffffff',
+      '--el-table-cell-hover-bg-color': '#ffffff'
+    };
+  }
+  // 其他列根据是否手填数据设置颜色
+  const bgColor = isManualRow(row) ? '#f0f9ff' : '#ffffff';
+  return {
+    backgroundColor: bgColor,
+    '--el-table-cell-hover-bg-color': bgColor
+  };
+};
+
 const handleDelete = (row: FlatRow) => {
   ElMessageBox.confirm(`确定删除用户「${row.username}」的全部指标数据？`, "删除确认", {
     confirmButtonText: "确定",
@@ -316,6 +418,7 @@ const handleDelete = (row: FlatRow) => {
 
 onMounted(() => {
   fetchData();
+  fetchUserList();
   fetchSqlLists();
 });
 </script>
@@ -349,12 +452,17 @@ onMounted(() => {
 
     <!-- 表格区域 -->
     <div class="table-section">
+      <div class="table-tip">
+        <el-tag size="small" type="info" effect="light">提示</el-tag>
+        <span class="tip-text">蓝色背景行为手填数据</span>
+      </div>
       <el-table
         v-loading="loading"
         :data="flatTableData"
         :span-method="spanMethod"
+        :cell-style="tableCellStyle"
+        :highlight-current-row="false"
         border
-        stripe
         style="width: 100%"
       >
         <el-table-column label="序号" width="60" align="center">
@@ -409,6 +517,25 @@ onMounted(() => {
         <el-table-column label="达成率" width="160">
           <template #default="{ row }">
             {{ getSqlExecNameById(finishingRateSqlList, getSqlExecIdByType(row.metric?.sqlExecConfig, 'finishingRate')) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="计算类型" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag
+              v-if="parseOtherConfig(row.metric?.otherConfig).calculationType"
+              :type="getCalculationTypeTag(parseOtherConfig(row.metric?.otherConfig).calculationType)"
+              size="small"
+              effect="light"
+            >
+              {{ getCalculationTypeText(parseOtherConfig(row.metric?.otherConfig).calculationType) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="通知人" min-width="180">
+          <template #default="{ row }">
+            <template v-if="row.isFirst">
+              {{ getNotifyUserNames(row.notifyUserList) }}
+            </template>
           </template>
         </el-table-column>
         <el-table-column fixed="right" label="操作" width="120" align="center">
@@ -468,9 +595,25 @@ onMounted(() => {
 
 <style scoped>
 .kpi-metric-user-container {
-  display: flex;
-  flex-direction: column;
+  width: 100%;
   gap: 16px;
+}
+
+/* 最彻底的方式：强制所有单元格保持背景色，不受 hover 影响 */
+:deep(.el-table__cell),
+:deep(.el-table__cell:hover),
+:deep(.el-table__body tr:hover > td),
+:deep(.el-table--enable-row-hover .el-table__body tr:hover > td) {
+  background-clip: padding-box;
+  transition: none !important;
+}
+
+/* 覆盖 Element Plus 的所有 hover 变量 */
+:deep(.el-table) {
+  --el-table-row-hover-bg-color: transparent !important;
+  --el-table-cell-hover-bg-color: transparent !important;
+  --el-table-tr-bg-color: transparent !important;
+  --el-table-bg-color: transparent !important;
 }
 
 .search-section {
@@ -483,6 +626,7 @@ onMounted(() => {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
+  margin-bottom: 16px;
 }
 
 .search-section :deep(.el-form) {
@@ -501,6 +645,22 @@ onMounted(() => {
   border-radius: 8px;
   padding: 16px;
   background: #fff;
+}
+
+.table-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background-color: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 4px;
+}
+
+.tip-text {
+  font-size: 14px;
+  color: #0c4a6e;
 }
 
 .pagination-section {

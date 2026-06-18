@@ -53,6 +53,12 @@ interface MetricItem {
   nodeName: string;
   status?: number;
   sqlExecConfig?: string | SqlExecItem[];
+  otherConfig?: string | null;
+}
+
+interface OtherConfig {
+  calculationType?: number;
+  notifyUserList?: number[];
 }
 
 interface RecordItem {
@@ -96,6 +102,7 @@ const selectedNodeName = ref("");
 const nodeConfigGroups = ref<NodeConfigGroup[]>([]);
 const selectedUserId = ref<number>();
 const selectedUserName = ref("");
+const notifyUserList = ref<number[]>([]);
 
 // 编辑态中指标列表的副本，支持独立修改
 const metricsEdit = ref<MetricItem[]>([]);
@@ -156,6 +163,51 @@ const setSqlExecIdByType = (
   row.sqlExecConfig = config;
 };
 
+// 解析otherConfig字符串为对象
+const parseOtherConfig = (otherConfig?: string | null): OtherConfig => {
+  if (!otherConfig || otherConfig.trim() === "") {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(otherConfig);
+    return parsed || {};
+  } catch (error) {
+    console.error("解析otherConfig失败", error);
+    return {};
+  }
+};
+
+// 从第一条指标中获取otherConfig（获取统一的notifyUserList）
+const getUnifiedOtherConfig = (metrics: MetricItem[]): OtherConfig => {
+  const firstMetric = metrics.find(m => m.otherConfig);
+  if (!firstMetric) return {};
+  return parseOtherConfig(firstMetric.otherConfig);
+};
+
+// 更新所有指标的通知人列表
+const updateAllMetricsNotifyUserList = (metrics: MetricItem[], notifyUserList: number[]) => {
+  metrics.forEach(metric => {
+    const config = parseOtherConfig(metric.otherConfig);
+    config.notifyUserList = notifyUserList.length > 0 ? notifyUserList : undefined;
+    metric.otherConfig = JSON.stringify(config);
+  });
+};
+
+// 更新单个指标的计算类型
+const updateMetricCalculationType = (metric: MetricItem, calculationType?: number) => {
+  const config = parseOtherConfig(metric.otherConfig);
+  // 保留原有的notifyUserList
+  const notifyUserList = config.notifyUserList;
+  const newConfig: OtherConfig = {};
+  if (calculationType !== undefined) {
+    newConfig.calculationType = calculationType;
+  }
+  if (notifyUserList && notifyUserList.length > 0) {
+    newConfig.notifyUserList = notifyUserList;
+  }
+  metric.otherConfig = Object.keys(newConfig).length > 0 ? JSON.stringify(newConfig) : null;
+};
+
 const buildMetricsByNode = (
   nodeConfig?: NodeConfigGroup,
   oldMetrics: MetricItem[] = []
@@ -165,6 +217,10 @@ const buildMetricsByNode = (
     oldMetrics.map(item => [item.metricConfigId, item] as const)
   );
 
+  // 获取旧指标中的统一通知人列表
+  const unifiedConfig = getUnifiedOtherConfig(oldMetrics);
+  const oldNotifyList = unifiedConfig.notifyUserList || [];
+
   return (nodeConfig.configList || []).map(config => {
     const oldMetric = config.id ? oldMetricMap.get(config.id) : undefined;
     const sqlExecConfig = oldMetric?.sqlExecConfig
@@ -173,6 +229,19 @@ const buildMetricsByNode = (
           { type: "achieved", sqlExecId: null },
           { type: "finishingRate", sqlExecId: null }
         ];
+
+    // 构建新的otherConfig，保留通知人
+    const newConfig: OtherConfig = {};
+    if (oldMetric?.otherConfig) {
+      const oldConfig = parseOtherConfig(oldMetric.otherConfig);
+      if (oldConfig.calculationType !== undefined) {
+        newConfig.calculationType = oldConfig.calculationType;
+      }
+    }
+    if (oldNotifyList.length > 0) {
+      newConfig.notifyUserList = oldNotifyList;
+    }
+
     return {
       id: oldMetric?.id,
       metricConfigId: config.id || 0,
@@ -184,7 +253,8 @@ const buildMetricsByNode = (
       nodeId: nodeConfig.nodeId || 0,
       nodeName: nodeConfig.nodeName || "",
       status: oldMetric?.status ?? 1,
-      sqlExecConfig
+      sqlExecConfig,
+      otherConfig: Object.keys(newConfig).length > 0 ? JSON.stringify(newConfig) : null
     };
   });
 };
@@ -215,7 +285,15 @@ const resetState = () => {
   metricsEdit.value = [];
   selectedUserId.value = undefined;
   selectedUserName.value = "";
+  notifyUserList.value = [];
 };
+
+// 监听通知人变化，自动更新所有指标
+watch(notifyUserList, newList => {
+  if (metricsEdit.value.length > 0) {
+    updateAllMetricsNotifyUserList(metricsEdit.value, newList);
+  }
+});
 
 watch(
   () => props.modelValue,
@@ -229,10 +307,15 @@ watch(
       userJobNum.value = props.recordData.jobNum || "";
       selectedNodeId.value = props.recordData.nodeId;
       selectedNodeName.value = props.recordData.nodeName || "";
-      metricsEdit.value = props.recordData.metricList.map(m => ({
+      const initialMetrics = props.recordData.metricList.map(m => ({
         ...m,
         status: m.status ?? 1
       }));
+      metricsEdit.value = sortMetrics(initialMetrics);
+
+      // 从第一条指标中解析otherConfig并初始化状态
+      const parsedConfig = getUnifiedOtherConfig(metricsEdit.value);
+      notifyUserList.value = parsedConfig.notifyUserList || [];
     } else if (props.mode === "add") {
       resetState();
     }
@@ -255,11 +338,47 @@ const metricTypeText = (type: number) => {
   return type === 1 ? "定量考核" : String(type);
 };
 
+// 获取计算类型文本
+const getCalculationTypeText = (calculationType?: number): string => {
+  if (calculationType === 1) return "混合模式";
+  if (calculationType === 2) return "累计模式";
+  if (calculationType === 3) return "当月模式";
+  return "";
+};
+
+// 获取计算类型对应的TAG类型
+const getCalculationTypeTag = (calculationType?: number): "primary" | "success" | "warning" | "info" | "danger" => {
+  if (calculationType === 1) return "primary";    // 蓝色
+  if (calculationType === 2) return "success";    // 绿色
+  if (calculationType === 3) return "warning";    // 橙色
+  return "info";
+};
+
+// 指标排序函数：开启的优先，状态相同则保持原顺序
+const sortMetrics = (metrics: MetricItem[]): MetricItem[] => {
+  return [...metrics].sort((a, b) => {
+    const statusA = a.status ?? 1;
+    const statusB = b.status ?? 1;
+    // 状态为1（开启）的排前面
+    if (statusA !== statusB) {
+      return statusB - statusA;
+    }
+    // 状态相同保持原顺序（通过metricConfigId或其他字段稳定排序）
+    return (a.metricConfigId || 0) - (b.metricConfigId || 0);
+  });
+};
+
+// 当开关状态改变时，重新排序列表
+const handleStatusChange = () => {
+  metricsEdit.value = sortMetrics(metricsEdit.value);
+};
+
 const handleNodeChange = (nodeId: number) => {
   const nodeConfig = nodeConfigGroups.value.find(item => item.nodeId === nodeId);
   selectedNodeName.value = nodeConfig?.nodeName || "";
   // 切换考核组后，指标全部更新为所选考核组的最新指标配置
-  metricsEdit.value = buildMetricsByNode(nodeConfig);
+  const newMetrics = buildMetricsByNode(nodeConfig);
+  metricsEdit.value = sortMetrics(newMetrics);
 };
 
 const handleSubmit = async () => {
@@ -297,7 +416,8 @@ const handleSubmit = async () => {
         status: m.status ?? 1,
         sqlExecConfig: Array.isArray(m.sqlExecConfig)
           ? JSON.stringify(m.sqlExecConfig)
-          : m.sqlExecConfig || ""
+          : m.sqlExecConfig || "",
+        otherConfig: m.otherConfig
       }))
     };
 
@@ -389,6 +509,27 @@ const handleClose = () => {
               </el-form-item>
             </el-col>
           </el-row>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="通知用户">
+                <el-select
+                  v-model="notifyUserList"
+                  multiple
+                  filterable
+                  placeholder="请选择通知用户"
+                  :loading="props.userLoading"
+                  style="width: 100%"
+                >
+                  <el-option
+                    v-for="item in props.userList"
+                    :key="item.id"
+                    :label="item.username"
+                    :value="item.id"
+                  />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
         </el-form>
       </div>
 
@@ -413,6 +554,24 @@ const handleClose = () => {
                 placeholder="请输入指标编号"
                 size="small"
               />
+            </template>
+          </el-table-column>
+          <el-table-column label="计算类型" width="160">
+            <template #default="{ row }">
+              <div class="calculation-type-cell">
+                <el-select
+                  :model-value="parseOtherConfig(row.otherConfig).calculationType"
+                  placeholder="请选择"
+                  clearable
+                  size="small"
+                  style="width: 100%"
+                  @update:model-value="val => updateMetricCalculationType(row, val)"
+                >
+                  <el-option label="混合模式" :value="1" />
+                  <el-option label="累计模式" :value="2" />
+                  <el-option label="当月模式" :value="3" />
+                </el-select>
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="实际值" width="160">
@@ -462,6 +621,7 @@ const handleClose = () => {
                 :active-value="1"
                 :inactive-value="0"
                 size="small"
+                @change="handleStatusChange"
               />
             </template>
           </el-table-column>
