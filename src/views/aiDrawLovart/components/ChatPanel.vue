@@ -12,7 +12,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useLovartStore();
-const { messages, selectedLayer, selectedLayerId, isGenerating, currentModel, aiMode, hasShownWelcome } = storeToRefs(store);
+const { messages, selectedLayer, selectedLayerId, isGenerating, currentModel, currentChatModel, aiMode, hasShownWelcome } = storeToRefs(store);
 
 const inputValue = ref("");
 const messagesContainer = ref<HTMLDivElement | null>(null);
@@ -331,9 +331,14 @@ const handleAddImageToCanvas = (imageUrl: string, index: number) => {
   ElMessage.success("已添加到画布");
 };
 
-// 切换模型
+// 切换生图模型
 const handleModelChange = (model: AiModelType) => {
   store.setCurrentModel(model);
+};
+
+// 切换聊天模型
+const handleChatModelChange = (model: AiModelType) => {
+  store.setCurrentChatModel(model);
 };
 
 const handleKeyDown = (evt: KeyboardEvent) => {
@@ -384,14 +389,19 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 生图模式的模型选择 -->
-      <div v-if="aiMode === 'generate'" class="model-selector">
-        <el-select v-model="currentModel" size="small" @change="handleModelChange">
-          <el-option label="阿里云" value="aliyun" />
+      <!-- 模型选择 -->
+      <div class="model-selector">
+        <el-select v-if="aiMode === 'generate'" v-model="currentModel" size="small" @change="handleModelChange">
+          <el-option label="阿里云Qwen" value="aliyun" />
+          <el-option label="七牛云Nano2" value="gemini" />
+          <el-option label="七牛云GPT2" value="qnaigc" />
+        </el-select>
+        <el-select v-else v-model="currentChatModel" size="small" @change="handleChatModelChange">
           <el-option label="Gemini" value="gemini" />
-          <el-option label="七牛云GPT" value="qnaigc" />
+          <el-option label="阿里云Qwen" value="aliyunChat" />
         </el-select>
         <el-button
+          v-if="aiMode === 'generate'"
           type="text"
           size="small"
           class="advanced-btn"

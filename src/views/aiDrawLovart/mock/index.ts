@@ -41,7 +41,9 @@ export const mockInitialLayers: Layer[] = [
     text: "开始你的创作",
     fontSize: 40,
     fontFamily: "Arial",
-    fill: "#303133"
+    fill: "#303133",
+    stroke: undefined,
+    strokeWidth: 0
   },
   {
     id: "layer_text_002",
@@ -61,6 +63,8 @@ export const mockInitialLayers: Layer[] = [
     text: "使用 AI 助手生成图片或编辑元素",
     fontSize: 18,
     fontFamily: "Arial",
-    fill: "#909399"
+    fill: "#909399",
+    stroke: undefined,
+    strokeWidth: 0
   }
 ];

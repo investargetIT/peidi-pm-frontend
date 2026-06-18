@@ -8,6 +8,7 @@ import ChatPanel from "./components/ChatPanel.vue";
 import {
   RefreshLeft,
   ArrowLeft,
+  ArrowDown,
   ChatDotRound,
   Operation,
   Edit,
@@ -40,9 +41,49 @@ const handleUndo = () => {
   }
 };
 
-const handleResetView = () => {
-  store.resetCanvas();
-  ElMessage.success("视图已重置");
+const handleResetView = async () => {
+  try {
+    await ElMessageBox.confirm(
+      "确定要重置画布吗？所有元素将被清除，恢复到初始状态。",
+      "重置确认",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      }
+    );
+    store.resetAllToInitial();
+    nextTick(() => {
+      canvasAreaRef.value?.refreshCanvas();
+    });
+    ElMessage.success("画布已重置");
+  } catch {
+    // 用户取消
+  }
+};
+
+// 处理键盘删除
+const handleKeyDown = (evt: KeyboardEvent) => {
+  if (evt.key === "Delete" || evt.key === "Backspace") {
+    // 检查是否在输入框中，避免误删
+    const target = evt.target as HTMLElement;
+    if (
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.isContentEditable
+    ) {
+      return;
+    }
+
+    if (selectedLayerIds.value.length > 0) {
+      // 复制一份，防止删除过程中数组变化
+      const idsToDelete = [...selectedLayerIds.value];
+      idsToDelete.forEach(id => {
+        store.deleteLayer(id);
+      });
+      ElMessage.success(`已删除 ${idsToDelete.length} 个元素`);
+    }
+  }
 };
 
 const handleEditText = (layerId: string) => {
@@ -82,9 +123,27 @@ const handleAddTextLayer = () => {
     text: "双击编辑",
     fontSize: 24,
     fontFamily: "Arial",
-    fill: "#303133"
+    fill: "#303133",
+    stroke: undefined,
+    strokeWidth: 0
   });
   ElMessage.success("已添加文本图层");
+};
+
+const handleAddShape = (shapeType: any) => {
+  const names: Record<string, string> = {
+    rect: "矩形",
+    triangle: "三角形"
+  };
+  const colors: Record<string, string> = {
+    rect: "#409eff",
+    triangle: "#f56c6c"
+  };
+
+  store.addShapeToCanvas(shapeType, names[shapeType] || "形状", {
+    fill: colors[shapeType] || "#409eff"
+  });
+  ElMessage.success(`已添加${names[shapeType] || "形状"}`);
 };
 
 const handlePropertyChange = () => {
@@ -265,10 +324,6 @@ const handleUploadImage = () => {
           src: dataUrl
         });
         console.log("Layer added:", newLayer);
-        // 直接调用画布刷新
-        nextTick(() => {
-          canvasAreaRef.value?.refreshCanvas();
-        });
         ElMessage.success("图片已添加到画布");
       };
       reader.readAsDataURL(file);
@@ -279,6 +334,14 @@ const handleUploadImage = () => {
   };
   input.click();
 };
+
+onMounted(() => {
+  window.addEventListener("keydown", handleKeyDown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("keydown", handleKeyDown);
+});
 </script>
 
 <template>
@@ -314,6 +377,18 @@ const handleUploadImage = () => {
         <el-button :icon="Edit" @click="handleAddTextLayer">
           添加文本
         </el-button>
+        <el-dropdown @command="handleAddShape" trigger="click">
+          <el-button>
+            添加形状
+            <el-icon class="el-icon--right"><arrow-down /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="rect">矩形</el-dropdown-item>
+              <el-dropdown-item command="triangle">三角形</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button type="primary" :icon="Download" @click="handleExport">
           导出图片
         </el-button>
@@ -499,6 +574,50 @@ const handleUploadImage = () => {
                     v-model="selectedLayer.fill"
                     size="small"
                     show-alpha
+                    @change="handlePropertyChange"
+                  />
+                </div>
+              </div>
+
+              <!-- 形状属性 -->
+              <div
+                v-if="selectedLayer && (selectedLayer.type === 'shape' || selectedLayer.type === 'text')"
+                class="property-group"
+              >
+                <div class="form-item">
+                  <label>填充</label>
+                  <el-color-picker
+                    v-model="selectedLayer.fill"
+                    size="small"
+                    show-alpha
+                    @change="handlePropertyChange"
+                  />
+                </div>
+                <div class="form-item">
+                  <label>描边</label>
+                  <el-color-picker
+                    v-model="selectedLayer.stroke"
+                    size="small"
+                    show-alpha
+                    @change="handlePropertyChange"
+                  />
+                </div>
+              </div>
+
+              <div
+                v-if="selectedLayer && (selectedLayer.type === 'shape' || selectedLayer.type === 'text')"
+                class="property-group"
+              >
+                <div class="form-item">
+                  <label>描边宽度</label>
+                  <el-input-number
+                    v-model="selectedLayer.strokeWidth"
+                    size="small"
+                    :min="0"
+                    :max="50"
+                    :precision="0"
+                    :step="1"
+                    style="width: 100%"
                     @change="handlePropertyChange"
                   />
                 </div>

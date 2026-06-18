@@ -2,7 +2,7 @@ import { http } from "@/utils/http";
 
 const baseUrlApi = (url: string) => {
   return `https://api.peidigroup.cn${url}`;
-  // return `http://12.18.1.12:8091${url}`;
+  // return `http://12.18.1.36:8091${url}`;
 };
 
 export interface AiDrawPageRequest {
@@ -154,6 +154,14 @@ export const getClickRateTrend = (params: AiDrawPageRequest) => {
 // 中转gemini模型
 export const transferGemini = (data: { urlParam: string }) => {
   return http.request("post", baseUrlApi("/ai/draw/transfer/gemini"), {
+    data,
+    timeout: 0
+  });
+};
+
+// 中转阿里云通义千问聊天接口
+export const transferAliyunChat = (data: { urlParam: string }) => {
+  return http.request("post", baseUrlApi("/ai/draw/transfer/aliyunDrawing"), {
     data,
     timeout: 0
   });

@@ -1,4 +1,6 @@
-export type LayerType = 'image' | 'text';
+export type LayerType = 'image' | 'text' | 'shape';
+
+export type ShapeType = 'rect' | 'triangle';
 
 export interface Layer {
   id: string;
@@ -21,7 +23,15 @@ export interface Layer {
   text?: string;
   fontSize?: number;
   fontFamily?: string;
+  // 形状和文本通用
   fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  // 形状图层专用
+  shapeType?: ShapeType;
+  // 圆形/椭圆专用
+  rx?: number;
+  ry?: number;
 }
 
 export interface HistorySnapshot {
@@ -56,7 +66,7 @@ export interface LovartState {
 }
 
 // 预设 AI 模型
-export type AiModelType = 'default' | 'aliyun' | 'qnaigc' | 'gemini';
+export type AiModelType = 'default' | 'aliyun' | 'qnaigc' | 'gemini' | 'aliyunChat';
 
 // 生图配置
 export interface GenerateImageConfig {

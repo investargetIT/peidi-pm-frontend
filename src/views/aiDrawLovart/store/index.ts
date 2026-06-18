@@ -7,12 +7,14 @@ import type {
   LovartState,
   AiModelType
 } from "../types";
+import type { ShapeType } from "../types";
 import { mockInitialLayers, generateId } from "../mock";
 import {
   transferDraw,
   transferDrawAliyun,
   transferDrawQnaigc,
   transferGemini,
+  transferAliyunChat,
   type AiTransferParams
 } from "@/api/aiDraw";
 
@@ -29,7 +31,8 @@ export const useLovartStore = defineStore("lovart", () => {
   const canvasZoom = ref(1);
   const canvasPan = ref({ x: 0, y: 0 });
   const isGenerating = ref(false);
-  const currentModel = ref<AiModelType>("aliyun");
+  const currentModel = ref<AiModelType>("aliyun"); // 生图模型
+  const currentChatModel = ref<AiModelType>("aliyunChat"); // 聊天模型
   const aiMode = ref<"chat" | "generate">("generate"); // AI 助手的模式：生图或聊天
   const hasShownWelcome = ref(false); // 是否已显示欢迎语
 
@@ -67,6 +70,9 @@ export const useLovartStore = defineStore("lovart", () => {
       history.value.shift();
       historyIndex.value--;
     }
+
+    // 保存到 localStorage
+    saveToLocalStorage();
   };
 
   // 撤销
@@ -77,6 +83,7 @@ export const useLovartStore = defineStore("lovart", () => {
     const snapshot = history.value[historyIndex.value];
     if (snapshot) {
       layers.value = JSON.parse(JSON.stringify(snapshot.layers));
+      saveToLocalStorage();
     }
   };
 
@@ -87,14 +94,67 @@ export const useLovartStore = defineStore("lovart", () => {
       const snapshot = history.value[historyIndex.value];
       if (snapshot) {
         layers.value = JSON.parse(JSON.stringify(snapshot.layers));
+        saveToLocalStorage();
       }
+    }
+  };
+
+  // 从 localStorage 加载数据
+  const loadFromLocalStorage = () => {
+    try {
+      const savedData = localStorage.getItem("lovart-canvas-data");
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        if (
+          parsed.layers &&
+          parsed.history &&
+          parsed.historyIndex !== undefined
+        ) {
+          layers.value = parsed.layers;
+          history.value = parsed.history;
+          historyIndex.value = parsed.historyIndex;
+          canvasZoom.value = parsed.canvasZoom || 1;
+          canvasPan.value = parsed.canvasPan || { x: 0, y: 0 };
+          currentModel.value = parsed.currentModel || "aliyun";
+          currentChatModel.value = parsed.currentChatModel || "aliyunChat";
+          aiMode.value = parsed.aiMode || "generate";
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load from localStorage:", error);
+    }
+    return false;
+  };
+
+  // 保存到 localStorage
+  const saveToLocalStorage = () => {
+    try {
+      const dataToSave = {
+        layers: layers.value,
+        history: history.value,
+        historyIndex: historyIndex.value,
+        canvasZoom: canvasZoom.value,
+        canvasPan: canvasPan.value,
+        currentModel: currentModel.value,
+        currentChatModel: currentChatModel.value,
+        aiMode: aiMode.value
+      };
+      localStorage.setItem("lovart-canvas-data", JSON.stringify(dataToSave));
+    } catch (error) {
+      console.error("Failed to save to localStorage:", error);
     }
   };
 
   // 初始化图层
   const initLayers = () => {
-    layers.value = JSON.parse(JSON.stringify(mockInitialLayers));
-    saveSnapshot();
+    // 首先尝试从 localStorage 加载
+    const loaded = loadFromLocalStorage();
+    if (!loaded) {
+      // 如果加载失败，使用默认的初始图层
+      layers.value = JSON.parse(JSON.stringify(mockInitialLayers));
+      saveSnapshot();
+    }
   };
 
   // 选中图层
@@ -261,27 +321,71 @@ export const useLovartStore = defineStore("lovart", () => {
   // 设置画布缩放
   const setCanvasZoom = (zoom: number) => {
     canvasZoom.value = Math.max(0.1, Math.min(5, zoom));
+    // 保存到 localStorage（防抖处理，避免频繁保存）
+    debouncedSaveToLocalStorage();
   };
 
   // 设置画布平移
   const setCanvasPan = (x: number, y: number) => {
     canvasPan.value = { x, y };
+    // 保存到 localStorage（防抖处理，避免频繁保存）
+    debouncedSaveToLocalStorage();
   };
 
-  // 重置画布
+  // 防抖保存到 localStorage
+  let saveToLocalStorageTimer: number | null = null;
+  const debouncedSaveToLocalStorage = () => {
+    if (saveToLocalStorageTimer) {
+      clearTimeout(saveToLocalStorageTimer);
+    }
+    saveToLocalStorageTimer = window.setTimeout(() => {
+      saveToLocalStorage();
+      saveToLocalStorageTimer = null;
+    }, 500);
+  };
+
+  // 重置画布视图
   const resetCanvas = () => {
     canvasZoom.value = 1;
     canvasPan.value = { x: 0, y: 0 };
   };
 
-  // 设置当前模型
+  // 重置所有到初始状态
+  const resetAllToInitial = () => {
+    // 清除 localStorage
+    localStorage.removeItem("lovart-canvas-data");
+
+    // 清空并重置为初始图层
+    layers.value = JSON.parse(JSON.stringify(mockInitialLayers));
+    history.value = [];
+    historyIndex.value = -1;
+    selectedLayerId.value = null;
+    selectedLayerIds.value = [];
+    canvasZoom.value = 1;
+    canvasPan.value = { x: 0, y: 0 };
+    messages.value = [];
+    hasShownWelcome.value = false;
+
+    // 保存快照
+    saveSnapshot();
+  };
+
+  // 设置当前生图模型
   const setCurrentModel = (model: AiModelType) => {
     currentModel.value = model;
+    debouncedSaveToLocalStorage();
+  };
+
+  // 设置当前聊天模型
+  const setCurrentChatModel = (model: AiModelType) => {
+    currentChatModel.value = model;
+    debouncedSaveToLocalStorage();
   };
 
   // 设置 AI 模式
   const setAiMode = (mode: "chat" | "generate") => {
     aiMode.value = mode;
+    debouncedSaveToLocalStorage();
   };
 
   // 设置是否已显示欢迎语
@@ -419,27 +523,82 @@ export const useLovartStore = defineStore("lovart", () => {
     });
   };
 
-  // 调用 GPT 聊天接口
+  // 添加形状到画布
+  const addShapeToCanvas = (shapeType: ShapeType, name = "形状", options: Partial<Layer> = {}) => {
+    const maxZ = layers.value.length > 0 ? Math.max(...layers.value.map(l => l.zIndex)) + 1 : 0;
+
+    return addLayer({
+      type: "shape",
+      shapeType,
+      name,
+      visible: true,
+      locked: false,
+      x: options.x || 200 + Math.random() * 100,
+      y: options.y || 200 + Math.random() * 100,
+      width: options.width || 100,
+      height: options.height || 100,
+      angle: 0,
+      scaleX: 1,
+      scaleY: 1,
+      zIndex: maxZ,
+      opacity: 1,
+      fill: options.fill || "#409eff",
+      stroke: options.stroke || "#303133",
+      strokeWidth: options.strokeWidth || 0,
+      ...options
+    });
+  };
+
+  // 调用 AI 聊天接口
   const chatWithGemini = async (prompt: string) => {
     isGenerating.value = true;
     try {
-      const params = {
-        model: "gemini-3.1-pro",
-        stream: true,
-        messages: [
-          {
-            role: "system",
-            content:
-              "你是一个专业的智能画布助手，帮助用户编辑画布和内容。你的回复要友好、简洁。"
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ]
-      };
+      let res;
 
-      const res = await transferGemini({ urlParam: JSON.stringify(params) }) as { code: number; data: string; message?: string };
+      if (currentChatModel.value === "aliyunChat") {
+        // 调用阿里云通义千问聊天接口
+        const params = {
+          model: "qwen3.7-plus", // 可以根据需要调整模型名称
+          stream: false,
+          messages: [
+            {
+              role: "system",
+              content:
+                "你是一个专业的智能画布助手，帮助用户编辑画布和内容。你的回复要友好、简洁。"
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          enable_thinking: false
+        };
+        res = (await transferAliyunChat({
+          urlParam: JSON.stringify(params)
+        })) as { code: number; data: string; message?: string };
+      } else {
+        // 默认调用 Gemini 接口
+        const params = {
+          model: "gemini-3.1-pro",
+          stream: true,
+          messages: [
+            {
+              role: "system",
+              content:
+                "你是一个专业的智能画布助手，帮助用户编辑画布和内容。你的回复要友好、简洁。"
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ]
+        };
+        res = (await transferGemini({ urlParam: JSON.stringify(params) })) as {
+          code: number;
+          data: string;
+          message?: string;
+        };
+      }
 
       if (res.code === 200) {
         return res.data;
@@ -463,6 +622,7 @@ export const useLovartStore = defineStore("lovart", () => {
     canvasPan,
     isGenerating,
     currentModel,
+    currentChatModel,
     aiMode,
     hasShownWelcome,
     // 计算属性
@@ -490,13 +650,16 @@ export const useLovartStore = defineStore("lovart", () => {
     setCanvasZoom,
     setCanvasPan,
     resetCanvas,
+    resetAllToInitial,
     undo,
     redo,
     saveSnapshot,
     // AI 相关
     generateImage,
     addImageToCanvas,
+    addShapeToCanvas,
     setCurrentModel,
+    setCurrentChatModel,
     chatWithGemini,
     setAiMode,
     setHasShownWelcome

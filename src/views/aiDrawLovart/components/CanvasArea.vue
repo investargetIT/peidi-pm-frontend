@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, ref, nextTick, watch } from "vue";
 import * as fabric from "fabric";
 import { useLovartStore } from "../store";
-import type { Layer } from "../types";
+import type { Layer, ShapeType } from "../types";
 
 const props = defineProps<{
   width?: number;
@@ -26,8 +26,8 @@ let pendingUpdate: number | null = null;
 
 // 暴露给父组件的刷新方法
 const refreshCanvas = () => {
-  nextTick(() => {
-    renderAllLayers();
+  nextTick(async () => {
+    await renderAllLayers();
   });
 };
 
@@ -415,7 +415,7 @@ const applyCanvasTransform = () => {
 };
 
 // 渲染所有图层
-const renderAllLayers = () => {
+const renderAllLayers = async () => {
   if (!canvas) return;
   isUpdatingFromStore = true;
 
@@ -424,9 +424,86 @@ const renderAllLayers = () => {
 
   // 按 zIndex 排序后添加
   const sorted = [...store.layers].sort((a, b) => a.zIndex - b.zIndex);
-  sorted.forEach((layer, index) => {
-    addLayerToCanvas(layer, index);
-  });
+
+  // 等待所有图层添加完成
+  const promises: Promise<void>[] = [];
+
+  // 重写 addLayerToCanvas 的逻辑，使其返回 Promise
+  for (let index = 0; index < sorted.length; index++) {
+    const layer = sorted[index];
+    const promise = new Promise<void>(async (resolve) => {
+      let fabricObject: fabric.Object | null = null;
+
+      if (layer.type === "image" && layer.src) {
+        try {
+          const img = await fabric.Image.fromURL(layer.src, {
+            crossOrigin: "anonymous"
+          });
+
+          // 计算缩放比例，使图片缩放到目标尺寸，避免裁剪
+          const scaleX = layer.width / img.width!;
+          const scaleY = layer.height / img.height!;
+
+          img.set({
+            left: layer.x,
+            top: layer.y,
+            angle: layer.angle,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            opacity: layer.opacity,
+            selectable: !layer.locked,
+            evented: !layer.locked,
+            visible: layer.visible
+          });
+
+          fabricObject = img;
+        } catch (error) {
+          console.error("Failed to load image:", error);
+          // 加载失败时显示占位矩形
+          fabricObject = createPlaceholderRect(layer);
+        }
+      } else if (layer.type === "image") {
+        fabricObject = createPlaceholderRect(layer);
+      } else if (layer.type === "text" && layer.text) {
+        fabricObject = new fabric.Textbox(layer.text, {
+          left: layer.x,
+          top: layer.y,
+          width: layer.width,
+          height: layer.height,
+          fontSize: layer.fontSize || 24,
+          fontFamily: layer.fontFamily || "Arial",
+          fill: layer.fill || "#333",
+          stroke: layer.stroke,
+          strokeWidth: layer.strokeWidth || 0,
+          angle: layer.angle,
+          scaleX: 1,
+          scaleY: 1,
+          opacity: layer.opacity,
+          selectable: !layer.locked,
+          evented: !layer.locked,
+          visible: layer.visible,
+          // 让 Textbox 的行为更像普通元素
+          splitByGrapheme: true, // 更好的换行处理
+          uniScaleTransform: false // 允许非等比缩放
+        });
+      } else if (layer.type === "shape") {
+        fabricObject = createFabricShape(layer);
+      }
+
+      if (fabricObject && canvas) {
+        (fabricObject as any).layerId = layer.id;
+        canvas.add(fabricObject);
+        canvas.moveObjectTo(fabricObject, index);
+      }
+
+      resolve();
+    });
+
+    promises.push(promise);
+  }
+
+  // 等待所有图层添加完成
+  await Promise.all(promises);
 
   canvas.renderAll();
 
@@ -504,6 +581,8 @@ const addLayerToCanvas = async (layer: Layer, index: number) => {
       fontSize: layer.fontSize || 24,
       fontFamily: layer.fontFamily || "Arial",
       fill: layer.fill || "#333",
+      stroke: layer.stroke,
+      strokeWidth: layer.strokeWidth || 0,
       angle: layer.angle,
       scaleX: 1,
       scaleY: 1,
@@ -515,6 +594,8 @@ const addLayerToCanvas = async (layer: Layer, index: number) => {
       splitByGrapheme: true, // 更好的换行处理
       uniScaleTransform: false // 允许非等比缩放
     });
+  } else if (layer.type === "shape") {
+    fabricObject = createFabricShape(layer);
   }
 
   if (fabricObject) {
@@ -544,14 +625,58 @@ const createPlaceholderRect = (layer: Layer) => {
   });
 };
 
+// 创建 Fabric 形状对象
+const createFabricShape = (layer: Layer): fabric.Object => {
+  const commonOptions = {
+    left: layer.x,
+    top: layer.y,
+    angle: layer.angle,
+    scaleX: 1,
+    scaleY: 1,
+    opacity: layer.opacity,
+    fill: layer.fill || "#409eff",
+    stroke: layer.stroke || "#303133",
+    strokeWidth: layer.strokeWidth || 0,
+    selectable: !layer.locked,
+    evented: !layer.locked,
+    visible: layer.visible
+  };
+
+  switch (layer.shapeType) {
+    case "rect":
+      return new fabric.Rect({
+        ...commonOptions,
+        width: layer.width,
+        height: layer.height
+      });
+
+    case "triangle":
+      return new fabric.Triangle({
+        ...commonOptions,
+        width: layer.width,
+        height: layer.height
+      });
+
+    default:
+      // 默认返回矩形
+      return new fabric.Rect({
+        ...commonOptions,
+        width: layer.width,
+        height: layer.height
+      });
+  }
+};
+
 // 生命周期
 onMounted(() => {
   nextTick(() => {
     initCanvas();
     store.initLayers();
-    nextTick(() => {
-      renderAllLayers();
+    nextTick(async () => {
+      await renderAllLayers();
       applyCanvasTransform();
+      // 初始化图层数量
+      prevLayerCount = store.layers.length;
     });
   });
 });
@@ -565,16 +690,48 @@ watch(
   { deep: true }
 );
 
+// 保存上一次的图层数量，用于检测删除操作
+let prevLayerCount = 0;
+
 // 监听图层变化
 watch(
   () => store.layers,
-  () => {
-    if (!isUpdatingFromStore) {
-      renderAllLayers();
+  (newLayers) => {
+    if (!isUpdatingFromStore && canvas) {
+      // 只有删除操作时用增量删除，其他情况都全量重绘
+      if (newLayers.length < prevLayerCount && prevLayerCount > 0) {
+        handleLayerDeletion(newLayers);
+      } else {
+        renderAllLayers();
+      }
+      prevLayerCount = newLayers.length;
     }
   },
   { deep: true }
 );
+
+// 处理图层删除 - 增量删除
+const handleLayerDeletion = (newLayers: Layer[]) => {
+  if (!canvas) return;
+
+  isUpdatingFromStore = true;
+
+  const newLayerIds = new Set(newLayers.map(l => l.id));
+  const objectsToRemove: any[] = [];
+
+  canvas.getObjects().forEach((obj: any) => {
+    if (obj.layerId && !newLayerIds.has(obj.layerId)) {
+      objectsToRemove.push(obj);
+    }
+  });
+
+  // 删除对象
+  objectsToRemove.forEach(obj => canvas!.remove(obj));
+
+  canvas.requestRenderAll();
+  isUpdatingFromStore = false;
+};
+
 
 onUnmounted(() => {
   if (canvas) {

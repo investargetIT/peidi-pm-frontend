@@ -14,8 +14,8 @@ interface MetricTargetItem {
   metricUserId?: number | string;
   month: string;
   targetName: string;
-  target: number;
-  achieved: number;
+  target: number | string;
+  achieved: number | string;
   nodeId: number | string;
   nodeName: string;
   treePath: string;
@@ -109,7 +109,7 @@ const editingCell = ref<{
   rowId: number | string;
   field: "target" | "achieved";
 } | null>(null);
-const editingValue = ref<number | undefined>();
+const editingValue = ref<string | number | undefined>();
 const savingCellKey = ref("");
 const updatingUserId = ref<string | null>(null);
 
@@ -217,6 +217,9 @@ const flattenRecords = (records: ApiRecordItem[]) => {
         flatRecords.push({
           ...userInfo,
           ...metric,
+          // 确保 target 和 achieved 以适当的格式存储
+          target: metric.target,
+          achieved: metric.achieved,
           rowSpan: i === 0 ? filteredMetrics.length : 0,
           groupIndex: i
         });
@@ -366,13 +369,22 @@ const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
     rowId: row.id,
     field
   };
-  editingValue.value = row[field];
+  // 确保编辑时使用正确的字符串格式
+  editingValue.value = row[field] != null ? String(row[field]) : "";
   await nextTick();
   const input = document.querySelector(
     `.editable-cell-input-${row.id}-${field} input`
   ) as HTMLInputElement | null;
   input?.focus();
   input?.select();
+};
+
+// 验证输入是否为有效数字，最多4位小数
+const validateNumberInput = (value: string): boolean => {
+  if (!value || value === "") return true; // 允许空值，后续会处理
+  // 正则表达式：允许整数或小数，小数最多4位
+  const regex = /^-?\d+(\.\d{0,4})?$/;
+  return regex.test(value);
 };
 
 const cancelEdit = () => {
@@ -399,12 +411,28 @@ const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
   const newValue = editingValue.value;
   const oldValue = row[field];
 
-  if (newValue === undefined || Number.isNaN(Number(newValue))) {
+  // 验证输入
+  if (newValue === undefined || newValue === null || newValue === "") {
     ElMessage.warning("请输入有效数值");
     return;
   }
 
-  if (Number(newValue) === Number(oldValue)) {
+  if (!validateNumberInput(String(newValue))) {
+    ElMessage.warning("请输入有效数值，最多保留4位小数");
+    return;
+  }
+
+  const numValue = Number(newValue);
+  if (Number.isNaN(numValue)) {
+    ElMessage.warning("请输入有效数值");
+    return;
+  }
+
+  // 格式化新值，保留用户输入的格式（最多4位小数）
+  const formattedNewValue = preserveDecimalPlaces(newValue);
+
+  // 比较数值是否相等（不比较格式）
+  if (Number(formattedNewValue) === Number(oldValue)) {
     cancelEdit();
     return;
   }
@@ -429,11 +457,12 @@ const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
       treePathName: row.treePathName,
       target: row.target,
       achieved: row.achieved,
-      [field]: Number(newValue)
+      [field]: numValue
     })) as { success: boolean; msg?: string };
 
     if (res.success) {
-      row[field] = Number(newValue);
+      // 保存为字符串以保持格式
+      row[field] = formattedNewValue;
       ElMessage.success("保存成功");
       cancelEdit();
       fetchData();
@@ -449,16 +478,20 @@ const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
 };
 
 // 计算完成率
-const getCompletionRate = (target: number, achieved: number) => {
-  if (!target || target === 0) return "-";
-  const rate = (achieved / target) * 100;
+const getCompletionRate = (target: number | string, achieved: number | string) => {
+  const targetNum = Number(target);
+  const achievedNum = Number(achieved);
+  if (!targetNum || targetNum === 0) return "-";
+  const rate = (achievedNum / targetNum) * 100;
   return rate.toFixed(2) + "%";
 };
 
 // 根据完成率返回样式
-const getRateClass = (target: number, achieved: number) => {
-  if (!target || target === 0) return "";
-  const rate = achieved / target;
+const getRateClass = (target: number | string, achieved: number | string) => {
+  const targetNum = Number(target);
+  const achievedNum = Number(achieved);
+  if (!targetNum || targetNum === 0) return "";
+  const rate = achievedNum / targetNum;
   if (rate >= 1) return "rate-excellent";
   if (rate >= 0.8) return "rate-good";
   return "rate-poor";
@@ -468,6 +501,36 @@ const getRateClass = (target: number, achieved: number) => {
 const formatMonth = (dateStr: string) => {
   if (!dateStr) return "-";
   return dayjs(dateStr).format("YYYY-MM");
+};
+
+// 格式化数字，保留用户输入的小数位数，最多4位
+const formatNumber = (num: number | string) => {
+  if (num == null || num === "") return "-";
+  // 如果是字符串，直接返回（保持原始格式）
+  if (typeof num === "string") {
+    // 验证是否是有效数字
+    const parsed = parseFloat(num);
+    if (isNaN(parsed)) return "-";
+    return num;
+  }
+  // 如果是数字，转换为字符串保持其格式
+  return String(num);
+};
+
+// 保留小数位数，最多4位
+const preserveDecimalPlaces = (num: number | string): string => {
+  if (num == null || num === "") return "";
+  const str = String(num);
+  // 检查是否包含小数点
+  if (str.includes(".")) {
+    const parts = str.split(".");
+    // 限制小数位数最多4位
+    if (parts[1].length > 4) {
+      return parts[0] + "." + parts[1].slice(0, 4);
+    }
+    return str;
+  }
+  return str;
 };
 
 onMounted(() => {
@@ -550,12 +613,10 @@ onMounted(() => {
         />
         <el-table-column prop="target" label="目标值" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <el-input
               v-if="isEditing(row, 'target')"
               v-model="editingValue"
               :class="`editable-cell-input-${row.id}-target`"
-              :controls="false"
-              :precision="2"
               style="width: 120px"
               @blur="confirmEdit(row, 'target')"
               @keydown="handleEditKeydown($event, row, 'target')"
@@ -567,7 +628,7 @@ onMounted(() => {
               title="双击修改"
               @dblclick="startEdit(row, 'target')"
             >
-              {{ row.target }}
+              {{ formatNumber(row.target) }}
             </span>
           </template>
         </el-table-column>
@@ -578,12 +639,10 @@ onMounted(() => {
           align="right"
         >
           <template #default="{ row }">
-            <el-input-number
+            <el-input
               v-if="isEditing(row, 'achieved')"
               v-model="editingValue"
               :class="`editable-cell-input-${row.id}-achieved`"
-              :controls="false"
-              :precision="2"
               style="width: 120px"
               @blur="confirmEdit(row, 'achieved')"
               @keydown="handleEditKeydown($event, row, 'achieved')"
@@ -595,7 +654,7 @@ onMounted(() => {
               title="双击修改"
               @dblclick="startEdit(row, 'achieved')"
             >
-              {{ row.achieved }}
+              {{ formatNumber(row.achieved) }}
             </span>
           </template>
         </el-table-column>
