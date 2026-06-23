@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import Examination from "./examination.vue";
 import ReportExport from "./reportExport.vue";
 import FileUpload from "./fileUpload.vue";
@@ -7,7 +8,6 @@ import Designer from "./designer.vue";
 import Evaluation from "./evaluation/index.vue";
 import NavBar from "./navBar.vue";
 import type { TabsPaneContext } from "element-plus";
-import { storageLocal } from "@pureadmin/utils";
 import "../aiDrawingPro/style/reset.scss";
 
 const DEV_ID = [
@@ -63,22 +63,61 @@ const PERMISSION_ID_LIST = {
   ]
 };
 
-// 从localStorage读取上次保存的选项卡，没有则使用默认值
-const activeName = ref<string>(
-  storageLocal().getItem("examination-active-tab") || "excamination"
-);
-
-const userInfo: any = storageLocal().getItem("user-check-info");
+const route = useRoute();
+const router = useRouter();
+const userInfo: any = localStorage.getItem("user-check-info") ? JSON.parse(localStorage.getItem("user-check-info")!) : null;
 const userId = ref(userInfo?.id ?? "");
 
+// 从路由参数读取选项卡，没有则使用默认值
+const activeName = ref<string>("excamination");
+
+const initActiveName = () => {
+  // 从路由参数获取
+  const tabFromQuery = route.query.tab as string;
+  activeName.value = tabFromQuery || "excamination";
+};
+
 const handleClick = (tab: TabsPaneContext, event: Event) => {
-  // 保存当前选项卡到localStorage
-  storageLocal().setItem("examination-active-tab", tab.props.name);
+  // 更新路由参数
+  router.replace({
+    query: {
+      ...route.query,
+      tab: tab.props.name
+    }
+  });
 };
 
 const checkPermission = (name: string) => {
   return userId.value ? PERMISSION_ID_LIST[name].includes(userId.value) : false;
 };
+
+// 监听路由参数变化
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && typeof newTab === "string") {
+      activeName.value = newTab;
+    } else if (!newTab) {
+      activeName.value = "excamination";
+    }
+  }
+);
+
+// 监听 tab 变化，同步到路由
+watch(activeName, (newVal) => {
+  if (newVal !== route.query.tab) {
+    router.replace({
+      query: {
+        ...route.query,
+        tab: newVal
+      }
+    });
+  }
+});
+
+onMounted(() => {
+  initActiveName();
+});
 </script>
 
 <template>

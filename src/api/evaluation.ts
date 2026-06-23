@@ -1,7 +1,7 @@
 import { http } from "@/utils/http";
 
 const baseUrlApi = (url: string) => {
-  return "http://12.18.1.36:8087" + url;
+  // return "http://12.18.1.36:8087" + url;
   return "https://api.peidigroup.cn" + url;
 };
 
@@ -362,4 +362,18 @@ export const generateKpiMonthMetricTargetByUserId = (data: {
   return http.request("post", baseUrlApi("/pm/kpi-month-metric-target/generateByUserId"), {
     data
   });
+};
+
+// 通知用户填写指标信息
+export const notifyUserApi = (params: {
+  id: number;
+  [property: string]: any;
+}) => {
+  return http.request(
+    "post",
+    baseUrlApi("/pm/kpi-month-metric-target/notifyUser"),
+    {
+      params
+    }
+  );
 };

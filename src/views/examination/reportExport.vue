@@ -314,11 +314,17 @@ const handleExportForFinance = async () => {
 
 <style lang="scss" scoped>
 .search-form {
+  :deep(.el-form) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+  }
   :deep(.el-form-item) {
-    margin-bottom: 18px;
+    margin-bottom: 0;
   }
   :deep(.el-form-item:last-child) {
-    margin-bottom: 0;
+    margin-left: auto;
   }
 }
 </style>

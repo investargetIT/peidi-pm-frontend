@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import ReSegmented from "@/components/ReSegmented";
 import Organization from "./components/organization/index.vue";
 import TmallRevenue from "./components/tmallRevenue/index.vue";
 import MonthlyIndicators from "./components/monthlyIndicators/index.vue";
 import KpiMetricUser from "./components/kpiMetricUser/index.vue";
 
-const STORAGE_KEY = "evaluation-active-index";
+const route = useRoute();
+const router = useRouter();
 const componentPermissionConfig = [
-  { label: "组织架构", permissionKey: "organization" },
-  { label: "天猫收入", permissionKey: "tmallRevenue" },
-  { label: "月度指标", permissionKey: "monthlyIndicators" },
-  { label: "KPI指标用户", permissionKey: "kpiMetricUser" }
+  { label: "组织架构", permissionKey: "organization", index: 0 },
+  { label: "天猫收入", permissionKey: "tmallRevenue", index: 1 },
+  { label: "月度指标", permissionKey: "monthlyIndicators", index: 2 },
+  { label: "KPI指标用户", permissionKey: "kpiMetricUser", index: 3 }
 ];
 
 const DEVELOPER_USER_IDS = [
@@ -41,11 +43,14 @@ const COMPONENT_PERMISSION_USER_IDS: Record<string, string[]> = {
 };
 
 const getStoredIndex = (): number => {
-  const stored = sessionStorage.getItem(STORAGE_KEY);
-  if (stored !== null) {
-    const index = Number(stored);
-    if (!isNaN(index) && index >= 0 && index <= 3) {
-      return index;
+  // 从路由参数获取
+  const subTabFromQuery = route.query.subTab as string;
+  if (subTabFromQuery) {
+    const config = componentPermissionConfig.find(
+      item => item.permissionKey === subTabFromQuery
+    );
+    if (config) {
+      return config.index;
     }
   }
   return 0;
@@ -149,13 +154,39 @@ const loadComponentPermissions = () => {
 };
 
 watch(activeIndex, val => {
-  sessionStorage.setItem(STORAGE_KEY, String(val));
+  // 更新路由参数
+  const config = componentPermissionConfig.find(item => item.index === val);
+  if (config) {
+    router.replace({
+      query: {
+        ...route.query,
+        subTab: config.permissionKey
+      }
+    });
+  }
 });
 
 const handleChange = ({ index }: { index: number }) => {
   const component = permittedComponents.value[index];
   console.log("当前选中:", component?.index ?? index);
 };
+
+// 监听路由参数变化
+watch(
+  () => route.query.subTab,
+  (newSubTab) => {
+    if (newSubTab && typeof newSubTab === "string") {
+      const config = componentPermissionConfig.find(
+        item => item.permissionKey === newSubTab
+      );
+      if (config) {
+        activeIndex.value = config.index;
+      }
+    } else if (!newSubTab) {
+      activeIndex.value = 0;
+    }
+  }
+);
 
 onMounted(() => {
   loadComponentPermissions();

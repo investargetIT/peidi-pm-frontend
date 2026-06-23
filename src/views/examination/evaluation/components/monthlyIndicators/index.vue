@@ -6,10 +6,20 @@ import {
   execSqlByUserId,
   execSqlByMonth,
   getDingAllDepartmentUsersApi,
-  getUserListApi
+  getUserListApi,
+  notifyUserApi
 } from "@/api/evaluation";
+import { processAndExportMonthlyMetricForHR } from "@/views/examination/utils/exportMonthlyMetricForHR";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { Download } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+
+interface OtherConfig {
+  calculationType?: number;
+  notifyUserList?: Array<number | string>;
+}
 
 interface MetricTargetItem {
   id: number | string;
@@ -24,6 +34,7 @@ interface MetricTargetItem {
   treePathName: string;
   status?: number;
   existSqlConfig?: number;
+  otherConfig?: string | null;
 }
 
 interface RecordItem extends MetricTargetItem {
@@ -440,6 +451,32 @@ const handleUpdateMetricData = async (row: RecordItem) => {
   }
 };
 
+const handleNotifyUser = async (row: RecordItem) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定通知用户「${row.username}」填写指标信息吗？`,
+      "通知确认",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      }
+    );
+    if (!row.id) return;
+    const res = (await notifyUserApi({ id: Number(row.id) })) as any;
+    if (res?.code === 200 || res?.success) {
+      ElMessage.success("通知成功");
+    } else {
+      ElMessage.error(res?.msg || "通知失败");
+    }
+  } catch (error) {
+    if (error !== "cancel" && error !== "close") {
+      console.error("通知用户失败", error);
+      ElMessage.error("通知用户失败");
+    }
+  }
+};
+
 const handleBatchUpdateMetricData = async () => {
   try {
     const selectedMonth = searchParams.value.startDate;
@@ -705,6 +742,90 @@ const preserveDecimalPlaces = (num: number | string): string => {
   return str;
 };
 
+// 导出Excel功能
+const handleExport = () => {
+  if (visibleRecords.value.length === 0) {
+    ElMessage.warning("暂无数据可导出");
+    return;
+  }
+
+  // 准备导出数据
+  const exportData: any[] = [];
+
+  // 遍历所有可见记录，展开为二维表格数据
+  visibleRecords.value.forEach((record, recordIndex) => {
+    const filteredMetrics = (record.metricTargetList || []).filter(
+      metric => metric.status !== 0
+    );
+
+    filteredMetrics.forEach((metric, metricIndex) => {
+      const row: any = {
+        "序号": "",
+        "月份": "",
+        "负责人": "",
+        "指标名称": metric.targetName,
+        "目标值": formatNumber(metric.target),
+        "完成值": formatNumber(metric.achieved),
+        "完成率": getCompletionRate(metric.target, metric.achieved),
+        "数据类型": metric.existSqlConfig === 0 ? "手填" : "自动计算",
+        "组织路径": metric.treePathName || ""
+      };
+
+      // 只有第一个指标行显示序号、月份、负责人
+      if (metricIndex === 0) {
+        row["序号"] = recordIndex + 1;
+        row["月份"] = formatMonth(record.month);
+        row["负责人"] = record.username;
+      }
+
+      exportData.push(row);
+    });
+  });
+
+  // 创建工作簿
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "月度指标");
+
+  // 设置列宽
+  worksheet["!cols"] = [
+    { wch: 8 },  // 序号
+    { wch: 12 }, // 月份
+    { wch: 12 }, // 负责人
+    { wch: 30 }, // 指标名称
+    { wch: 15 }, // 目标值
+    { wch: 15 }, // 完成值
+    { wch: 12 }, // 完成率
+    { wch: 12 }, // 数据类型
+    { wch: 30 }  // 组织路径
+  ];
+
+  // 导出文件
+  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([excelBuffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  });
+
+  const fileName = `月度指标_${formatMonth(searchParams.value.startDate) || dayjs().format("YYYY-MM")}_${dayjs().format("YYYYMMDDHHmmss")}.xlsx`;
+  saveAs(blob, fileName);
+
+  ElMessage.success("导出成功");
+};
+
+const hrExportLoading = ref(false);
+const handleExportForHR = async () => {
+  try {
+    hrExportLoading.value = true;
+    await processAndExportMonthlyMetricForHR();
+    ElMessage.success("人事导出成功");
+  } catch (error) {
+    console.error("人事导出失败:", error);
+    ElMessage.error("人事导出失败，请查看控制台日志");
+  } finally {
+    hrExportLoading.value = false;
+  }
+};
+
 onMounted(() => {
   fetchData();
   fetchUserList();
@@ -770,9 +891,28 @@ onMounted(() => {
 
     <!-- 表格区域 -->
     <div class="table-section">
-      <div class="table-tip">
-        <el-tag size="small" type="warning" effect="light">提示</el-tag>
-        <span class="tip-text">黄色背景行为手填数据</span>
+      <div class="table-actions">
+        <div class="table-tip">
+          <el-tag size="small" type="warning" effect="light">提示</el-tag>
+          <span class="tip-text">黄色背景行为手填数据</span>
+        </div>
+        <div class="export-buttons">
+          <el-button
+            class="excel-export-btn"
+            :loading="hrExportLoading"
+            @click="handleExportForHR"
+          >
+            <el-icon><Download /></el-icon>
+            人事导出
+          </el-button>
+          <el-button
+            class="excel-export-btn"
+            @click="handleExport"
+          >
+            <el-icon><Download /></el-icon>
+            导出
+          </el-button>
+        </div>
       </div>
       <el-table
         v-loading="loading"
@@ -865,16 +1005,23 @@ onMounted(() => {
             </span>
           </template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="160" align="center">
+        <el-table-column fixed="right" label="操作" width="220" align="center">
           <template #default="{ row }">
             <template v-if="row.groupIndex === 0">
               <el-button
-                type="primary"
+                type="success"
                 size="small"
                 :loading="isUpdating(row.userId || '')"
                 @click="handleUpdateMetricData(row)"
               >
                 更新指标数据
+              </el-button>
+              <el-button
+                class="dingtalk-blue-btn"
+                size="small"
+                @click="handleNotifyUser(row)"
+              >
+                通知
               </el-button>
             </template>
           </template>
@@ -987,11 +1134,22 @@ onMounted(() => {
   margin-top: 20px;
 }
 
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 12px;
+}
+
 .table-tip {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
   padding: 8px 12px;
   background-color: #fff3cd;
   border: 1px solid #ffc107;
@@ -1001,6 +1159,30 @@ onMounted(() => {
 .tip-text {
   font-size: 14px;
   color: #e6a23c;
+}
+
+.excel-export-btn {
+  background-color: #217346;
+  border-color: #217346;
+  color: #ffffff;
+}
+
+.excel-export-btn:hover {
+  background-color: #1e6b3e;
+  border-color: #1e6b3e;
+  color: #ffffff;
+}
+
+.dingtalk-blue-btn {
+  background-color: #0089ff;
+  border-color: #0089ff;
+  color: #ffffff;
+}
+
+.dingtalk-blue-btn:hover {
+  background-color: #006ec7;
+  border-color: #006ec7;
+  color: #ffffff;
 }
 
 .search-section {
