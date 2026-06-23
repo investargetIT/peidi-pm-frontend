@@ -1,16 +1,18 @@
 <script lang="ts" setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   getPmKpiMetricUserPage,
   deletePmKpiMetricUserApi,
   getUserListApi,
-  getPmExecSqlListApi
+  getPmExecSqlListApi,
+  generateKpiMonthMetricTargetByUserId
 } from "@/api/evaluation";
 import DetailDialog from "./components/detailDialog.vue";
 import RiAddLine from "@iconify-icons/ri/add-line";
 import RiEditLine from "@iconify-icons/ri/edit-line";
 import RiDeleteBinLine from "@iconify-icons/ri/delete-bin-line";
+import RiCalendarEventLine from "@iconify-icons/ri/calendar-event-line";
 
 interface SqlExecItem {
   type: string;
@@ -35,6 +37,7 @@ interface MetricItem {
   status?: number;
   sqlExecConfig?: string | SqlExecItem[];
   otherConfig?: string | null;
+  existSqlConfig?: number;
 }
 
 interface RecordItem {
@@ -81,8 +84,15 @@ interface UserItem {
 const loading = ref(false);
 const tableData = ref<RecordItem[]>([]);
 const total = ref(0);
-const currentPage = ref(1);
-const pageSize = ref(5);
+const PAGE_SIZE_STORAGE_KEY = "kpi-metric-user-page-size";
+const PAGE_STORAGE_KEY = "kpi-metric-user-current-page";
+
+// 从本地存储读取配置
+const savedPageSize = localStorage.getItem(PAGE_SIZE_STORAGE_KEY);
+const savedCurrentPage = localStorage.getItem(PAGE_STORAGE_KEY);
+
+const currentPage = ref(savedCurrentPage ? Number(savedCurrentPage) : 1);
+const pageSize = ref(savedPageSize ? Number(savedPageSize) : 10);
 
 const dialogVisible = ref(false);
 const dialogMode = ref<"add" | "edit">("edit");
@@ -92,6 +102,36 @@ const userList = ref<UserItem[]>([]);
 const sqlLoading = ref(false);
 const achievedSqlList = ref<{ id?: string; name?: string }[]>([]);
 const finishingRateSqlList = ref<{ id?: string; name?: string }[]>([]);
+
+// 生成指标数据对话框
+const generateDialogVisible = ref(false);
+const generateLoading = ref(false);
+const generateMonths = ref<string[]>([]);
+const selectedMonth = ref<string>('');
+const currentGenerateUser = ref<FlatRow | null>(null);
+
+// 添加月份
+const addMonth = () => {
+  if (!selectedMonth.value) {
+    ElMessage.warning('请先选择月份');
+    return;
+  }
+  if (!generateMonths.value.includes(selectedMonth.value)) {
+    generateMonths.value.push(selectedMonth.value);
+    generateMonths.value.sort();
+  } else {
+    ElMessage.warning('该月份已选择');
+  }
+  selectedMonth.value = '';
+};
+
+// 删除月份
+const removeMonth = (month: string) => {
+  const index = generateMonths.value.indexOf(month);
+  if (index > -1) {
+    generateMonths.value.splice(index, 1);
+  }
+};
 
 // 解析otherConfig字符串为对象
 const parseOtherConfig = (otherConfig?: string | null): OtherConfig => {
@@ -199,6 +239,15 @@ const spanMethod = ({
 const searchParams = ref({
   username: ""
 });
+
+const queryUserSuggestions = (queryString: string, cb: any) => {
+  let results = queryString
+    ? userList.value.filter((user: any) =>
+        user.username.toLowerCase().includes(queryString.toLowerCase())
+      )
+    : userList.value;
+  cb(results.map((user: any) => ({ value: user.username })));
+};
 
 const fetchData = async () => {
   loading.value = true;
@@ -309,6 +358,15 @@ const handleAdd = async () => {
   fetchSqlLists();
 };
 
+// 监听页码和每页条数变化，保存到本地存储
+watch(currentPage, (newPage) => {
+  localStorage.setItem(PAGE_STORAGE_KEY, String(newPage));
+});
+
+watch(pageSize, (newSize) => {
+  localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(newSize));
+});
+
 const handleDialogSuccess = () => {
   fetchData();
 };
@@ -357,23 +415,11 @@ const getSqlExecNameById = (list: { id?: string; name?: string }[], id: number |
   return item?.name || "";
 };
 
-// 判断 sqlExecConfig 是否为空或空字符串
+// 判断是否为手填数据：existSqlConfig为0就是手填，1是服务端计算
 const isManualRow = (row: FlatRow): boolean => {
   if (!row.metric) return false;
-  if (!row.metric.sqlExecConfig) return true;
-
-  const config = row.metric.sqlExecConfig;
-
-  if (typeof config === "string") {
-    return config === "" || config === "0" || config === "[]";
-  }
-
-  // 数组类型的检查
-  if (Array.isArray(config)) {
-    return config.length === 0 || config.every(item => !item.sqlExecId);
-  }
-
-  return false;
+  // existSqlConfig为0就是手填
+  return row.metric.existSqlConfig === 0;
 };
 
 // 表格单元格样式
@@ -386,7 +432,7 @@ const tableCellStyle = ({ row, columnIndex }: { row: FlatRow; columnIndex: numbe
     };
   }
   // 其他列根据是否手填数据设置颜色
-  const bgColor = isManualRow(row) ? '#f0f9ff' : '#ffffff';
+  const bgColor = isManualRow(row) ? '#fff3cd' : '#ffffff';
   return {
     backgroundColor: bgColor,
     '--el-table-cell-hover-bg-color': bgColor
@@ -416,6 +462,50 @@ const handleDelete = (row: FlatRow) => {
   }).catch(() => {});
 };
 
+const handleOpenGenerateDialog = (row: FlatRow) => {
+  currentGenerateUser.value = row;
+  generateMonths.value = [];
+  generateDialogVisible.value = true;
+};
+
+const handleGenerate = () => {
+  if (!currentGenerateUser.value) return;
+  if (generateMonths.value.length === 0) {
+    ElMessage.warning("请选择至少一个月份");
+    return;
+  }
+
+  ElMessageBox.confirm(
+    `确定为用户「${currentGenerateUser.value.username}」生成${generateMonths.value.join('、')}的指标数据？`,
+    "生成确认",
+    {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "info"
+    }
+  ).then(async () => {
+    generateLoading.value = true;
+    try {
+      const res = await generateKpiMonthMetricTargetByUserId({
+        userId: currentGenerateUser.value.userId,
+        months: generateMonths.value
+      }) as any;
+      if (res?.code === 200 || res?.success) {
+        ElMessage.success("生成成功");
+        generateDialogVisible.value = false;
+        fetchData();
+      } else {
+        ElMessage.error(res?.msg || "生成失败");
+      }
+    } catch (error) {
+      console.error("生成失败", error);
+      ElMessage.error("生成失败");
+    } finally {
+      generateLoading.value = false;
+    }
+  }).catch(() => {});
+};
+
 onMounted(() => {
   fetchData();
   fetchUserList();
@@ -429,11 +519,13 @@ onMounted(() => {
     <div class="search-section">
       <el-form :model="searchParams" inline size="default">
         <el-form-item label="用户名">
-          <el-input
+          <el-autocomplete
             v-model="searchParams.username"
+            :fetch-suggestions="queryUserSuggestions"
             placeholder="请输入用户名"
             clearable
             style="width: 200px"
+            :trigger-on-focus="true"
           />
         </el-form-item>
         <el-form-item>
@@ -453,8 +545,14 @@ onMounted(() => {
     <!-- 表格区域 -->
     <div class="table-section">
       <div class="table-tip">
-        <el-tag size="small" type="info" effect="light">提示</el-tag>
-        <span class="tip-text">蓝色背景行为手填数据</span>
+        <el-tag size="small" type="warning" effect="light">提示</el-tag>
+        <span class="tip-text">黄色背景行为手填数据</span>
+      </div>
+      <div class="calculation-type-tip">
+        <el-tag size="small" type="info" effect="light">计算类型说明</el-tag>
+        <div class="type-item"><span class="type-name">混合模式：</span><span class="type-desc">目标值使用累计值（从年初到当前月的总和），完成值使用当月值（仅统计上个月的完成值）</span></div>
+        <div class="type-item"><span class="type-name">累计模式：</span><span class="type-desc">目标值和完成值都使用累计值（从年初到当前月的总和）</span></div>
+        <div class="type-item"><span class="type-name">当月模式：</span><span class="type-desc">目标值和完成值都使用当月值（仅统计上个月的数据）</span></div>
       </div>
       <el-table
         v-loading="loading"
@@ -521,14 +619,7 @@ onMounted(() => {
         </el-table-column>
         <el-table-column label="计算类型" width="120" align="center">
           <template #default="{ row }">
-            <el-tag
-              v-if="parseOtherConfig(row.metric?.otherConfig).calculationType"
-              :type="getCalculationTypeTag(parseOtherConfig(row.metric?.otherConfig).calculationType)"
-              size="small"
-              effect="light"
-            >
-              {{ getCalculationTypeText(parseOtherConfig(row.metric?.otherConfig).calculationType) }}
-            </el-tag>
+            {{ getCalculationTypeText(parseOtherConfig(row.metric?.otherConfig).calculationType) }}
           </template>
         </el-table-column>
         <el-table-column label="通知人" min-width="180">
@@ -538,29 +629,45 @@ onMounted(() => {
             </template>
           </template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="120" align="center">
+        <el-table-column fixed="right" label="操作" width="180" align="center">
           <template #default="{ row }">
             <template v-if="row.isFirst">
-              <el-button
-                link
-                type="primary"
-                size="small"
-                @click="handleEdit(row)"
-              >
-                <template #icon>
-                  <IconifyIconOffline :icon="RiEditLine" />
-                </template>
-              </el-button>
-              <el-button
-                link
-                type="danger"
-                size="small"
-                @click="handleDelete(row)"
-              >
-                <template #icon>
-                  <IconifyIconOffline :icon="RiDeleteBinLine" />
-                </template>
-              </el-button>
+              <el-tooltip content="编辑" placement="top">
+                <el-button
+                  link
+                  type="primary"
+                  size="small"
+                  @click="handleEdit(row)"
+                >
+                  <template #icon>
+                    <IconifyIconOffline :icon="RiEditLine" />
+                  </template>
+                </el-button>
+              </el-tooltip>
+              <el-tooltip content="生成指标数据" placement="top">
+                <el-button
+                  link
+                  type="success"
+                  size="small"
+                  @click="handleOpenGenerateDialog(row)"
+                >
+                  <template #icon>
+                    <IconifyIconOffline :icon="RiCalendarEventLine" />
+                  </template>
+                </el-button>
+              </el-tooltip>
+              <el-tooltip content="删除" placement="top">
+                <el-button
+                  link
+                  type="danger"
+                  size="small"
+                  @click="handleDelete(row)"
+                >
+                  <template #icon>
+                    <IconifyIconOffline :icon="RiDeleteBinLine" />
+                  </template>
+                </el-button>
+              </el-tooltip>
             </template>
           </template>
         </el-table-column>
@@ -571,7 +678,7 @@ onMounted(() => {
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
-          :page-sizes="[5, 10, 20]"
+          :page-sizes="[2, 10, 20, 100]"
           :total="total"
           layout="total, sizes, prev, pager, next, jumper"
           @current-change="handleCurrentChange"
@@ -590,6 +697,64 @@ onMounted(() => {
       :finishing-rate-sql-list="finishingRateSqlList"
       @success="handleDialogSuccess"
     />
+
+    <!-- 生成指标数据对话框 -->
+    <el-dialog
+      v-model="generateDialogVisible"
+      title="生成指标数据"
+      width="450px"
+    >
+      <el-form :model="{}" label-position="top">
+        <el-form-item label="选择用户">
+          <el-input
+            :value="currentGenerateUser?.username"
+            disabled
+            placeholder="选择用户"
+          />
+        </el-form-item>
+        <el-form-item label="添加月份">
+          <div class="month-selector">
+            <el-date-picker
+              v-model="selectedMonth"
+              type="month"
+              placeholder="选择月份"
+              format="YYYY-MM"
+              value-format="YYYY-MM"
+              style="flex: 1"
+            />
+            <el-button type="primary" @click="addMonth" style="margin-left: 8px">
+              添加
+            </el-button>
+          </div>
+        </el-form-item>
+        <el-form-item label="已选月份">
+          <div class="selected-months">
+            <el-tag
+              v-for="month in generateMonths"
+              :key="month"
+              closable
+              @close="removeMonth(month)"
+              style="margin: 4px"
+            >
+              {{ month }}
+            </el-tag>
+            <span v-if="generateMonths.length === 0" style="color: #909399">暂无选择</span>
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="generateDialogVisible = false">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="generateLoading"
+            @click="handleGenerate"
+          >
+            确定生成
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -653,19 +818,60 @@ onMounted(() => {
   gap: 8px;
   margin-bottom: 12px;
   padding: 8px 12px;
-  background-color: #f0f9ff;
-  border: 1px solid #bae6fd;
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
   border-radius: 4px;
 }
 
 .tip-text {
   font-size: 14px;
-  color: #0c4a6e;
+  color: #e6a23c;
+}
+
+.calculation-type-tip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background-color: #f5f7fa;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+}
+
+.type-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.type-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #409eff;
+}
+
+.type-desc {
+  font-size: 12px;
+  color: #606266;
 }
 
 .pagination-section {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+.month-selector {
+  display: flex;
+  align-items: center;
+}
+
+.selected-months {
+  min-height: 32px;
+  padding: 8px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
 }
 </style>

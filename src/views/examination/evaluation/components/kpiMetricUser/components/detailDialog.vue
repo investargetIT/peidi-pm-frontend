@@ -536,6 +536,12 @@ const handleClose = () => {
       <!-- 指标列表编辑 -->
       <div class="metrics-section">
         <h4 class="section-title">指标列表</h4>
+        <div class="calculation-type-tip">
+          <el-tag size="small" type="info" effect="light">计算类型说明</el-tag>
+          <div class="type-item"><span class="type-name">混合模式：</span><span class="type-desc">目标值使用累计值（从年初到当前月的总和），完成值使用当月值（仅统计上个月的完成值）</span></div>
+          <div class="type-item"><span class="type-name">累计模式：</span><span class="type-desc">目标值和完成值都使用累计值（从年初到当前月的总和）</span></div>
+          <div class="type-item"><span class="type-name">当月模式：</span><span class="type-desc">目标值和完成值都使用当月值（仅统计上个月的数据）</span></div>
+        </div>
         <el-table :data="metricsEdit" border stripe size="small">
           <el-table-column label="考核指标" min-width="160">
             <template #default="{ row }">
@@ -667,5 +673,34 @@ const handleClose = () => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.calculation-type-tip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background-color: #f5f7fa;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+}
+
+.type-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.type-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #409eff;
+}
+
+.type-desc {
+  font-size: 12px;
+  color: #606266;
 }
 </style>

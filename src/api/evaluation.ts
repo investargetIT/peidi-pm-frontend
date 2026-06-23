@@ -1,7 +1,7 @@
 import { http } from "@/utils/http";
 
 const baseUrlApi = (url: string) => {
-  // return "http://12.18.1.36:8087" + url;
+  return "http://12.18.1.36:8087" + url;
   return "https://api.peidigroup.cn" + url;
 };
 
@@ -349,6 +349,17 @@ export const updatePmKpiMetricUserApi = (data: {
   }>;
 }) => {
   return http.request("post", baseUrlApi("/pm/kpi-metric-user/update"), {
+    data
+  });
+};
+
+// 为指定用户生成指定月份的指标数据
+export const generateKpiMonthMetricTargetByUserId = (data: {
+  months: string[];
+  userId: number;
+  [property: string]: any;
+}) => {
+  return http.request("post", baseUrlApi("/pm/kpi-month-metric-target/generateByUserId"), {
     data
   });
 };

@@ -5,7 +5,8 @@ import {
   updatePmKpiMonthMetricTargetApi,
   execSqlByUserId,
   execSqlByMonth,
-  getDingAllDepartmentUsersApi
+  getDingAllDepartmentUsersApi,
+  getUserListApi
 } from "@/api/evaluation";
 import { ElMessage, ElMessageBox } from "element-plus";
 import dayjs from "dayjs";
@@ -22,6 +23,7 @@ interface MetricTargetItem {
   treePath: string;
   treePathName: string;
   status?: number;
+  existSqlConfig?: number;
 }
 
 interface RecordItem extends MetricTargetItem {
@@ -78,20 +80,31 @@ const allRecords = ref<ApiRecordItem[]>([]);
 const visibleRecords = ref<ApiRecordItem[]>([]);
 const visibleUsernameSet = ref<Set<string> | null>(new Set());
 let visibleUsernameSetPromise: Promise<Set<string> | null> | null = null;
+const userList = ref<any[]>([]);
+const userLoading = ref(false);
 const total = ref(0);
-const currentPage = ref(1);
-const pageSize = ref(5);
+
+// 从localStorage读取分页状态
+const STORAGE_KEY = "monthly-indicators-pagination";
+const savedPagination = localStorage.getItem(STORAGE_KEY);
+const initialPagination = savedPagination ? JSON.parse(savedPagination) : { currentPage: 1, pageSize: 5 };
+const currentPage = ref(initialPagination.currentPage);
+const pageSize = ref(initialPagination.pageSize);
 const ALL_PAGE_SIZE = 99999;
 const DEVELOPER_USER_IDS = [
   "1846392647319093250", // Summer
   "1926449443739600965", // 沈皓钰
   "1850741012504838145", // 张思宇
-  "1926449443739601629" // 杨世豪
+  "1926449443739601629", // 杨世豪
+  "1869635118983348225", // 肖嘉玲
+  "1870023775338692610" // 任琪琳
 ];
 const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
   邓苏: ["王永蝶", "夏立明", "潘明旺", "缪欣瑶"],
   孙舒欣: ["孙舒欣"],
-  方云: ["侯子洋", "王琳"]
+  方云: ["侯子洋", "王琳"],
+  付阳: ["黄文豪"],
+  范振吉: ["邓苏", "孙舒欣"]
 };
 const DEPARTMENT_LIST = [
   { name: "零食", deptId: 992836831 },
@@ -140,8 +153,51 @@ const getDefaultMonth = () =>
 const searchParams = ref({
   username: "",
   treePathName: "",
-  startDate: getDefaultMonth()
+  startDate: getDefaultMonth(),
+  dataType: "" // ""全部/ "manual"手填/ "auto"自动计算
 });
+
+// 判断是否为手填数据：existSqlConfig为0就是手填，1是服务端计算
+const isManualRow = (row: RecordItem): boolean => {
+  return row.existSqlConfig === 0;
+};
+
+// 表格单元格样式
+const tableCellStyle = ({ row, columnIndex }: { row: RecordItem; columnIndex: number }) => {
+  // 只有指标名称(3)、目标值(4)、完成值(5)、完成率(6)这几列在手填数据行显示黄色背景
+  const shouldColor = isManualRow(row) && [3, 4, 5, 6].includes(columnIndex);
+  const bgColor = shouldColor ? "#fff3cd" : "#ffffff";
+  return {
+    backgroundColor: bgColor,
+    "--el-table-cell-hover-bg-color": bgColor
+  };
+};
+
+const queryUserSuggestions = (queryString: string, cb: any) => {
+  let results = queryString
+    ? userList.value.filter((user: any) =>
+        user.username.toLowerCase().includes(queryString.toLowerCase())
+      )
+    : userList.value;
+  cb(results.map((user: any) => ({ value: user.username })));
+};
+
+const fetchUserList = async () => {
+  if (userList.value.length || userLoading.value) return;
+  userLoading.value = true;
+  try {
+    const res = (await getUserListApi({ name: "" })) as any;
+    if (res?.success && Array.isArray(res.data)) {
+      userList.value = res.data.sort((a: any, b: any) =>
+        (a.username || "").localeCompare(b.username || "", "zh-CN")
+      );
+    }
+  } catch (error) {
+    console.error("获取用户列表失败", error);
+  } finally {
+    userLoading.value = false;
+  }
+};
 
 const getCurrentUserInfo = () => {
   try {
@@ -268,11 +324,45 @@ const fetchData = async () => {
       allRecords.value = (res.data.records || []).filter(record =>
         (record.metricTargetList || []).some(metric => metric.status !== 0)
       );
-      visibleRecords.value = usernameSet
+
+      // 先按权限过滤
+      let filteredByPermission = usernameSet
         ? allRecords.value.filter(record =>
             usernameSet.has(String(record.username || "").trim())
           )
         : allRecords.value;
+
+      // 再根据数据类型过滤
+      visibleRecords.value = filteredByPermission.map(record => {
+        // 过滤符合dataType条件的metric
+        let filteredMetrics = (record.metricTargetList || []).filter(metric => {
+          if (metric.status === 0) return false;
+
+          if (searchParams.value.dataType === "manual") {
+            return metric.existSqlConfig === 0;
+          } else if (searchParams.value.dataType === "auto") {
+            return metric.existSqlConfig === 1;
+          }
+          return true; // 全部类型
+        });
+
+        // 当选择手填类型时，完成值为空的数据放上面
+        if (searchParams.value.dataType === "manual") {
+          filteredMetrics.sort((a, b) => {
+            const aEmpty = a.achieved == null || a.achieved === '' || a.achieved === 0;
+            const bEmpty = b.achieved == null || b.achieved === '' || b.achieved === 0;
+            if (aEmpty && !bEmpty) return -1;
+            if (!aEmpty && bEmpty) return 1;
+            return 0;
+          });
+        }
+
+        return {
+          ...record,
+          metricTargetList: filteredMetrics
+        };
+      }).filter(record => (record.metricTargetList || []).length > 0); // 过滤掉没有有效指标的记录
+
       total.value = visibleRecords.value.length;
       updateTableDataByPage();
     }
@@ -292,20 +382,31 @@ const handleReset = () => {
   searchParams.value = {
     username: "",
     treePathName: "",
-    startDate: getDefaultMonth()
+    startDate: getDefaultMonth(),
+    dataType: ""
   };
   currentPage.value = 1;
   fetchData();
 };
 
+// 保存分页状态到localStorage
+const savePaginationState = () => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    currentPage: currentPage.value,
+    pageSize: pageSize.value
+  }));
+};
+
 const handleCurrentChange = (page: number) => {
   currentPage.value = page;
+  savePaginationState();
   updateTableDataByPage();
 };
 
 const handleSizeChange = (size: number) => {
   pageSize.value = size;
   currentPage.value = 1;
+  savePaginationState();
   updateTableDataByPage();
 };
 
@@ -419,6 +520,11 @@ const isSaving = (row: RecordItem, field: "target" | "achieved") => {
 
 const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
   if (savingCellKey.value) return;
+  // 只有手填数据才可以编辑
+  if (!isManualRow(row)) {
+    ElMessage.warning("只有手填数据才可以修改");
+    return;
+  }
   editingCell.value = {
     rowId: row.id,
     field
@@ -464,6 +570,12 @@ const handleEditKeydown = (
 
 const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
   if (!isEditing(row, field)) return;
+  // 只有手填数据才可以编辑
+  if (!isManualRow(row)) {
+    ElMessage.warning("只有手填数据才可以修改");
+    cancelEdit();
+    return;
+  }
 
   const newValue = editingValue.value;
   const oldValue = row[field];
@@ -535,7 +647,10 @@ const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
 };
 
 // 计算完成率
-const getCompletionRate = (target: number | string, achieved: number | string) => {
+const getCompletionRate = (
+  target: number | string,
+  achieved: number | string
+) => {
   const targetNum = Number(target);
   const achievedNum = Number(achieved);
   if (!targetNum || targetNum === 0) return "-";
@@ -592,6 +707,7 @@ const preserveDecimalPlaces = (num: number | string): string => {
 
 onMounted(() => {
   fetchData();
+  fetchUserList();
 });
 </script>
 
@@ -601,11 +717,13 @@ onMounted(() => {
     <div class="search-section">
       <el-form :model="searchParams" inline size="default">
         <el-form-item label="负责人">
-          <el-input
+          <el-autocomplete
             v-model="searchParams.username"
+            :fetch-suggestions="queryUserSuggestions"
             placeholder="请输入负责人"
             clearable
             style="width: 200px"
+            :trigger-on-focus="true"
           />
         </el-form-item>
         <el-form-item label="组织路径">
@@ -625,10 +743,25 @@ onMounted(() => {
             style="width: 200px"
           />
         </el-form-item>
+        <el-form-item label="数据类型">
+          <el-select
+            v-model="searchParams.dataType"
+            placeholder="请选择数据类型"
+            clearable
+            style="width: 200px"
+          >
+            <el-option label="手填类型" value="manual" />
+            <el-option label="自动计算类型" value="auto" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
-          <el-button type="success" :loading="batchUpdating" @click="handleBatchUpdateMetricData">
+          <el-button
+            type="success"
+            :loading="batchUpdating"
+            @click="handleBatchUpdateMetricData"
+          >
             批量更新指标数据
           </el-button>
         </el-form-item>
@@ -637,6 +770,10 @@ onMounted(() => {
 
     <!-- 表格区域 -->
     <div class="table-section">
+      <div class="table-tip">
+        <el-tag size="small" type="warning" effect="light">提示</el-tag>
+        <span class="tip-text">黄色背景行为手填数据</span>
+      </div>
       <el-table
         v-loading="loading"
         :data="tableData"
@@ -644,6 +781,7 @@ onMounted(() => {
         stripe
         style="width: 100%"
         :span-method="objectSpanMethod"
+        :cell-style="tableCellStyle"
       >
         <el-table-column label="序号" width="60" align="center">
           <template #default="{ $index }">
@@ -685,8 +823,9 @@ onMounted(() => {
               v-else
               v-loading="isSaving(row, 'target')"
               class="editable-cell"
-              title="双击修改"
-              @dblclick="startEdit(row, 'target')"
+              :class="{ 'editable-cell-disabled': !isManualRow(row) }"
+              :title="isManualRow(row) ? '双击修改' : '不可编辑'"
+              @dblclick="isManualRow(row) ? startEdit(row, 'target') : undefined"
             >
               {{ formatNumber(row.target) }}
             </span>
@@ -711,8 +850,9 @@ onMounted(() => {
               v-else
               v-loading="isSaving(row, 'achieved')"
               class="editable-cell"
-              title="双击修改"
-              @dblclick="startEdit(row, 'achieved')"
+              :class="{ 'editable-cell-disabled': !isManualRow(row) }"
+              :title="isManualRow(row) ? '双击修改' : '不可编辑'"
+              @dblclick="isManualRow(row) ? startEdit(row, 'achieved') : undefined"
             >
               {{ formatNumber(row.achieved) }}
             </span>
@@ -746,7 +886,7 @@ onMounted(() => {
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
-          :page-sizes="[5, 10, 20]"
+          :page-sizes="[5, 10, 20, 100]"
           :total="total"
           layout="total, sizes, prev, pager, next, jumper"
           @current-change="handleCurrentChange"
@@ -768,7 +908,9 @@ onMounted(() => {
             <span class="total-count">{{ execResult.totalCount || 0 }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="成功数量">
-            <span class="success-count">{{ execResult.successCount || 0 }}</span>
+            <span class="success-count">{{
+              execResult.successCount || 0
+            }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="失败数量">
             <span class="fail-count">{{ execResult.failCount || 0 }}</span>
@@ -780,20 +922,31 @@ onMounted(() => {
         <el-table :data="execResult.execDetails" border stripe max-height="400">
           <el-table-column prop="username" label="用户名" width="120" />
           <el-table-column prop="jobNum" label="工号" width="120" />
-          <el-table-column prop="metricCount" label="执行指标数" width="100" align="center" />
+          <el-table-column
+            prop="metricCount"
+            label="执行指标数"
+            width="100"
+            align="center"
+          />
           <el-table-column label="执行状态" width="100" align="center">
             <template #default="{ row }">
               <el-tag :type="row.status === 'success' ? 'success' : 'danger'">
-                {{ row.status === 'success' ? '成功' : '失败' }}
+                {{ row.status === "success" ? "成功" : "失败" }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="failReason" label="失败原因" show-overflow-tooltip />
+          <el-table-column
+            prop="failReason"
+            label="失败原因"
+            show-overflow-tooltip
+          />
         </el-table>
       </div>
 
       <template #footer>
-        <el-button type="primary" @click="execResultDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="execResultDialogVisible = false"
+          >关闭</el-button
+        >
       </template>
     </el-dialog>
   </div>
@@ -832,6 +985,22 @@ onMounted(() => {
 
 .result-details {
   margin-top: 20px;
+}
+
+.table-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+}
+
+.tip-text {
+  font-size: 14px;
+  color: #e6a23c;
 }
 
 .search-section {
@@ -881,6 +1050,16 @@ onMounted(() => {
 .editable-cell:hover {
   background: var(--el-fill-color-light);
   color: var(--el-color-primary);
+}
+
+.editable-cell-disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.editable-cell-disabled:hover {
+  background: transparent;
+  color: inherit;
 }
 
 .rate-excellent {
