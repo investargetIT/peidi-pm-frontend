@@ -1,7 +1,7 @@
 import { http } from "@/utils/http";
 
 const baseUrlApi = (url: string) => {
-  // return "http://12.18.1.36:8087" + url;
+  return "http://12.18.1.36:8087" + url;
   return "https://api.peidigroup.cn" + url;
 };
 
@@ -376,4 +376,16 @@ export const notifyUserApi = (params: {
       params
     }
   );
+};
+
+// 获取月度指标目标结果列表（人事导出专用）
+export const getPmKpiMonthMetricTargetResultList = (params: {
+  endDate?: string;
+  startDate?: string;
+  username?: string;
+  [property: string]: any;
+}) => {
+  return http.request("get", baseUrlApi("/pm/kpi-month-metric-target/result/list"), {
+    params
+  });
 };

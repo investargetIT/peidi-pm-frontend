@@ -1,4 +1,4 @@
-import { getPmKpiMonthMetricTargetPage } from "@/api/evaluation";
+import { getPmKpiMonthMetricTargetResultList } from "@/api/evaluation";
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -8,28 +8,30 @@ interface MonthlyMetricOtherConfig {
   notifyUserList?: Array<number | string>;
 }
 
-interface MonthlyMetricItem {
-  id: number | string;
-  metricUserId?: number | string;
-  month: string;
-  targetName: string;
-  target: number | string;
-  achieved: number | string;
-  nodeId: number | string;
-  nodeName: string;
-  treePath: string;
-  treePathName: string;
-  status?: number;
-  existSqlConfig?: number;
-  otherConfig?: string | null;
+interface MonthData {
+  month?: string;
+  value?: number;
+  [property: string]: any;
 }
 
-interface MonthlyMetricUserRecord {
-  userId: number | string;
+interface MetricItem {
+  data?: MonthData[];
+  dataType?: string;
+  [property: string]: any;
+}
+
+interface MonthlyMetricResultRecord {
   jobNum?: string;
-  username: string;
-  metricTargetList?: MonthlyMetricItem[];
-  month: string;
+  metric?: MetricItem[];
+  nodeId?: number;
+  nodeName?: string;
+  otherConfig?: string;
+  targetName?: string;
+  treePath?: string;
+  treePathName?: string;
+  userId?: number;
+  username?: string;
+  [property: string]: any;
 }
 
 //#region 辅助函数
@@ -84,18 +86,16 @@ const fetchMonthlyMetricFullData = async (year?: number) => {
   const endDate = dayjs(`${targetYear}-12-31`).format("YYYY-MM-DD");
 
   try {
-    const res: any = await getPmKpiMonthMetricTargetPage({
+    const res: any = await getPmKpiMonthMetricTargetResultList({
       startDate,
-      endDate,
-      pageNo: 1,
-      pageSize: 99999 // 全量数据
+      endDate
     });
 
     if (res.code !== 200 && !res.success) {
       throw new Error(res.msg || "获取月度指标数据失败");
     }
 
-    return res.data?.records || [];
+    return res.data || [];
   } catch (error) {
     console.error("获取月度指标数据失败:", error);
     throw error;
@@ -103,51 +103,51 @@ const fetchMonthlyMetricFullData = async (year?: number) => {
 };
 
 // 将月度指标数据转换为按用户+指标类型分组的累计数据格式
-const transformMonthlyMetricData = (records: MonthlyMetricUserRecord[]) => {
+const transformMonthlyMetricData = (records: MonthlyMetricResultRecord[]) => {
   // 先按用户和指标分组，收集全年的月度数据
   const groupedData: any = {};
 
   records.forEach(record => {
-    const { userId, username, jobNum, metricTargetList = [] } = record;
+    const { userId, username, jobNum, metric = [], targetName, nodeName, otherConfig } = record;
 
-    metricTargetList.forEach(metric => {
-      const otherConfig = parseMonthlyMetricOtherConfig(metric.otherConfig);
+    // 只有有 calculationType 的指标才需要处理
+    const parsedOtherConfig = parseMonthlyMetricOtherConfig(otherConfig);
+    if (!parsedOtherConfig.calculationType) return;
 
-      // 只有有 calculationType 的指标才需要处理
-      if (!otherConfig.calculationType) return;
+    const key = `${userId}-${targetName}`;
 
-      const key = `${userId}-${metric.targetName}`;
+    if (!groupedData[key]) {
+      groupedData[key] = {
+        id: null,
+        month: null,
+        userId: userId,
+        userName: username,
+        examinationTypeId: null,
+        examinationType: targetName,
+        targetType: null,
+        department1: null,
+        department2: null,
+        position: null,
+        examinationGroup: nodeName || null,
+        target: null,
+        achieved: null,
+        calculationType: parsedOtherConfig.calculationType,
+        examination: []
+      };
 
-      if (!groupedData[key]) {
-        groupedData[key] = {
-          userName: username,
-          examinationType: metric.targetName,
-          calculationType: otherConfig.calculationType,
-          examination: [
-            {
-              type: "target",
-              data: []
-            },
-            {
-              type: "actual",
-              data: []
-            }
-          ]
-        };
-      }
+      // 直接复用新接口返回的 examination 数据结构
+      metric.forEach(m => {
+        let dataType = m.dataType;
+        // 确保 dataType 符合老接口格式要求
+        if (dataType === "target") dataType = "目标值";
+        if (dataType === "actual") dataType = "实际达成值";
 
-      // 添加目标值
-      groupedData[key].examination[0].data.push({
-        month: metric.month,
-        value: metric.target
+        groupedData[key].examination.push({
+          dataType: dataType,
+          data: m.data || []
+        });
       });
-
-      // 添加实际值
-      groupedData[key].examination[1].data.push({
-        month: metric.month,
-        value: metric.achieved
-      });
-    });
+    }
   });
 
   // 转换为数组格式
@@ -155,7 +155,7 @@ const transformMonthlyMetricData = (records: MonthlyMetricUserRecord[]) => {
 };
 
 /**
- * 处理月度指标人事数据：根据月度指标数据填充 Excel 指定列后导出
+ * 处理月度指标人事数据：从源数据直接遍历填充 Excel 后导出
  * @param sourceFileName 源文件名
  * @param outputFileName 输出文件名（不含扩展名）
  * @param year 指定年份，默认当前年
@@ -191,70 +191,28 @@ export const processAndExportMonthlyMetricForHR = async (
       throw new Error("Excel 文件中没有工作表");
     }
 
-    // 先删除第 75 行和第 33 行（从下往上删除，避免行号变化）
-    try {
-      const rowsToDelete = [75, 33].filter(
-        rowNum => rowNum <= worksheet.rowCount
-      );
-
-      rowsToDelete.forEach(rowNum => {
-        worksheet.spliceRows(rowNum, 1);
-        console.log(`已删除第 ${rowNum} 行`);
-      });
-    } catch (error) {
-      console.error("删除行失败:", error);
-    }
-
-    // 定义需要跳过的行号
-    const skipRows = [1, 2];
-
-    // 定义需要修改的列号（I=9, K=11, M=13, O=15）
-    const targetColumns = [9, 11, 13, 15];
-
     // 获取当前月份
     const currentMonth = dayjs().month() + 1; // 当前月份（1-12）
     const previousMonth = currentMonth - 1; // 上个月份
 
     let modifiedCount = 0;
 
-    // 逐行处理
-    for (let rowNumber = 1; rowNumber <= worksheet.rowCount; rowNumber++) {
-      // 跳过指定的行
-      if (skipRows.includes(rowNumber)) {
-        continue;
-      }
-
+    // 从第 3 行开始填充数据
+    apiTableData.forEach((dataItem: any, index: number) => {
+      const rowNumber = 3 + index;
       const row = worksheet.getRow(rowNumber);
 
-      // 读取 B 列（userName）和 E 列（examinationType）
-      const userName = row.getCell(2).value?.toString() || "";
-      const examinationType = row.getCell(5).value?.toString() || "";
+      // B 列：用户名
+      row.getCell(2).value = dataItem.userName;
+      // E 列：指标名称
+      row.getCell(5).value = dataItem.examinationType;
 
-      // 根据 userName 和 examinationType 匹配数据
-      const matchedData = apiTableData.find(
-        (item: any) =>
-          item.userName === userName && item.examinationType === examinationType
-      );
-
-      // 未找到匹配数据时，填充提示文字
-      if (!matchedData || !matchedData.examination) {
-        console.warn(`未找到匹配的数据：${userName} - ${examinationType}`);
-
-        row.getCell(9).value = "未找到匹配的数据"; // I 列
-        row.getCell(11).value = "未找到匹配的数据"; // K 列
-        row.getCell(13).value = "未找到匹配的数据"; // M 列
-        row.getCell(15).value = "未找到匹配的数据"; // O 列
-
-        modifiedCount++;
-        continue;
-      }
-
-      const examination = matchedData.examination;
-      const calculationType = matchedData.calculationType;
+      const examination = dataItem.examination;
+      const calculationType = dataItem.calculationType;
 
       // 确保有足够的 examination 数据
-      if (examination.length < 2) {
-        console.warn(`examination 数据不足：${userName} - ${examinationType}`);
+      if (!examination || examination.length < 2) {
+        console.warn(`examination 数据不足：${dataItem.userName} - ${dataItem.examinationType}`);
 
         row.getCell(9).value = "未找到匹配的数据"; // I 列
         row.getCell(11).value = "未找到匹配的数据"; // K 列
@@ -262,7 +220,7 @@ export const processAndExportMonthlyMetricForHR = async (
         row.getCell(15).value = "未找到匹配的数据"; // O 列
 
         modifiedCount++;
-        continue;
+        return;
       }
 
       const targetData = examination[0]?.data || []; // 目标值
@@ -292,8 +250,8 @@ export const processAndExportMonthlyMetricForHR = async (
         // 累计模式：目标值和实际值都累计
         // 侯子洋 好适嘉项目净毛利20% 单独处理 取上上个月
         if (
-          userName === "侯子洋" &&
-          examinationType === "好适嘉项目净毛利20%"
+          dataItem.userName === "侯子洋" &&
+          dataItem.examinationType === "好适嘉项目净毛利20%"
         ) {
           valueI = targetData
             .slice(0, findObjectByMonthIndex(targetData, previousMonth - 1) + 1)
@@ -344,7 +302,7 @@ export const processAndExportMonthlyMetricForHR = async (
       row.getCell(15).value = valueO; // O 列
 
       modifiedCount++;
-    }
+    });
 
     workbook.modified = new Date();
     workbook.lastModifiedBy = "Peidi PM System - Monthly Metric HR Export";
@@ -359,7 +317,7 @@ export const processAndExportMonthlyMetricForHR = async (
     saveAs(blob, finalFileName);
 
     console.log(
-      `月度指标人事数据处理完成，共修改 ${modifiedCount} 行，${modifiedCount * targetColumns.length} 个单元格`
+      `月度指标人事数据处理完成，共添加 ${modifiedCount} 行数据`
     );
     return { success: true, count: modifiedCount };
   } catch (error) {
