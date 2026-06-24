@@ -6,14 +6,16 @@ import Organization from "./components/organization/index.vue";
 import TmallRevenue from "./components/tmallRevenue/index.vue";
 import MonthlyIndicators from "./components/monthlyIndicators/index.vue";
 import KpiMetricUser from "./components/kpiMetricUser/index.vue";
+import ChannelSalesSummary from "./components/channelSalesSummary/index.vue";
 
 const route = useRoute();
 const router = useRouter();
 const componentPermissionConfig = [
   { label: "组织架构", permissionKey: "organization", index: 0 },
-  { label: "天猫收入", permissionKey: "tmallRevenue", index: 1 },
-  { label: "月度指标", permissionKey: "monthlyIndicators", index: 2 },
-  { label: "KPI指标用户", permissionKey: "kpiMetricUser", index: 3 }
+  // { label: "天猫收入", permissionKey: "tmallRevenue", index: 1 },
+  { label: "月度指标", permissionKey: "monthlyIndicators", index: 1 },
+  { label: "KPI指标用户", permissionKey: "kpiMetricUser", index: 2 },
+  { label: "各渠道销售汇总", permissionKey: "channelSalesSummary", index: 3 }
 ];
 
 const DEVELOPER_USER_IDS = [
@@ -26,7 +28,8 @@ const DEVELOPER_USER_IDS = [
 
 const COMPONENT_PERMISSION_USER_IDS: Record<string, string[]> = {
   organization: [],
-  tmallRevenue: [],
+  // tmallRevenue: [],
+  channelSalesSummary: [],
   monthlyIndicators: [
     "1870023775338692610", // 任琪琳
     "1874711258007646210", // 范振吉
@@ -218,13 +221,13 @@ onMounted(() => {
           <Organization />
         </div>
         <div v-if="activeIndex === 1">
-          <TmallRevenue />
-        </div>
-        <div v-if="activeIndex === 2">
           <MonthlyIndicators />
         </div>
-        <div v-if="activeIndex === 3">
+        <div v-if="activeIndex === 2">
           <KpiMetricUser />
+        </div>
+        <div v-if="activeIndex === 3">
+          <ChannelSalesSummary />
         </div>
       </template>
     </div>

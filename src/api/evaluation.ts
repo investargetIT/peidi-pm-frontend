@@ -389,3 +389,37 @@ export const getPmKpiMonthMetricTargetResultList = (params: {
     params
   });
 };
+
+// 店铺考核分组统计（按group_name和month分组）
+export interface MonthData {
+  /**
+   * 月份
+   */
+  month?: string;
+  /**
+   * 销售回款总额
+   */
+  salesCollection?: number;
+  [property: string]: any;
+}
+
+export interface ShopExaminationGroupRes {
+  /**
+   * 分组名称
+   */
+  groupName?: string;
+  /**
+   * 月份数据列表
+   */
+  monthData?: MonthData[];
+  [property: string]: any;
+}
+
+export const getPmKpiShopExaminationGroupStatistics = (params: {
+  year?: number;
+  [property: string]: any;
+}) => {
+  return http.request("get", baseUrlApi("/pm/kpi-examination/shop-examination/group-statistics"), {
+    params
+  });
+};
