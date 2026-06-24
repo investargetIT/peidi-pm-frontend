@@ -366,6 +366,18 @@ export const processAndExportMonthlyMetricForHR = async (
       valueK = toNumber(valueK);
       valueO = toNumber(valueO);
 
+      // 计算 M 列：完成率 (K/I*100)
+      let valueM = 0;
+      if (valueI !== 0) {
+        valueM = (valueK / valueI) * 100;
+      }
+
+      // 填充到对应列（因为删除了E列，所有列往前移动一列）
+      row.getCell(8).value = valueI; // 原 I 列（目标值累计）
+      row.getCell(10).value = Number(valueK.toFixed(2)); // 原 K 列（实际值），保留两位小数
+      row.getCell(12).value = Number(Math.max(0, valueM).toFixed(2)); // 原 M 列（完成率），保留两位小数，小于0时为0
+      row.getCell(14).value = valueO; // 原 O 列（目标值当月）
+
       modifiedCount++;
     });
 

@@ -557,10 +557,6 @@ onMounted(() => {
         </div>
         <div class="types-container">
           <div class="type-item">
-            <span class="type-name">混合模式</span>
-            <span class="type-desc">目标值使用累计值（从年初到当前月的总和），完成值使用当月值（仅统计上个月的完成值）</span>
-          </div>
-          <div class="type-item">
             <span class="type-name">累计模式</span>
             <span class="type-desc">目标值和完成值都使用累计值（从年初到当前月的总和）</span>
           </div>
