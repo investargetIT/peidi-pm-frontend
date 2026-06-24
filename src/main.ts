@@ -58,6 +58,9 @@ import VueTippy from "vue-tippy";
 app.use(VueTippy);
 
 getPlatformConfig(app).then(async config => {
+  // 保存初始 URL 供调试浮层使用
+  localStorage.setItem("debug_initial_url", window.location.href);
+
   setupStore(app);
   app.use(router);
   await router.isReady();

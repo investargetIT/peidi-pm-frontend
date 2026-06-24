@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>简单 URL 测试</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      padding: 30px; 
+      max-width: 900px; 
+      margin: 0 auto;
+      background: #f0f2f5;
+    }
+    .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+    h1 { color: #409eff; margin-top: 0; }
+    .url-box { 
+      background: #f5f7fa; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin: 20px 0;
+      word-break: break-all;
+      font-family: monospace;
+    }
+    .section { margin: 30px 0; }
+    .label { font-weight: bold; color: #606266; margin-bottom: 8px; display: block; }
+    .success { color: #67c23a; }
+    .warning { color: #e6a23c; }
+    .danger { color: #f56c6c; }
+    button { 
+      padding: 12px 24px; 
+      margin: 5px; 
+      font-size: 14px; 
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+    }
+    .btn-primary { background: #409eff; color: white; }
+    .btn-success { background: #67c23a; color: white; }
+    .btn-warning { background: #e6a23c; color: white; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th, td { border: 1px solid #ebeef5; padding: 12px; text-align: left; }
+    th { background: #f5f7fa; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 简单 URL 测试页面</h1>
+    <p class="warning">这个页面不依赖任何框架路由，直接显示浏览器接收到的 URL！</p>
+
+    <div class="section">
+      <h2>📊 当前 URL 信息</h2>
+      <table>
+        <tr>
+          <th>项目</th>
+          <th>值</th>
+        </tr>
+        <tr>
+          <td>完整 URL</td>
+          <td id="full-url" class="url-box">-</td>
+        </tr>
+        <tr>
+          <td>Protocol</td>
+          <td id="protocol">-</td>
+        </tr>
+        <tr>
+          <td>Host</td>
+          <td id="host">-</td>
+        </tr>
+        <tr>
+          <td>Pathname</td>
+          <td id="pathname">-</td>
+        </tr>
+        <tr>
+          <td>Hash</td>
+          <td id="hash" class="warning">-</td>
+        </tr>
+        <tr>
+          <td>Search (Query)</td>
+          <td id="search">-</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>💾 保存记录</h2>
+      <button class="btn-primary" onclick="saveRecord()">保存当前 URL</button>
+      <button class="btn-warning" onclick="clearRecords()">清空记录</button>
+      <div id="records" style="margin-top: 15px;"></div>
+    </div>
+
+    <div class="section">
+      <h2>🔗 测试链接</h2>
+      <p>点击这些链接测试不同的 URL：</p>
+      <button class="btn-success" onclick="window.location.href='simple-test.html#/examination?tab=evaluation&subTab=monthlyIndicators'">
+        测试带 Hash 的 URL
+      </button>
+      <button class="btn-primary" onclick="window.location.href='simple-test.html?foo=bar#/test'">
+        测试带 Search 和 Hash 的 URL
+      </button>
+    </div>
+
+    <div class="section">
+      <h2>🔄 跳转测试</h2>
+      <p>输入任意 URL 跳转到该页面（会带上当前页面的 Hash）：</p>
+      <input type="text" id="target-url" value="http://localhost:8848/simple-test.html" style="width: 70%; padding: 8px;">
+      <button class="btn-primary" onclick="jumpToUrl()">跳转</button>
+    </div>
+
+    <div class="section">
+      <h2>🎛️ 调试开关</h2>
+      <p>点击下方按钮启用应用内的调试浮层：</p>
+      <button class="btn-primary" onclick="enableAppDebug()">启用调试浮层</button>
+      <button class="btn-warning" onclick="disableAppDebug()">禁用调试浮层</button>
+      <p style="margin-top: 10px; color: #666; font-size: 14px;">
+        启用后，访问 <a href="http://localhost:8848/#/examination?tab=evaluation&subTab=monthlyIndicators&debug=true" target="_blank">目标页面</a> 会显示调试浮层
+      </p>
+    </div>
+  </div>
+
+  <script>
+    function updateInfo() {
+      document.getElementById('full-url').textContent = window.location.href;
+      document.getElementById('protocol').textContent = window.location.protocol;
+      document.getElementById('host').textContent = window.location.host;
+      document.getElementById('pathname').textContent = window.location.pathname;
+      document.getElementById('hash').textContent = window.location.hash || '(空)';
+      document.getElementById('search').textContent = window.location.search || '(空)';
+    }
+
+    function saveRecord() {
+      const records = JSON.parse(localStorage.getItem('simple_test_records') || '[]');
+      records.push({
+        time: new Date().toLocaleString(),
+        url: window.location.href,
+        hash: window.location.hash,
+        search: window.location.search
+      });
+      localStorage.setItem('simple_test_records', JSON.stringify(records));
+      showRecords();
+      alert('已保存！');
+    }
+
+    function showRecords() {
+      const records = JSON.parse(localStorage.getItem('simple_test_records') || '[]');
+      const container = document.getElementById('records');
+      if (records.length === 0) {
+        container.innerHTML = '<p>暂无记录</p>';
+        return;
+      }
+      let html = '<h3>历史记录：</h3><ul>';
+      records.slice().reverse().forEach((record, index) => {
+        html += `<li style="margin: 10px 0; padding: 10px; background: #f5f7fa; border-radius: 4px;">
+          <strong>${record.time}</strong><br>
+          <span style="color: #409eff;">${record.url}</span>
+        </li>`;
+      });
+      html += '</ul>';
+      container.innerHTML = html;
+    }
+
+    function clearRecords() {
+      localStorage.removeItem('simple_test_records');
+      showRecords();
+    }
+
+    function jumpToUrl() {
+      const baseUrl = document.getElementById('target-url').value;
+      const targetUrl = baseUrl + window.location.hash + window.location.search;
+      window.location.href = targetUrl;
+    }
+
+    function enableAppDebug() {
+      localStorage.setItem('debug_enabled', 'true');
+      alert('调试浮层已启用！\n\n现在访问应用页面时，右上角会显示调试浮层。\n也可以直接在 URL 后添加 ?debug=true 或 #/...?debug=true 来临时启用。');
+    }
+
+    function disableAppDebug() {
+      localStorage.removeItem('debug_enabled');
+      alert('调试浮层已禁用！');
+    }
+
+    // 初始化
+    updateInfo();
+    showRecords();
+
+    // 监听 hash 变化
+    window.addEventListener('hashchange', function() {
+      console.log('Hash changed:', window.location.hash);
+      updateInfo();
+      saveRecord();
+    });
+  </script>
+</body>
+</html>

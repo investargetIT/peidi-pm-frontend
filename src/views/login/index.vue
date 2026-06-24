@@ -98,14 +98,11 @@ const onLogin = async () => {
           const redirectPath = localStorage.getItem("redirectPath") || "/";
           if (redirectPath.includes("/examination")) {
             return initRouter().then(() => {
-              router.push("/examination");
+              router.push(redirectPath);
             });
           } else if (redirectPath.includes("/aiDrawingApp")) {
             return initRouter().then(() => {
-              router.push({
-                path: "/aiDrawingApp",
-                query: { firstLogin: "true" }
-              });
+              router.push(redirectPath);
             });
           } else if (route.query.tabName == "worker") {
             return initRouter().then(() => {
