@@ -20,7 +20,8 @@ const DEVELOPER_USER_IDS = [
   "1846392647319093250", // Summer
   "1926449443739600965", // 沈皓钰
   "1850741012504838145", // 张思宇
-  "1926449443739601629" // 杨世豪
+  "1926449443739601629", // 杨世豪
+  "1926449443739601538" // 王晓莹
 ];
 
 const COMPONENT_PERMISSION_USER_IDS: Record<string, string[]> = {
@@ -174,7 +175,7 @@ const handleChange = ({ index }: { index: number }) => {
 // 监听路由参数变化
 watch(
   () => route.query.subTab,
-  (newSubTab) => {
+  newSubTab => {
     if (newSubTab && typeof newSubTab === "string") {
       const config = componentPermissionConfig.find(
         item => item.permissionKey === newSubTab

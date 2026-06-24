@@ -744,6 +744,11 @@ const preserveDecimalPlaces = (num: number | string): string => {
 
 // 导出Excel功能
 const handleExport = () => {
+  if (!isDeveloper()) {
+    ElMessage.warning("只有开发者可以导出");
+    return;
+  }
+
   if (visibleRecords.value.length === 0) {
     ElMessage.warning("暂无数据可导出");
     return;
@@ -814,6 +819,11 @@ const handleExport = () => {
 
 const hrExportLoading = ref(false);
 const handleExportForHR = async () => {
+  if (!isDeveloper()) {
+    ElMessage.warning("只有开发者可以导出");
+    return;
+  }
+
   try {
     hrExportLoading.value = true;
     await processAndExportMonthlyMetricForHR();
@@ -896,7 +906,7 @@ onMounted(() => {
           <el-tag size="small" type="warning" effect="light">提示</el-tag>
           <span class="tip-text">黄色背景行为手填数据</span>
         </div>
-        <div class="export-buttons">
+        <div class="export-buttons" v-if="isDeveloper()">
           <el-button
             class="excel-export-btn"
             :loading="hrExportLoading"

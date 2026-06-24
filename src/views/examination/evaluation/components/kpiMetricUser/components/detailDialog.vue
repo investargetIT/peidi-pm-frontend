@@ -343,6 +343,7 @@ const getCalculationTypeText = (calculationType?: number): string => {
   if (calculationType === 1) return "混合模式";
   if (calculationType === 2) return "累计模式";
   if (calculationType === 3) return "当月模式";
+  if (calculationType === 4) return "自定义模式";
   return "";
 };
 
@@ -351,6 +352,7 @@ const getCalculationTypeTag = (calculationType?: number): "primary" | "success" 
   if (calculationType === 1) return "primary";    // 蓝色
   if (calculationType === 2) return "success";    // 绿色
   if (calculationType === 3) return "warning";    // 橙色
+  if (calculationType === 4) return "danger";     // 红色
   return "info";
 };
 
@@ -576,6 +578,7 @@ const handleClose = () => {
                   <el-option label="混合模式" :value="1" />
                   <el-option label="累计模式" :value="2" />
                   <el-option label="当月模式" :value="3" />
+                  <el-option label="自定义模式" :value="4" />
                 </el-select>
               </div>
             </template>
@@ -627,7 +630,6 @@ const handleClose = () => {
                 :active-value="1"
                 :inactive-value="0"
                 size="small"
-                @change="handleStatusChange"
               />
             </template>
           </el-table-column>
