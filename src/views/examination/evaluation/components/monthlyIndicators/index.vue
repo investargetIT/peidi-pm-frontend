@@ -175,9 +175,15 @@ const isManualRow = (row: RecordItem): boolean => {
 
 // 表格单元格样式
 const tableCellStyle = ({ row, columnIndex }: { row: RecordItem; columnIndex: number }) => {
-  // 只有指标名称(3)、目标值(4)、完成值(5)、完成率(6)这几列在手填数据行显示黄色背景
-  const shouldColor = isManualRow(row) && [3, 4, 5, 6].includes(columnIndex);
-  const bgColor = shouldColor ? "#fff3cd" : "#ffffff";
+  // 目标值列(4)总是可以编辑，所以在手填数据行显示黄色背景，在自动计算行也可以有浅背景色
+  // 完成值(5)、完成率(6)只在手填数据行显示黄色背景
+  let bgColor = "#ffffff";
+  if (isManualRow(row) && [3, 4, 5, 6].includes(columnIndex)) {
+    bgColor = "#fff3cd";
+  } else if (columnIndex === 4) {
+    // 目标值列在自动计算数据行也显示一个浅灰色，表示可以编辑
+    bgColor = "#f8f9fa";
+  }
   return {
     backgroundColor: bgColor,
     "--el-table-cell-hover-bg-color": bgColor
@@ -557,9 +563,9 @@ const isSaving = (row: RecordItem, field: "target" | "achieved") => {
 
 const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
   if (savingCellKey.value) return;
-  // 只有手填数据才可以编辑
-  if (!isManualRow(row)) {
-    ElMessage.warning("只有手填数据才可以修改");
+  // 目标值可以随时编辑，完成值只有手填数据才可以编辑
+  if (field === "achieved" && !isManualRow(row)) {
+    ElMessage.warning("只有手填数据的完成值才可以修改");
     return;
   }
   editingCell.value = {
@@ -607,9 +613,9 @@ const handleEditKeydown = (
 
 const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
   if (!isEditing(row, field)) return;
-  // 只有手填数据才可以编辑
-  if (!isManualRow(row)) {
-    ElMessage.warning("只有手填数据才可以修改");
+  // 目标值可以随时编辑，完成值只有手填数据才可以编辑
+  if (field === "achieved" && !isManualRow(row)) {
+    ElMessage.warning("只有手填数据的完成值才可以修改");
     cancelEdit();
     return;
   }
@@ -904,7 +910,7 @@ onMounted(() => {
       <div class="table-actions">
         <div class="table-tip">
           <el-tag size="small" type="warning" effect="light">提示</el-tag>
-          <span class="tip-text">黄色背景行为手填数据</span>
+          <span class="tip-text">黄色背景行为手填数据，浅灰色背景的目标值可随时编辑</span>
         </div>
         <div class="export-buttons" v-if="isDeveloper()">
           <el-button
@@ -973,9 +979,8 @@ onMounted(() => {
               v-else
               v-loading="isSaving(row, 'target')"
               class="editable-cell"
-              :class="{ 'editable-cell-disabled': !isManualRow(row) }"
-              :title="isManualRow(row) ? '双击修改' : '不可编辑'"
-              @dblclick="isManualRow(row) ? startEdit(row, 'target') : undefined"
+              :title="'双击修改'"
+              @dblclick="startEdit(row, 'target')"
             >
               {{ formatNumber(row.target) }}
             </span>

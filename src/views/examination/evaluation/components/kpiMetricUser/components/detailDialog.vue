@@ -539,10 +539,27 @@ const handleClose = () => {
       <div class="metrics-section">
         <h4 class="section-title">指标列表</h4>
         <div class="calculation-type-tip">
-          <el-tag size="small" type="info" effect="light">计算类型说明</el-tag>
-          <div class="type-item"><span class="type-name">混合模式：</span><span class="type-desc">目标值使用累计值（从年初到当前月的总和），完成值使用当月值（仅统计上个月的完成值）</span></div>
-          <div class="type-item"><span class="type-name">累计模式：</span><span class="type-desc">目标值和完成值都使用累计值（从年初到当前月的总和）</span></div>
-          <div class="type-item"><span class="type-name">当月模式：</span><span class="type-desc">目标值和完成值都使用当月值（仅统计上个月的数据）</span></div>
+          <div class="tip-header">
+            <el-tag size="small" type="info" effect="light">计算类型说明</el-tag>
+          </div>
+          <div class="types-container">
+            <div class="type-item">
+              <span class="type-name">混合模式</span>
+              <span class="type-desc">目标值使用累计值（从年初到当前月的总和），完成值使用当月值（仅统计上个月的完成值）</span>
+            </div>
+            <div class="type-item">
+              <span class="type-name">累计模式</span>
+              <span class="type-desc">目标值和完成值都使用累计值（从年初到当前月的总和）</span>
+            </div>
+            <div class="type-item">
+              <span class="type-name">当月模式</span>
+              <span class="type-desc">目标值和完成值都使用当月值（仅统计上个月的数据）</span>
+            </div>
+            <div class="type-item">
+              <span class="type-name">自定义模式</span>
+              <span class="type-desc">根据特定指标的特殊需求进行自定义计算逻辑，需要在代码中单独配置</span>
+            </div>
+          </div>
         </div>
         <el-table :data="metricsEdit" border stripe size="small">
           <el-table-column label="考核指标" min-width="160">
@@ -678,25 +695,35 @@ const handleClose = () => {
 }
 
 .calculation-type-tip {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 16px;
   margin-bottom: 12px;
   padding: 8px 12px;
   background-color: #f5f7fa;
   border: 1px solid #dcdfe6;
-  border-radius: 4px;
+  border-radius: 6px;
+}
+
+.tip-header {
+  margin-bottom: 8px;
+}
+
+.types-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 8px;
 }
 
 .type-item {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background-color: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #ebeef5;
 }
 
 .type-name {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #409eff;
 }
@@ -704,5 +731,6 @@ const handleClose = () => {
 .type-desc {
   font-size: 12px;
   color: #606266;
+  line-height: 1.4;
 }
 </style>
