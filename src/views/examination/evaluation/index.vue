@@ -29,9 +29,9 @@ const DEVELOPER_USER_IDS = [
 const COMPONENT_PERMISSION_USER_IDS: Record<string, string[]> = {
   organization: [],
   // tmallRevenue: [],
-  channelSalesSummary: [],
   monthlyIndicators: [
     "1870023775338692610", // 任琪琳
+    "1869635118983348225", // 肖嘉玲
     "1874711258007646210", // 范振吉
     "1874730426438299649", // 付阳
     "1879443024278761474", // 邓苏
@@ -43,7 +43,8 @@ const COMPONENT_PERMISSION_USER_IDS: Record<string, string[]> = {
     "1874806470939815937", // 王小龙
     "1848656573381541890" // 方云
   ],
-  kpiMetricUser: []
+  kpiMetricUser: [],
+  channelSalesSummary: []
 };
 
 const getStoredIndex = (): number => {

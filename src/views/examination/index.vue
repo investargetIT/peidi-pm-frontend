@@ -169,7 +169,6 @@ onMounted(() => {
         label="自动化考核"
         name="evaluation"
         lazy
-        v-if="checkPermission('evaluation')"
       >
         <Evaluation v-if="activeName === 'evaluation'" />
       </el-tab-pane>
