@@ -357,6 +357,10 @@ const fetchData = async () => {
 
           if (searchParams.value.dataType === "manual") {
             return metric.existSqlConfig === 0;
+          } else if (searchParams.value.dataType === "manual_unfilled") {
+            // 手填且完成值为空或0
+            return metric.existSqlConfig === 0 &&
+                   (metric.achieved == null || metric.achieved === '' || Number(metric.achieved) === 0);
           } else if (searchParams.value.dataType === "auto") {
             return metric.existSqlConfig === 1;
           }
@@ -899,6 +903,7 @@ onMounted(() => {
             style="width: 200px"
           >
             <el-option label="手填类型" value="manual" />
+            <el-option label="手填类型（未填写）" value="manual_unfilled" />
             <el-option label="自动计算类型" value="auto" />
           </el-select>
         </el-form-item>
