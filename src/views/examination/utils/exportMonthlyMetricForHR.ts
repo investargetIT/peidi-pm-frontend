@@ -394,10 +394,18 @@ export const processAndExportMonthlyMetricForHR = async (
       }
 
       // 填充到对应列（因为删除了E列，所有列往前移动一列）
-      row.getCell(8).value = valueI; // 原 I 列（目标值累计）
-      row.getCell(10).value = Number(valueK.toFixed(2)); // 原 K 列（实际值），保留两位小数
-      row.getCell(12).value = Number(Math.max(0, valueM).toFixed(2)); // 原 M 列（完成率），保留两位小数，小于0时为0
-      row.getCell(14).value = valueO; // 原 O 列（目标值当月）
+      // 处理后的I列（原I列，现第8列）放数值，后一列（第9列）加元
+      row.getCell(8).value = valueI;
+      row.getCell(9).value = "元";
+      // 处理后的K列（原K列，现第10列）放数值，后一列（第11列）加%
+      row.getCell(10).value = Number(valueK.toFixed(2));
+      row.getCell(11).value = "%";
+      // 处理后的M列（原M列，现第12列）放数值，后一列（第13列）加元
+      row.getCell(12).value = Number(Math.max(0, valueM).toFixed(2));
+      row.getCell(13).value = "元";
+      // 处理后的O列（原O列，现第14列）放数值，后一列（第15列）加元
+      row.getCell(14).value = valueO;
+      row.getCell(15).value = "元";
 
       modifiedCount++;
       currentRowNum++;
