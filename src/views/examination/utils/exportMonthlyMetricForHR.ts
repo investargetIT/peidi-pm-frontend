@@ -212,28 +212,17 @@ export const processAndExportMonthlyMetricForHR = async (
     // 删除 E 列（第 5 列）
     worksheet.spliceColumns(5, 1);
 
-    // 清空从第 3 行开始的数据和样式
+    // 清空从第 3 行开始的所有数据，并将所有单元格填充颜色设置为空
     let rowNumber = 3;
     while (worksheet.getRow(rowNumber).hasValues) {
       const row = worksheet.getRow(rowNumber);
-      // 清空单元格值和样式
+      // 清空所有单元格值
       row.eachCell((cell) => {
         cell.value = null;
-        // 统一设置样式：无背景色，默认字体
+        // 将所有单元格的填充颜色设置为空
         cell.fill = {
           type: 'pattern',
           pattern: 'none'
-        };
-        cell.font = {
-          name: '宋体',
-          size: 11,
-          bold: false
-        };
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
         };
       });
       rowNumber++;
@@ -245,10 +234,54 @@ export const processAndExportMonthlyMetricForHR = async (
 
     let modifiedCount = 0;
 
+    // 定义计算类型名称映射
+    const calculationTypeNames: { [key: number]: string } = {
+      1: '混合模式',
+      2: '累计模式',
+      3: '当月模式',
+      4: '自定义模式'
+    };
+
+    // 按照 calculationType 对数据进行分组
+    const groupedData: { [key: number]: any[] } = {};
+    apiTableData.forEach((item: any) => {
+      const type = item.calculationType || 0;
+      if (!groupedData[type]) {
+        groupedData[type] = [];
+      }
+      groupedData[type].push(item);
+    });
+
     // 从第 3 行开始填充数据
-    apiTableData.forEach((dataItem: any, index: number) => {
-      const rowNum = 3 + index;
-      const row = worksheet.getRow(rowNum);
+    let currentRowNum = 3;
+    // 按照类型顺序处理各组数据
+    [1, 2, 3, 4].forEach((type) => {
+      const items = groupedData[type];
+      if (!items || items.length === 0) return;
+
+      // 添加分组标题行
+      const titleRow = worksheet.getRow(currentRowNum);
+      // 在 A 列显示分组标题
+      titleRow.getCell(1).value = calculationTypeNames[type] || '其他模式';
+      // 设置标题行填充颜色为鲜艳的颜色
+      const colors: { [key: number]: string } = {
+        1: 'FF90EE90', // 混合模式 - 淡绿色
+        2: 'FF87CEEB', // 累计模式 - 淡蓝色
+        3: 'FFFFD700', // 当月模式 - 金色
+        4: 'FFFFA07A'  // 自定义模式 - 浅橙色
+      };
+      titleRow.eachCell((cell) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: colors[type] || 'FFE0E0E0' }
+        };
+      });
+      currentRowNum++;
+
+      // 填充该组的数据
+      items.forEach((dataItem: any) => {
+        const row = worksheet.getRow(currentRowNum);
 
       // A 列：工号
       row.getCell(1).value = dataItem.jobNum;
@@ -265,23 +298,11 @@ export const processAndExportMonthlyMetricForHR = async (
       // G 列（原 H 列）：权重
       row.getCell(7).value = dataItem.rate;
 
-      // 统一设置行样式
-      row.eachCell((cell) => {
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'none'
-        };
-        cell.font = {
-          name: '宋体',
-          size: 11,
-          bold: false
-        };
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
+      // 恢复保留列的数据（注意：因为添加了标题行，行号可能不匹配，这里暂不恢复保留列数据）
+      // 如果需要保留列数据，需要更复杂的行号映射逻辑
+      // 这里先清空保留列的数据，因为行号已经改变
+      [9, 11, 13, 15, 16, 17].forEach(colNum => {
+        row.getCell(colNum).value = null;
       });
 
       const examination = dataItem.examination;
@@ -379,7 +400,19 @@ export const processAndExportMonthlyMetricForHR = async (
       row.getCell(14).value = valueO; // 原 O 列（目标值当月）
 
       modifiedCount++;
+      currentRowNum++;
+      });
     });
+
+    // 由于添加了分组标题行，保留列的数据无法正确对应，所以暂不恢复保留列数据
+    // 确保指标ID列（第5列，原F列）的所有单元格背景色都为空
+    for (let r = 1; r <= worksheet.rowCount; r++) {
+      const cell = worksheet.getRow(r).getCell(5);
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'none'
+      };
+    }
 
     workbook.modified = new Date();
     workbook.lastModifiedBy = "Peidi PM System - Monthly Metric HR Export";

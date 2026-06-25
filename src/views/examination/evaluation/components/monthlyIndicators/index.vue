@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted, nextTick } from "vue";
+import { ref, onMounted, nextTick, watch } from "vue";
 import {
   getPmKpiMonthMetricTargetPage,
   updatePmKpiMonthMetricTargetApi,
@@ -842,6 +842,16 @@ const handleExportForHR = async () => {
   }
 };
 
+// 监听 startDate，确保始终有值
+watch(
+  () => searchParams.value.startDate,
+  (newVal) => {
+    if (!newVal) {
+      searchParams.value.startDate = getDefaultMonth();
+    }
+  }
+);
+
 onMounted(() => {
   fetchData();
   fetchUserList();
@@ -878,6 +888,7 @@ onMounted(() => {
             placeholder="选择月度"
             value-format="YYYY-MM-DD"
             style="width: 200px"
+            :clearable="false"
           />
         </el-form-item>
         <el-form-item label="数据类型">

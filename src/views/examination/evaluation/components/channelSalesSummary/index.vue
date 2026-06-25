@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { getPmKpiShopExaminationGroupStatistics, type ShopExaminationGroupRes, type MonthData } from "@/api/evaluation";
 import dayjs from "dayjs";
 
@@ -10,7 +10,7 @@ interface TableRecordItem {
 
 const loading = ref(false);
 const groupData = ref<ShopExaminationGroupRes[]>([]);
-const selectedYear = ref<number>(dayjs().year());
+const selectedYear = ref<string | number>(String(dayjs().year()));
 
 // 获取所有月份列表
 const allMonths = computed(() => {
@@ -29,7 +29,7 @@ const fetchData = async () => {
   loading.value = true;
   try {
     const res = (await getPmKpiShopExaminationGroupStatistics({
-      year: selectedYear.value
+      year: Number(selectedYear.value)
     })) as any;
 
     if (res.success && res.data) {
@@ -47,9 +47,19 @@ const handleSearch = () => {
 };
 
 const handleReset = () => {
-  selectedYear.value = dayjs().year();
+  selectedYear.value = String(dayjs().year());
   fetchData();
 };
+
+// 监听 selectedYear，确保始终有值
+watch(
+  () => selectedYear.value,
+  (newVal) => {
+    if (!newVal) {
+      selectedYear.value = String(dayjs().year());
+    }
+  }
+);
 
 // 格式化金额
 const formatCurrency = (value: number | string) => {
@@ -95,6 +105,7 @@ onMounted(() => {
             placeholder="选择年份"
             value-format="YYYY"
             style="width: 200px"
+            :clearable="false"
           />
         </el-form-item>
         <el-form-item>
