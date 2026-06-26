@@ -120,8 +120,11 @@ const transformMonthlyMetricData = (records: MonthlyMetricResultRecord[]) => {
   records.forEach(record => {
     const {
       userId, username, jobNum, metric = [], targetName, nodeName, otherConfig,
-      metricType, metricId, kpiDepict, rate
+      metricType, metricId, kpiDepict, rate, status
     } = record;
+
+    // 排除 status=0 的数据
+    if (status === 0) return;
 
     // 只有有 calculationType 的指标才需要处理
     const parsedOtherConfig = parseMonthlyMetricOtherConfig(otherConfig);

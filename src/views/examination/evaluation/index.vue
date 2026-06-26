@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { QuestionFilled } from "@element-plus/icons-vue";
 import ReSegmented from "@/components/ReSegmented";
 import Organization from "./components/organization/index.vue";
 import TmallRevenue from "./components/tmallRevenue/index.vue";
 import MonthlyIndicators from "./components/monthlyIndicators/index.vue";
 import KpiMetricUser from "./components/kpiMetricUser/index.vue";
 import ChannelSalesSummary from "./components/channelSalesSummary/index.vue";
+import HelpModal from "./components/HelpModal.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -44,7 +46,9 @@ const COMPONENT_PERMISSION_USER_IDS: Record<string, string[]> = {
     "1848656573381541890" // 方云
   ],
   kpiMetricUser: [],
-  channelSalesSummary: []
+  channelSalesSummary: [
+    "1848656573381541890" // 方云
+  ]
 };
 
 const getStoredIndex = (): number => {
@@ -85,6 +89,20 @@ const permissionLoading = ref(true);
 const componentPermissions = ref<boolean[]>(
   componentPermissionConfig.map(() => false)
 );
+
+// 帮助弹窗
+const helpModalVisible = ref(false);
+const currentHelpModule = ref("");
+
+const openHelp = () => {
+  const config = componentPermissionConfig.find(
+    item => item.index === activeIndex.value
+  );
+  if (config) {
+    currentHelpModule.value = config.permissionKey;
+    helpModalVisible.value = true;
+  }
+};
 
 const permittedComponents = computed(() =>
   componentPermissionConfig
@@ -209,6 +227,14 @@ onMounted(() => {
       @change="handleChange"
     />
 
+    <!-- 帮助按钮 -->
+    <div v-if="!permissionLoading && hasAnyPermission" class="help-button-bar">
+      <el-button type="primary" plain size="small" @click="openHelp">
+        <el-icon><QuestionFilled /></el-icon>
+        帮助
+      </el-button>
+    </div>
+
     <!-- 内容区域 -->
     <div class="content-area">
       <el-empty v-if="permissionLoading" description="权限加载中..." />
@@ -232,6 +258,9 @@ onMounted(() => {
         </div>
       </template>
     </div>
+
+    <!-- 帮助弹窗 -->
+    <HelpModal v-model:visible="helpModalVisible" :module="currentHelpModule" />
   </div>
 </template>
 
@@ -243,8 +272,14 @@ onMounted(() => {
   border-radius: 8px;
 }
 
+.help-button-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  margin-bottom: 20px;
+}
+
 .content-area {
-  margin-top: 20px;
   min-height: 300px;
 }
 </style>
