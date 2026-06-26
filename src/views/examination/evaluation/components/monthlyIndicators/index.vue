@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted, nextTick, watch } from "vue";
+import { ref, onMounted, nextTick, watch, h } from "vue";
 import {
   getPmKpiMonthMetricTargetPage,
   updatePmKpiMonthMetricTargetApi,
@@ -7,13 +7,14 @@ import {
   execSqlByMonth,
   getDingAllDepartmentUsersApi,
   getUserListApi,
-  notifyUserApi
+  notifyUserApi,
+  notifyUserConfirmApi
 } from "@/api/evaluation";
 import { processAndExportMonthlyMetricForHR } from "@/views/examination/utils/exportMonthlyMetricForHR";
-import { ElMessage, ElMessageBox } from "element-plus";
-import { Download } from "@element-plus/icons-vue";
+import { ElMessage, ElMessageBox, ElCheckbox } from "element-plus";
+import { Download, Bell, CircleCheck, Warning } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
 interface OtherConfig {
@@ -88,6 +89,7 @@ interface DingDepartmentUsersResponse {
 const loading = ref(false);
 const tableData = ref<RecordItem[]>([]);
 const allRecords = ref<ApiRecordItem[]>([]);
+// 注意：visibleRecords 是所有筛选后的数据（不受分页影响），导出和通知都用的是这个
 const visibleRecords = ref<ApiRecordItem[]>([]);
 const visibleUsernameSet = ref<Set<string> | null>(new Set());
 let visibleUsernameSetPromise: Promise<Set<string> | null> | null = null;
@@ -98,7 +100,9 @@ const total = ref(0);
 // 从localStorage读取分页状态
 const STORAGE_KEY = "monthly-indicators-pagination";
 const savedPagination = localStorage.getItem(STORAGE_KEY);
-const initialPagination = savedPagination ? JSON.parse(savedPagination) : { currentPage: 1, pageSize: 5 };
+const initialPagination = savedPagination
+  ? JSON.parse(savedPagination)
+  : { currentPage: 1, pageSize: 5 };
 const currentPage = ref(initialPagination.currentPage);
 const pageSize = ref(initialPagination.pageSize);
 const ALL_PAGE_SIZE = 99999;
@@ -108,14 +112,15 @@ const DEVELOPER_USER_IDS = [
   "1850741012504838145", // 张思宇
   "1926449443739601629", // 杨世豪
   "1869635118983348225", // 肖嘉玲
-  "1870023775338692610" // 任琪琳
+  "1870023775338692610", // 任琪琳
+  "1926449443739601538" // 王晓莹
 ];
 const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
   邓苏: ["王永蝶", "夏立明", "潘明旺", "缪欣瑶"],
   孙舒欣: ["孙舒欣"],
   方云: ["侯子洋", "王琳"],
   付阳: ["黄文豪"],
-  范振吉: ["邓苏", "孙舒欣"]
+  范振吉: ["邓苏", "孙舒欣", "潘明旺"]
 };
 const DEPARTMENT_LIST = [
   { name: "零食", deptId: 992836831 },
@@ -174,7 +179,13 @@ const isManualRow = (row: RecordItem): boolean => {
 };
 
 // 表格单元格样式
-const tableCellStyle = ({ row, columnIndex }: { row: RecordItem; columnIndex: number }) => {
+const tableCellStyle = ({
+  row,
+  columnIndex
+}: {
+  row: RecordItem;
+  columnIndex: number;
+}) => {
   // 目标值列(4)总是可以编辑，所以在手填数据行显示黄色背景，在自动计算行也可以有浅背景色
   // 完成值(5)、完成率(6)只在手填数据行显示黄色背景
   let bgColor = "#ffffff";
@@ -350,39 +361,81 @@ const fetchData = async () => {
         : allRecords.value;
 
       // 再根据数据类型过滤
-      visibleRecords.value = filteredByPermission.map(record => {
-        // 过滤符合dataType条件的metric
-        let filteredMetrics = (record.metricTargetList || []).filter(metric => {
-          if (metric.status === 0) return false;
+      visibleRecords.value = filteredByPermission
+        .map(record => {
+          // 过滤符合dataType条件的metric
+          let filteredMetrics = (record.metricTargetList || []).filter(
+            metric => {
+              if (metric.status === 0) return false;
 
+              if (searchParams.value.dataType === "manual") {
+                return metric.existSqlConfig === 0;
+              } else if (
+                searchParams.value.dataType === "manual_unfilled_achieved"
+              ) {
+                // 手填且完成值为空或0
+                return (
+                  metric.existSqlConfig === 0 &&
+                  (metric.achieved == null ||
+                    metric.achieved === "" ||
+                    Number(metric.achieved) === 0)
+                );
+              } else if (
+                searchParams.value.dataType === "manual_unfilled_target"
+              ) {
+                // 手填且目标值为空或0
+                return (
+                  metric.existSqlConfig === 0 &&
+                  (metric.target == null ||
+                    metric.target === "" ||
+                    Number(metric.target) === 0)
+                );
+              } else if (searchParams.value.dataType === "auto") {
+                return metric.existSqlConfig === 1;
+              } else if (
+                searchParams.value.dataType === "auto_unfilled_achieved"
+              ) {
+                // 自动计算且完成值为空或0
+                return (
+                  metric.existSqlConfig === 1 &&
+                  (metric.achieved == null ||
+                    metric.achieved === "" ||
+                    Number(metric.achieved) === 0)
+                );
+              } else if (
+                searchParams.value.dataType === "auto_unfilled_target"
+              ) {
+                // 自动计算且目标值为空或0
+                return (
+                  metric.existSqlConfig === 1 &&
+                  (metric.target == null ||
+                    metric.target === "" ||
+                    Number(metric.target) === 0)
+                );
+              }
+              return true; // 全部类型
+            }
+          );
+
+          // 当选择手填类型时，完成值为空的数据放上面
           if (searchParams.value.dataType === "manual") {
-            return metric.existSqlConfig === 0;
-          } else if (searchParams.value.dataType === "manual_unfilled") {
-            // 手填且完成值为空或0
-            return metric.existSqlConfig === 0 &&
-                   (metric.achieved == null || metric.achieved === '' || Number(metric.achieved) === 0);
-          } else if (searchParams.value.dataType === "auto") {
-            return metric.existSqlConfig === 1;
+            filteredMetrics.sort((a, b) => {
+              const aEmpty =
+                a.achieved == null || a.achieved === "" || a.achieved === 0;
+              const bEmpty =
+                b.achieved == null || b.achieved === "" || b.achieved === 0;
+              if (aEmpty && !bEmpty) return -1;
+              if (!aEmpty && bEmpty) return 1;
+              return 0;
+            });
           }
-          return true; // 全部类型
-        });
 
-        // 当选择手填类型时，完成值为空的数据放上面
-        if (searchParams.value.dataType === "manual") {
-          filteredMetrics.sort((a, b) => {
-            const aEmpty = a.achieved == null || a.achieved === '' || a.achieved === 0;
-            const bEmpty = b.achieved == null || b.achieved === '' || b.achieved === 0;
-            if (aEmpty && !bEmpty) return -1;
-            if (!aEmpty && bEmpty) return 1;
-            return 0;
-          });
-        }
-
-        return {
-          ...record,
-          metricTargetList: filteredMetrics
-        };
-      }).filter(record => (record.metricTargetList || []).length > 0); // 过滤掉没有有效指标的记录
+          return {
+            ...record,
+            metricTargetList: filteredMetrics
+          };
+        })
+        .filter(record => (record.metricTargetList || []).length > 0); // 过滤掉没有有效指标的记录
 
       total.value = visibleRecords.value.length;
       updateTableDataByPage();
@@ -412,10 +465,13 @@ const handleReset = () => {
 
 // 保存分页状态到localStorage
 const savePaginationState = () => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({
-    currentPage: currentPage.value,
-    pageSize: pageSize.value
-  }));
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      currentPage: currentPage.value,
+      pageSize: pageSize.value
+    })
+  );
 };
 
 const handleCurrentChange = (page: number) => {
@@ -461,29 +517,28 @@ const handleUpdateMetricData = async (row: RecordItem) => {
   }
 };
 
-const handleNotifyUser = async (row: RecordItem) => {
+const confirmTodoNotify = async () => {
+  if (!todoNotifyChecked.value) {
+    ElMessage.warning("请先勾选确认发送钉钉待办");
+    return;
+  }
+  if (!currentTodoRow.value?.id) return;
+
   try {
-    await ElMessageBox.confirm(
-      `确定通知用户「${row.username}」填写指标信息吗？`,
-      "通知确认",
-      {
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
-        type: "warning"
-      }
-    );
-    if (!row.id) return;
-    const res = (await notifyUserApi({ id: Number(row.id) })) as any;
+    todoNotifyLoading.value = true;
+    todoNotifyDialogVisible.value = false;
+    const res = (await notifyUserApi({ id: Number(currentTodoRow.value.id) })) as any;
     if (res?.code === 200 || res?.success) {
       ElMessage.success("通知成功");
     } else {
       ElMessage.error(res?.msg || "通知失败");
     }
   } catch (error) {
-    if (error !== "cancel" && error !== "close") {
-      console.error("通知用户失败", error);
-      ElMessage.error("通知用户失败");
-    }
+    console.error("通知用户失败", error);
+    ElMessage.error("通知用户失败");
+  } finally {
+    todoNotifyLoading.value = false;
+    currentTodoRow.value = null;
   }
 };
 
@@ -752,82 +807,221 @@ const preserveDecimalPlaces = (num: number | string): string => {
   return str;
 };
 
-// 导出Excel功能
-const handleExport = () => {
+// 导出Excel功能 - 目标业绩表
+// 导出当前年份1-12月的数据
+const handleExport = async () => {
   if (!isDeveloper()) {
     ElMessage.warning("只有开发者可以导出");
     return;
   }
 
-  if (visibleRecords.value.length === 0) {
-    ElMessage.warning("暂无数据可导出");
-    return;
-  }
+  try {
+    exportLoading.value = true;
+    // 获取当前年份
+    const currentYear = dayjs(searchParams.value.startDate || new Date()).year();
 
-  // 准备导出数据
-  const exportData: any[] = [];
+    // 收集12个月的数据
+    const allYearRecords: ApiRecordItem[] = [];
 
-  // 遍历所有可见记录，展开为二维表格数据
-  visibleRecords.value.forEach((record, recordIndex) => {
-    const filteredMetrics = (record.metricTargetList || []).filter(
-      metric => metric.status !== 0
-    );
+    // 循环请求12个月的数据
+    for (let month = 1; month <= 12; month++) {
+      const monthDate = dayjs(`${currentYear}-${month}-01`).format('YYYY-MM-DD');
 
-    filteredMetrics.forEach((metric, metricIndex) => {
-      const row: any = {
-        "序号": "",
-        "月份": "",
-        "负责人": "",
-        "指标名称": metric.targetName,
-        "目标值": formatNumber(metric.target),
-        "完成值": formatNumber(metric.achieved),
-        "完成率": getCompletionRate(metric.target, metric.achieved),
-        "数据类型": metric.existSqlConfig === 0 ? "手填" : "自动计算",
-        "组织路径": metric.treePathName || ""
+      const res = (await getPmKpiMonthMetricTargetPage({
+        username: searchParams.value.username || undefined,
+        treePathName: searchParams.value.treePathName || undefined,
+        startDate: monthDate,
+        endDate: monthDate,
+        pageNo: 1,
+        pageSize: ALL_PAGE_SIZE
+      })) as ApiResponse;
+
+      if (res?.success && res?.data?.records?.length) {
+        allYearRecords.push(...res.data.records);
+      }
+    }
+
+    if (allYearRecords.length === 0) {
+      ElMessage.warning("暂无数据可导出");
+      return;
+    }
+
+    // 数据结构转换：按用户+指标分组，收集12个月的目标值
+    interface TargetData {
+      [month: string]: number | string;
+    }
+
+    interface RowData {
+      department: string;
+      assessmentGroup: string;
+      targetName: string;
+      username: string;
+      monthlyTargets: TargetData;
+      total: number;
+    }
+
+    const rowDataMap = new Map<string, RowData>();
+
+    allYearRecords.forEach((record) => {
+      const filteredMetrics = (record.metricTargetList || []).filter(
+        metric => metric.status !== 0
+      );
+
+      filteredMetrics.forEach((metric) => {
+        // 提取部门和考核组
+        const treePathParts = (metric.treePathName || "").split(",").map(s => s.trim()).filter(Boolean);
+        const department = treePathParts[1] || "";
+        const assessmentGroup = treePathParts[treePathParts.length - 1] || "";
+
+        // 唯一key：用户ID + 指标名称
+        const key = `${record.userId}-${metric.targetName}`;
+
+        // 获取月份（提取数字部分）
+        const monthNum = dayjs(record.month).month() + 1; // 1-12
+
+        if (!rowDataMap.has(key)) {
+          rowDataMap.set(key, {
+            department,
+            assessmentGroup,
+            targetName: metric.targetName || "",
+            username: record.username || "",
+            monthlyTargets: {},
+            total: 0
+          });
+        }
+
+        const rowData = rowDataMap.get(key)!;
+        // 存储目标值
+        rowData.monthlyTargets[monthNum.toString()] = metric.target ?? "";
+      });
+    });
+
+    // 创建工作簿
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("目标业绩表");
+
+    // 构建列配置
+    const columns: any[] = [
+      { key: "department", header: "部门", width: 20 },
+      { key: "assessmentGroup", header: "考核组", width: 20 },
+      { key: "targetName", header: "指标名称", width: 25 },
+      { key: "username", header: "姓名", width: 12 }
+    ];
+
+    // 添加1-12月列
+    for (let i = 1; i <= 12; i++) {
+      columns.push({
+        key: `month${i}`,
+        header: `${i}月`,
+        width: 12
+      });
+    }
+
+    // 添加合计和备注列
+    columns.push({ key: "total", header: "合计", width: 15 });
+    columns.push({ key: "remark", header: "单位：万", width: 12 });
+
+    worksheet.columns = columns;
+
+    // 添加表头并设置样式
+    const headerRow = worksheet.getRow(1);
+    headerRow.eachCell((cell, colNumber) => {
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF4472C4" }
       };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" }
+      };
+    });
+    headerRow.height = 25;
 
-      // 只有第一个指标行显示序号、月份、负责人
-      if (metricIndex === 0) {
-        row["序号"] = recordIndex + 1;
-        row["月份"] = formatMonth(record.month);
-        row["负责人"] = record.username;
+    // 添加数据行
+    let currentRow = 2;
+    rowDataMap.forEach((rowData) => {
+      // 计算合计
+      let total = 0;
+      const monthlyValues: (number | string)[] = [];
+      for (let i = 1; i <= 12; i++) {
+        const val = rowData.monthlyTargets[i.toString()];
+        monthlyValues.push(val ?? "");
+        if (val != null && val !== "" && !isNaN(Number(val))) {
+          total += Number(val);
+        }
       }
 
-      exportData.push(row);
+      const rowDataObj: any = {
+        department: rowData.department,
+        assessmentGroup: rowData.assessmentGroup,
+        targetName: rowData.targetName,
+        username: rowData.username
+      };
+
+      // 添加1-12月数据
+      for (let i = 1; i <= 12; i++) {
+        rowDataObj[`month${i}`] = monthlyValues[i - 1];
+      }
+
+      rowDataObj.total = total;
+      rowDataObj.remark = ""; // 备注列留空
+
+      const row = worksheet.addRow(rowDataObj);
+
+      // 设置数据行样式
+      row.eachCell((cell, colNumber) => {
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" }
+        };
+
+        // 奇数行添加浅灰色背景
+        if ((currentRow - 1) % 2 === 0) {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFF2F2F2" }
+          };
+        }
+
+        // 月份列和合计列右对齐
+        if (colNumber > 4) {
+          cell.alignment = { vertical: "middle", horizontal: "right" };
+        }
+      });
+
+      row.height = 20;
+      currentRow++;
     });
-  });
 
-  // 创建工作簿
-  const worksheet = XLSX.utils.json_to_sheet(exportData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "月度指标");
+    // 生成Excel文件
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
 
-  // 设置列宽
-  worksheet["!cols"] = [
-    { wch: 8 },  // 序号
-    { wch: 12 }, // 月份
-    { wch: 12 }, // 负责人
-    { wch: 30 }, // 指标名称
-    { wch: 15 }, // 目标值
-    { wch: 15 }, // 完成值
-    { wch: 12 }, // 完成率
-    { wch: 12 }, // 数据类型
-    { wch: 30 }  // 组织路径
-  ];
+    const fileName = `目标业绩表_${currentYear}年_${dayjs().format("YYYYMMDDHHmmss")}.xlsx`;
+    saveAs(blob, fileName);
 
-  // 导出文件
-  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-  const blob = new Blob([excelBuffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-  });
-
-  const fileName = `月度指标_${formatMonth(searchParams.value.startDate) || dayjs().format("YYYY-MM")}_${dayjs().format("YYYYMMDDHHmmss")}.xlsx`;
-  saveAs(blob, fileName);
-
-  ElMessage.success("导出成功");
+    ElMessage.success("导出成功");
+  } catch (error) {
+    console.error("导出失败:", error);
+    ElMessage.error("导出失败，请重试");
+  } finally {
+    exportLoading.value = false;
+  }
 };
 
 const hrExportLoading = ref(false);
+const exportLoading = ref(false);
 const handleExportForHR = async () => {
   if (!isDeveloper()) {
     ElMessage.warning("只有开发者可以导出");
@@ -846,10 +1040,70 @@ const handleExportForHR = async () => {
   }
 };
 
+const notifyConfirmLoading = ref(false);
+const notifyConfirmDialogVisible = ref(false);
+const confirmChecked = ref(false);
+const todoNotifyDialogVisible = ref(false);
+const todoNotifyChecked = ref(false);
+const currentTodoRow = ref<RecordItem | null>(null);
+const todoNotifyLoading = ref(false);
+
+const handleNotifyUserConfirm = async () => {
+  confirmChecked.value = false;
+  notifyConfirmDialogVisible.value = true;
+};
+
+const handleNotifyUser = (row: RecordItem) => {
+  currentTodoRow.value = row;
+  todoNotifyChecked.value = false;
+  todoNotifyDialogVisible.value = true;
+};
+
+const confirmNotify = async () => {
+  if (!confirmChecked.value) {
+    ElMessage.warning("请先勾选确认发送钉钉消息");
+    return;
+  }
+
+  try {
+    // 注意：通知的是 visibleRecords.value，即所有筛选后的数据，不受分页影响
+    // 收集可见用户的 userId 和 month（去重）
+    const userMonthSet = new Set<string>();
+    const args: Array<{ userId: string; month: string }> = [];
+
+    visibleRecords.value.forEach(record => {
+      if (record.userId && record.month) {
+        const key = `${record.userId}-${record.month}`;
+        if (!userMonthSet.has(key)) {
+          userMonthSet.add(key);
+          args.push({
+            userId: String(record.userId),
+            month: record.month
+          });
+        }
+      }
+    });
+
+    notifyConfirmLoading.value = true;
+    notifyConfirmDialogVisible.value = false;
+    const res = (await notifyUserConfirmApi({ args })) as any;
+    if (res?.code === 200 || res?.success) {
+      ElMessage.success("通知成功");
+    } else {
+      ElMessage.error(res?.msg || "通知失败");
+    }
+  } catch (error) {
+    console.error("通知用户确认绩效失败:", error);
+    ElMessage.error("通知用户确认绩效失败");
+  } finally {
+    notifyConfirmLoading.value = false;
+  }
+};
+
 // 监听 startDate，确保始终有值
 watch(
   () => searchParams.value.startDate,
-  (newVal) => {
+  newVal => {
     if (!newVal) {
       searchParams.value.startDate = getDefaultMonth();
     }
@@ -900,11 +1154,26 @@ onMounted(() => {
             v-model="searchParams.dataType"
             placeholder="请选择数据类型"
             clearable
-            style="width: 200px"
+            style="width: 220px"
           >
             <el-option label="手填类型" value="manual" />
-            <el-option label="手填类型（未填写）" value="manual_unfilled" />
+            <el-option
+              label="手填类型（未填写完成值）"
+              value="manual_unfilled_achieved"
+            />
+            <el-option
+              label="手填类型（未填写目标值）"
+              value="manual_unfilled_target"
+            />
             <el-option label="自动计算类型" value="auto" />
+            <el-option
+              label="自动计算类型（未填写完成值）"
+              value="auto_unfilled_achieved"
+            />
+            <el-option
+              label="自动计算类型（未填写目标值）"
+              value="auto_unfilled_target"
+            />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -926,24 +1195,40 @@ onMounted(() => {
       <div class="table-actions">
         <div class="table-tip">
           <el-tag size="small" type="warning" effect="light">提示</el-tag>
-          <span class="tip-text">黄色背景行为手填数据，浅灰色背景的目标值可随时编辑</span>
+          <span class="tip-text"
+            >黄色背景行为手填数据，浅灰色背景的目标值可随时编辑</span
+          >
         </div>
-        <div class="export-buttons" v-if="isDeveloper()">
-          <el-button
-            class="excel-export-btn"
-            :loading="hrExportLoading"
-            @click="handleExportForHR"
+        <div class="export-buttons">
+          <template v-if="isDeveloper()">
+            <el-button
+              class="excel-export-btn"
+              :loading="hrExportLoading"
+              @click="handleExportForHR"
+            >
+              <el-icon><Download /></el-icon>
+              人事导出
+            </el-button>
+            <el-tooltip content="导出选中月份所在年份1-12月的目标业绩表" placement="top">
+              <el-button class="excel-export-btn" :loading="exportLoading" @click="handleExport">
+                <el-icon><Download /></el-icon>
+                导出目标业绩表
+              </el-button>
+            </el-tooltip>
+          </template>
+          <el-tooltip
+            content="向当前可见用户发送钉钉消息，通知其确认绩效信息"
+            placement="top"
           >
-            <el-icon><Download /></el-icon>
-            人事导出
-          </el-button>
-          <el-button
-            class="excel-export-btn"
-            @click="handleExport"
-          >
-            <el-icon><Download /></el-icon>
-            导出
-          </el-button>
+            <el-button
+              type="primary"
+              :loading="notifyConfirmLoading"
+              @click="handleNotifyUserConfirm"
+            >
+              <el-icon><Bell /></el-icon>
+              通知用户确认绩效信息
+            </el-button>
+          </el-tooltip>
         </div>
       </div>
       <el-table
@@ -1023,7 +1308,9 @@ onMounted(() => {
               class="editable-cell"
               :class="{ 'editable-cell-disabled': !isManualRow(row) }"
               :title="isManualRow(row) ? '双击修改' : '不可编辑'"
-              @dblclick="isManualRow(row) ? startEdit(row, 'achieved') : undefined"
+              @dblclick="
+                isManualRow(row) ? startEdit(row, 'achieved') : undefined
+              "
             >
               {{ formatNumber(row.achieved) }}
             </span>
@@ -1036,24 +1323,28 @@ onMounted(() => {
             </span>
           </template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="220" align="center">
+        <el-table-column fixed="right" label="操作" width="280" align="center">
           <template #default="{ row }">
             <template v-if="row.groupIndex === 0">
-              <el-button
-                type="success"
-                size="small"
-                :loading="isUpdating(row.userId || '')"
-                @click="handleUpdateMetricData(row)"
-              >
-                更新指标数据
-              </el-button>
-              <el-button
-                class="dingtalk-blue-btn"
-                size="small"
-                @click="handleNotifyUser(row)"
-              >
-                通知
-              </el-button>
+              <div class="action-buttons">
+                <el-button
+                  type="success"
+                  size="small"
+                  :loading="isUpdating(row.userId || '')"
+                  @click="handleUpdateMetricData(row)"
+                >
+                  更新指标数据
+                </el-button>
+                <el-tooltip content="提醒该负责人的填写人填写指标信息" placement="top">
+                  <el-button
+                    class="dingtalk-blue-btn"
+                    size="small"
+                    @click="handleNotifyUser(row)"
+                  >
+                    提醒填写
+                  </el-button>
+                </el-tooltip>
+              </div>
             </template>
           </template>
         </el-table-column>
@@ -1127,6 +1418,86 @@ onMounted(() => {
         >
       </template>
     </el-dialog>
+
+    <!-- 通知确认对话框 -->
+    <el-dialog
+      v-model="notifyConfirmDialogVisible"
+      title="确认通知"
+      width="520px"
+      :close-on-click-modal="false"
+      class="notify-confirm-dialog"
+    >
+      <div class="notify-confirm-content">
+        <div class="notify-icon">
+          <el-icon :size="48" color="#409EFF"><Bell /></el-icon>
+        </div>
+        <div class="notify-info">
+          <div class="notify-title">发送钉钉通知</div>
+          <div class="notify-desc">即将向当前筛选条件下可见的用户发送绩效确认通知</div>
+        </div>
+      </div>
+      <div class="notify-features">
+        <div class="feature-item">
+          <el-icon color="#67C23A"><CircleCheck /></el-icon>
+          <span>向当前可见的所有用户发送钉钉消息</span>
+        </div>
+        <div class="feature-item">
+          <el-icon color="#67C23A"><CircleCheck /></el-icon>
+          <span>通知用户确认其绩效信息</span>
+        </div>
+        <div class="feature-item">
+          <el-icon color="#67C23A"><CircleCheck /></el-icon>
+          <span>仅通知当前筛选条件下可见的用户</span>
+        </div>
+      </div>
+      <div class="notify-checkbox">
+        <el-checkbox v-model="confirmChecked" size="large">我确认发送钉钉消息</el-checkbox>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button size="large" @click="notifyConfirmDialogVisible = false">取消</el-button>
+          <el-button type="primary" size="large" :loading="notifyConfirmLoading" :disabled="!confirmChecked" @click="confirmNotify">确定发送</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 发送钉钉待办确认对话框 -->
+    <el-dialog
+      v-model="todoNotifyDialogVisible"
+      title="发送钉钉待办"
+      width="520px"
+      :close-on-click-modal="false"
+      class="todo-notify-dialog"
+    >
+      <div class="notify-confirm-content">
+        <div class="notify-icon">
+          <el-icon :size="48" color="#0089FF"><Bell /></el-icon>
+        </div>
+        <div class="notify-info">
+          <div class="notify-title">发送待办提醒</div>
+          <div class="notify-desc">即将向「{{ currentTodoRow?.username }}」的填写人发送钉钉待办通知</div>
+        </div>
+      </div>
+      <div class="notify-features">
+        <div class="feature-item">
+          <el-icon color="#67C23A"><CircleCheck /></el-icon>
+          <span>提醒用户填写指标信息</span>
+        </div>
+        <div class="feature-item">
+          <el-icon color="#E6A23C"><Warning /></el-icon>
+          <span>24小时内只能发送一次</span>
+        </div>
+      </div>
+      <div class="notify-checkbox">
+        <el-checkbox v-model="todoNotifyChecked" size="large">我确认发送钉钉待办</el-checkbox>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button size="large" @click="todoNotifyDialogVisible = false">取消</el-button>
+          <el-button class="dingtalk-blue-btn" size="large" :loading="todoNotifyLoading" :disabled="!todoNotifyChecked" @click="confirmTodoNotify">确定发送</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1135,6 +1506,94 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+:deep(.notify-confirm-dialog .el-dialog__header),
+:deep(.todo-notify-dialog .el-dialog__header) {
+  text-align: center;
+  padding-bottom: 8px;
+}
+
+:deep(.notify-confirm-dialog .el-dialog__title),
+:deep(.todo-notify-dialog .el-dialog__title) {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+:deep(.todo-notify-dialog .notify-confirm-content) {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
+}
+
+:deep(.todo-notify-dialog .notify-icon) {
+  box-shadow: 0 4px 12px rgba(0, 137, 255, 0.15);
+}
+
+.notify-confirm-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.notify-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
+}
+
+.notify-info {
+  flex: 1;
+}
+
+.notify-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 4px;
+}
+
+.notify-desc {
+  font-size: 14px;
+  color: #606266;
+}
+
+.notify-features {
+  padding: 0 20px;
+  margin-bottom: 24px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 14px;
+  color: #606266;
+}
+
+.notify-checkbox {
+  padding: 0 20px;
+  margin-bottom: 8px;
+}
+
+:deep(.notify-checkbox .el-checkbox__label) {
+  font-size: 15px;
+  color: #303133;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding-top: 8px;
 }
 
 .result-summary {
@@ -1216,6 +1675,14 @@ onMounted(() => {
   color: #ffffff;
 }
 
+.dingtalk-blue-btn:disabled,
+.dingtalk-blue-btn.is-disabled {
+  background-color: #a0cfff !important;
+  border-color: #a0cfff !important;
+  color: #ffffff !important;
+  cursor: not-allowed;
+}
+
 .search-section {
   padding: 16px;
   border: 1px solid var(--el-border-color);
@@ -1288,5 +1755,13 @@ onMounted(() => {
 .rate-poor {
   color: var(--el-color-danger);
   font-weight: 500;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
 }
 </style>
