@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import { ElMessage } from "element-plus";
+import { match } from "pinyin-pro";
 import {
   getPmKpiGroupNodeConfigGroupApi,
   updatePmKpiMetricUserApi
@@ -103,9 +104,44 @@ const nodeConfigGroups = ref<NodeConfigGroup[]>([]);
 const selectedUserId = ref<number>();
 const selectedUserName = ref("");
 const notifyUserList = ref<number[]>([]);
+const userSearchQuery = ref("");
+const notifyUserSearchQuery = ref("");
 
 // 编辑态中指标列表的副本，支持独立修改
 const metricsEdit = ref<MetricItem[]>([]);
+
+// 过滤用户列表的通用方法
+const filterUserList = (query: string, userList: UserItem[]) => {
+  if (!query) {
+    return userList;
+  }
+  const lowerQuery = query.toLowerCase();
+  return userList.filter(item => {
+    if (!item.username) return false;
+    // 直接匹配
+    if (item.username.toLowerCase().includes(lowerQuery)) {
+      return true;
+    }
+    // 拼音匹配
+    try {
+      const matchResult = match(item.username, lowerQuery);
+      return matchResult && matchResult.length > 0;
+    } catch (e) {
+      console.error("拼音匹配错误:", e);
+      return false;
+    }
+  });
+};
+
+// 过滤后的用户列表（用于选择用户）
+const filteredUserList = computed(() => {
+  return filterUserList(userSearchQuery.value, props.userList);
+});
+
+// 过滤后的用户列表（用于通知用户）
+const filteredNotifyUserList = computed(() => {
+  return filterUserList(notifyUserSearchQuery.value, props.userList);
+});
 
 const dialogTitle = computed(() =>
   props.mode === "add" ? "新增KPI指标用户" : "修改KPI指标用户"
@@ -286,6 +322,8 @@ const resetState = () => {
   selectedUserId.value = undefined;
   selectedUserName.value = "";
   notifyUserList.value = [];
+  userSearchQuery.value = "";
+  notifyUserSearchQuery.value = "";
 };
 
 // 监听通知人变化，自动更新所有指标
@@ -445,6 +483,24 @@ const handleSubmit = async () => {
 const handleClose = () => {
   emit("update:modelValue", false);
 };
+
+// 拼音搜索用户过滤
+const userFilterMethod = (query: string, item: UserItem) => {
+  if (!query || !item.username) return false;
+  const lowerQuery = query.toLowerCase();
+  // 直接匹配
+  if (item.username.toLowerCase().includes(lowerQuery)) {
+    return true;
+  }
+  // 拼音匹配
+  try {
+    const matchResult = match(item.username, lowerQuery);
+    return matchResult && matchResult.length > 0;
+  } catch (e) {
+    console.error("拼音匹配错误:", e);
+    return false;
+  }
+};
 </script>
 
 <template>
@@ -472,12 +528,13 @@ const handleClose = () => {
                     v-model="selectedUserId"
                     placeholder="请搜索选择用户"
                     filterable
+                    :filter-method="(query: string) => userSearchQuery = query"
                     :loading="props.userLoading"
                     style="width: 100%"
                     @change="handleUserChange"
                   >
                     <el-option
-                      v-for="item in props.userList"
+                      v-for="item in filteredUserList"
                       :key="item.id"
                       :label="item.username"
                       :value="item.id"
@@ -518,12 +575,13 @@ const handleClose = () => {
                   v-model="notifyUserList"
                   multiple
                   filterable
+                  :filter-method="(query: string) => notifyUserSearchQuery = query"
                   placeholder="请选择通知用户"
                   :loading="props.userLoading"
                   style="width: 100%"
                 >
                   <el-option
-                    v-for="item in props.userList"
+                    v-for="item in filteredNotifyUserList"
                     :key="item.id"
                     :label="item.username"
                     :value="item.id"

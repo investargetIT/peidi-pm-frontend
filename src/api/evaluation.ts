@@ -1,7 +1,7 @@
 import { http } from "@/utils/http";
 
 const baseUrlApi = (url: string) => {
-  return "http://12.18.1.36:8087" + url;
+  // return "http://12.18.1.36:8087" + url;
   return "https://api.peidigroup.cn" + url;
 };
 

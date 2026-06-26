@@ -16,6 +16,7 @@ import { Download, Bell, CircleCheck, Warning } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
+import { match } from "pinyin-pro";
 
 interface OtherConfig {
   calculationType?: number;
@@ -203,9 +204,24 @@ const tableCellStyle = ({
 
 const queryUserSuggestions = (queryString: string, cb: any) => {
   let results = queryString
-    ? userList.value.filter((user: any) =>
-        user.username.toLowerCase().includes(queryString.toLowerCase())
-      )
+    ? userList.value.filter((user: any) => {
+        const username = user.username || "";
+        const lowerQuery = queryString.toLowerCase();
+
+        // 直接匹配用户名
+        if (username.toLowerCase().includes(lowerQuery)) {
+          return true;
+        }
+
+        // 使用 pinyin-pro 的 match 函数进行拼音匹配
+        try {
+          const matchResult = match(username, lowerQuery);
+          return matchResult && matchResult.length > 0;
+        } catch (e) {
+          console.error("拼音匹配错误:", e);
+          return false;
+        }
+      })
     : userList.value;
   cb(results.map((user: any) => ({ value: user.username })));
 };

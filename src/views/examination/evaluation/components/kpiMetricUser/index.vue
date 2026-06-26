@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { ref, onMounted, computed, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { match } from "pinyin-pro";
 import {
   getPmKpiMetricUserPage,
   deletePmKpiMetricUserApi,
@@ -245,9 +246,24 @@ const searchParams = ref({
 
 const queryUserSuggestions = (queryString: string, cb: any) => {
   let results = queryString
-    ? userList.value.filter((user: any) =>
-        user.username.toLowerCase().includes(queryString.toLowerCase())
-      )
+    ? userList.value.filter((user: any) => {
+        const username = user.username || "";
+        const lowerQuery = queryString.toLowerCase();
+
+        // 直接匹配
+        if (username.toLowerCase().includes(lowerQuery)) {
+          return true;
+        }
+
+        // 拼音匹配
+        try {
+          const matchResult = match(username, lowerQuery);
+          return matchResult && matchResult.length > 0;
+        } catch (e) {
+          console.error("拼音匹配错误:", e);
+          return false;
+        }
+      })
     : userList.value;
   cb(results.map((user: any) => ({ value: user.username })));
 };
