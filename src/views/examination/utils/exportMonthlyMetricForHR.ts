@@ -126,9 +126,8 @@ const transformMonthlyMetricData = (records: MonthlyMetricResultRecord[]) => {
     // 排除 status=0 的数据
     if (status === 0) return;
 
-    // 只有有 calculationType 的指标才需要处理
+    // 所有 status=1 的指标都需要处理，不管有没有 calculationType
     const parsedOtherConfig = parseMonthlyMetricOtherConfig(otherConfig);
-    if (!parsedOtherConfig.calculationType) return;
 
     const key = `${userId}-${targetName}`;
 
@@ -152,7 +151,7 @@ const transformMonthlyMetricData = (records: MonthlyMetricResultRecord[]) => {
         examinationGroup: nodeName || null,
         target: null,
         achieved: null,
-        calculationType: parsedOtherConfig.calculationType,
+        calculationType: parsedOtherConfig.calculationType || -1, // -1 表示人工填报
         examination: []
       };
 
@@ -215,6 +214,12 @@ export const processAndExportMonthlyMetricForHR = async (
     // 删除 E 列（第 5 列）
     worksheet.spliceColumns(5, 1);
 
+    // 调整列宽
+    worksheet.getColumn(8).width = 12; // H列 - 调窄
+    worksheet.getColumn(10).width = 18; // J列 - 加宽
+    worksheet.getColumn(12).width = 18; // L列 - 加宽
+    worksheet.getColumn(14).width = 18; // N列 - 加宽
+
     // 清空从第 3 行开始的所有数据，并将所有单元格填充颜色设置为空
     let rowNumber = 3;
     while (worksheet.getRow(rowNumber).hasValues) {
@@ -244,6 +249,7 @@ export const processAndExportMonthlyMetricForHR = async (
       3: '当月模式',
       4: '自定义模式'
     };
+    calculationTypeNames[-1] = '人工填报';
 
     // 按照 calculationType 对数据进行分组
     const groupedData: { [key: number]: any[] } = {};
@@ -258,7 +264,7 @@ export const processAndExportMonthlyMetricForHR = async (
     // 从第 3 行开始填充数据
     let currentRowNum = 3;
     // 按照类型顺序处理各组数据
-    [1, 2, 3, 4].forEach((type) => {
+    [1, 2, 3, 4, -1].forEach((type) => {
       const items = groupedData[type];
       if (!items || items.length === 0) return;
 
@@ -273,6 +279,7 @@ export const processAndExportMonthlyMetricForHR = async (
         3: 'FFFFD700', // 当月模式 - 金色
         4: 'FFFFA07A'  // 自定义模式 - 浅橙色
       };
+      colors[-1] = 'FFE0B0FF'; // 人工填报 - 浅紫色
       titleRow.eachCell((cell) => {
         cell.fill = {
           type: 'pattern',
@@ -383,6 +390,11 @@ export const processAndExportMonthlyMetricForHR = async (
           modifiedCount++;
           return;
         }
+      } else if (calculationType === -1) {
+        // 人工填报：直接取上个月的目标值和实际值，以及当前月的目标值
+        valueI = findObjectByMonthWithFirstDay(targetData, previousMonth)?.value || 0;
+        valueK = findObjectByMonthWithFirstDay(actualData, previousMonth)?.value || 0;
+        valueO = findObjectByMonthWithFirstDay(targetData, currentMonth)?.value || 0;
       }
 
       // 统一转成 number，避免接口返回字符串/null 导致 toFixed 报错
