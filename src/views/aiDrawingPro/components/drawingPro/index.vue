@@ -372,7 +372,16 @@ const formatPrompt = (prompt: string, config: any[]) => {
     JSON.stringify(config),
     PromptType.SelectiveAIPro
   );
-  return temp + "\n" + prompt;
+  let fullPrompt = temp;
+  // 添加必做事项（如果有）
+  if (imageConfigFirstPrompt.value) {
+    fullPrompt += "\n" + imageConfigFirstPrompt.value;
+  }
+  // 添加用户输入的提示词（如果有）
+  if (prompt) {
+    fullPrompt += "\n" + prompt;
+  }
+  return fullPrompt;
 };
 
 // 将图片 URL 转换为 base64

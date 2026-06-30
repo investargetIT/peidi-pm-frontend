@@ -215,9 +215,9 @@ const addDrawRecord = async (url: string, imgName: string) => {
   }
 };
 
-// 判断本月是否已生成 100 条记录
+// 判断本月是否已生成 200 条记录
 const isMonthlyLimitReached = () => {
-  return useNumber.value >= 100;
+  return useNumber.value >= 200;
 };
 
 // 刷新列表
@@ -238,7 +238,7 @@ defineExpose({
     <div class="flex items-end justify-between mb-[24px]">
       <h2 class="text-xl font-semibold text-[#0a0a0a]">历史记录</h2>
       <span class="text-xs text-[#0a0a0a]">
-        本月已生成 {{ useNumber }} / 100 张
+        本月已生成 {{ useNumber }} / 200 张
       </span>
     </div>
 

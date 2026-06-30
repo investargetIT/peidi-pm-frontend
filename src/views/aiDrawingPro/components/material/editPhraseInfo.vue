@@ -12,6 +12,7 @@ import { nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import {
   updateMaterial,
   transferGemini,
+  transferDrawAliyun,
   downloadFile,
   uploadDraw
 } from "@/api/aiDraw";
@@ -316,99 +317,115 @@ const handleGenerateDescriptorInfo = async () => {
 
   // 任务需求
   const TASK_REQUIREMENT = `
-第一张图是模板图，第二张图是进行了标记的模板图。
-请返回给我一个可以在模板图上渲染方块（包含方块信息）的参数数组，
-我用来告诉用户哪些地方是可以修改的，你还应该告诉我里面的内容，比如产品卖点 可以修改卖点文案 内容为特色酥骨工艺。
-特别注意如果type为text时，content中的label需要加上name前置，比如"产品卖点_卖点文案"。
-参考格式：
+【任务目标】
+你需要根据提供的三部分内容（原始图、标记图、指令）生成一个配置 JSON 数组。
+
+【关键约束 - 必须严格遵守】
+1. **唯一来源原则**：输出结果**必须严格限制**在第二张（标记）图中被框选或标记的区域内。
+2. **忽略未标记区域**：**绝对不要**提取、推断或生成任何第二张图中未被标记框选的区域（例如，即使图中看到有明显的Logo或价格，只要没在第二张图里框出来，就绝对不能出现在输出结果中）。
+3. **空结果处理**：如果第二张图中没有标记，请返回空数组 []。
+
+【任务步骤】
+1. 观察第一张图（原始模板），获取清晰的背景和内容信息。
+2. 观察第二张图（标记图），识别所有的标记框（通常是红框、方框等）。
+3. 对于每一个标记框：
+   a. 定位其在第一张图中的对应位置。
+   b. 识别该区域是图片还是文本。
+   c. 如果是文本，提取其内容，并根据下文规则生成 label。
+   d. 如果是图片，识别其类型（如产品图、背景图等）。
+4. 按照指定的 JSON 格式输出结果。
+
+【格式与内容规则】
+- 返回一个可以在模板图上渲染方块（包含方块信息）的参数数组。
+- 特别注意：如果 type 为 text 时，content 中的 label 需要加上 name 前置，例如 name 为"产品卖点"，label 需为 "产品卖点_卖点文案"。
+
+【参考输出格式】
 [
   {
-    id: "event_logo",
-    name: "活动logo",
-    type: "image",
-    rect: {
-      x: 0.275,
-      y: 0.06,
-      width: 0.125,
-      height: 0.065
-    }
+    "id": "event_logo",
+    "name": "活动logo",
+    "type": "image",
+    "rect": { "x": 0.275, "y": 0.06, "width": 0.125, "height": 0.065 }
   },
   {
-    id: "product_selling_point",
-    name: "1.产品卖点",
-    content: [
-      {
-        label: "产品卖点_卖点文案",
-        text: "特色酥骨工艺"
-      },
-    ]
-    type: "text",
-    rect: {
-      x: 0.06,
-      y: 0.23,
-      width: 0.65,
-      height: 0.075
-    }
-  },
+    "id": "product_selling_point",
+    "name": "产品卖点",
+    "type": "text",
+    "content": [
+      { "label": "产品卖点_卖点文案", "text": "特色酥骨工艺" }
+    ],
+    "rect": { "x": 0.06, "y": 0.23, "width": 0.65, "height": 0.075 }
+  }
 ]
-
-\'
 `;
 
   const params = {
-    model: "gemini-3.1-pro",
-    stream: true,
-    messages: [
-      {
-        role: "system",
-        content: "你是一名专业的电商主图设计与模板复用 AI"
-      },
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: `${TASK_REQUIREMENT}`
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: base64Url1
+    model: "qwen3.7-plus", // 确认你使用的是正确的视觉模型代号，通常是 qwen-vl-plus 或 qwen-vl-max
+    extra_body: {
+      enable_thinking: false,
+      thinking_budget: 81920
+    },
+    input: {
+      messages: [
+        {
+          role: "user",
+          content: [
+            { image: base64Url1 },
+            { image: base64Url2 },
+            {
+              text: `我将为你提供两张图片。
+图1（原始模板）：[见第一张图片]
+图2（标记图）：[见第二张图片]
+
+${TASK_REQUIREMENT}`
             }
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: base64Url2
-            }
-          }
-        ]
-      }
-    ]
+          ]
+        }
+      ]
+    }
   };
 
-  transferGemini({
-    urlParam: JSON.stringify(params)
+  transferDrawAliyun({
+    urlParam: JSON.stringify(params),
+    resultImage: false
   })
     .then((res: any) => {
       // console.log("中转gemini模型:", res);
       if (res.code === 200) {
-        const content = res.data;
-        console.log("截取后的内容:", content);
+        let content = res.data;
+        console.log("原始返回内容:", content);
 
         try {
-          const jsonBlockMatch = content.match(/```json\s*([\s\S]*?)```/);
-          if (jsonBlockMatch && jsonBlockMatch[1]) {
-            const jsonArray = JSON.parse(jsonBlockMatch[1].trim());
-
-            console.log("解析出的数组:", jsonArray);
-
-            ruleForm.editPhraseInfo = JSON.stringify(jsonArray, null, 2);
-            editPhraseList.value = jsonArray;
-
-            ElMessage.success("生成编辑词成功");
+          // 先解析整个响应
+          let responseData;
+          if (typeof content === "string") {
+            responseData = JSON.parse(content);
           } else {
-            throw new Error("未找到 JSON 代码块");
+            responseData = content;
+          }
+
+          // 提取实际的文本内容
+          const aiText =
+            responseData?.output?.choices?.[0]?.message?.content?.[0]?.text;
+          console.log("AI 返回文本:", aiText);
+
+          if (aiText) {
+            // 从 AI 文本中提取 JSON
+            const jsonBlockMatch = aiText.match(/```json\s*([\s\S]*?)```/);
+            if (jsonBlockMatch && jsonBlockMatch[1]) {
+              const jsonArray = JSON.parse(jsonBlockMatch[1].trim());
+
+              console.log("解析出的数组:", jsonArray);
+
+              ruleForm.editPhraseInfo = JSON.stringify(jsonArray, null, 2);
+              editPhraseList.value = jsonArray;
+
+              ElMessage.success("生成编辑词成功");
+            } else {
+              throw new Error("未找到 JSON 代码块");
+            }
+          } else {
+            throw new Error("未找到 AI 返回的文本内容");
           }
         } catch (error) {
           console.error("解析 AI 返回内容失败:", error);

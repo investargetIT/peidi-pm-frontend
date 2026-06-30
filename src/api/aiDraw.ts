@@ -129,7 +129,10 @@ export const transferDraw = (data: { urlParam: string }) => {
 };
 
 // 中转 阿里云百炼wan2.7-image模型
-export const transferDrawAliyun = (data: { urlParam: string }) => {
+export const transferDrawAliyun = (data: {
+  urlParam: string;
+  resultImage?: boolean;
+}) => {
   return http.request("post", baseUrlApi("/ai/draw/transfer/aliyun"), {
     data,
     timeout: 0

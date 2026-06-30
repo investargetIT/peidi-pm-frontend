@@ -113,9 +113,9 @@ const handlePictureCardPreview: UploadProps["onPreview"] = uploadFile => {
 
 //#region 历史记录相关逻辑
 const handleGenerateClick = async () => {
-  // 检查是否已生成 100 条记录
+  // 检查是否已生成 200 条记录
   if (resultCardRef.value?.isMonthlyLimitReached()) {
-    ElMessage.warning("本月已生成 100 条记录，无法继续生成");
+    ElMessage.warning("本月已生成 200 条记录，无法继续生成");
     return;
   }
 

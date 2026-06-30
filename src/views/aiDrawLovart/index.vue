@@ -350,7 +350,7 @@ onUnmounted(() => {
     <header class="page-header">
       <div class="header-left">
         <h1>SmartCanvas AI</h1>
-        <span class="subtitle">Lovart Style</span>
+        <!-- <span class="subtitle">Lovart Style</span> -->
       </div>
 
       <div class="header-center">

@@ -227,11 +227,7 @@ const parseExcelData = (jsonData: any[]) => {
         parsedRow["remark"] = row["第一优先级提示词"] || row["必做事项"];
       }
 
-      // 如果存在全局的第一优先级提示词，则添加到 remark 字段
-      if (props.imageConfigFirstPrompt) {
-        parsedRow["remark"] =
-          props.imageConfigFirstPrompt + "\\n" + (parsedRow["remark"] || "");
-      }
+      // 全局的第一优先级提示词现在在 buildPrompt 中统一添加，不需要在这里添加
 
       result.push(parsedRow as Record<string, any> & { _id: number });
     } catch (error) {
@@ -583,18 +579,23 @@ const buildPrompt = (rowData: Record<string, any>) => {
     return baseItem;
   });
 
-  const prompt = FORMAT_PROMPT(
+  let prompt = FORMAT_PROMPT(
     JSON.stringify(props.imageConfig),
     JSON.stringify(config),
     PromptType.SelectiveAIPro
   );
 
+  // 添加必做事项（如果有）
+  if (props.imageConfigFirstPrompt) {
+    prompt += "\n" + props.imageConfigFirstPrompt;
+  }
+
   // 如果有备注字段，添加到 prompt 中
   if (rowData.remark) {
-    return `${prompt}\n${rowData.remark}`;
-  } else {
-    return prompt;
+    prompt += "\n" + rowData.remark;
   }
+
+  return prompt;
 };
 
 /**

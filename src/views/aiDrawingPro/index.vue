@@ -139,9 +139,6 @@ onUnmounted(() => {
       <el-tab-pane label="素材库" name="Material" lazy>
         <Material ref="materialTabRef" />
       </el-tab-pane>
-      <el-tab-pane label="创意工作室" name="Creative" lazy>
-        <Creative ref="creativeTabRef" />
-      </el-tab-pane>
       <el-tab-pane label="模板编辑器" name="DrawingPro" disabled>
         <template #label>
           <span>
@@ -156,7 +153,15 @@ onUnmounted(() => {
         </template>
         <DrawingPro ref="drawingProTabRef" />
       </el-tab-pane>
-      <el-tab-pane v-if="hasLovartPermission" label="Lovart" name="Lovart" lazy>
+      <el-tab-pane label="创意工作室" name="Creative" lazy>
+        <Creative ref="creativeTabRef" />
+      </el-tab-pane>
+      <el-tab-pane
+        v-if="hasLovartPermission"
+        label="SmartCanvas"
+        name="Lovart"
+        lazy
+      >
         <AiDrawLovart ref="lovarTabRef" />
       </el-tab-pane>
     </el-tabs>
