@@ -15,18 +15,54 @@ export enum PromptType {
   SelectiveCustom = "selective_custom",
 
   /** 自定义是否保留 - AI */
-  SelectiveAI = "selective_ai"
+  SelectiveAI = "selective_ai",
+
+  /** 自定义是否保留/是否抹除 修订版 - AI */
+  SelectiveAIPro = "selective_ai_pro"
 }
 
 export const FORMAT_PROMPT = (
   imageConfig: string,
   userConfig: string,
-  type: PromptType = PromptType.SelectiveAI
+  type: PromptType = PromptType.SelectiveAIPro
 ) => {
+  // 辅助函数：将 rect 转换为 location 格式
+  const transformRectToLocation = (configStr: string): string => {
+    try {
+      const config = JSON.parse(configStr);
+
+      const transformItem = (item: any) => {
+        if (item.rect && !item.location) {
+          const { rect, ...rest } = item;
+          return {
+            ...rest,
+            location: {
+              description: "元素在模板中的相对位置（仅供参考，无需绘制）",
+              coordinates: rect
+            }
+          };
+        }
+        return item;
+      };
+
+      const transformedConfig = Array.isArray(config)
+        ? config.map(transformItem)
+        : transformItem(config);
+
+      return JSON.stringify(transformedConfig);
+    } catch (e) {
+      // 如果解析失败，返回原始字符串
+      return configStr;
+    }
+  };
+
+  // 转换参数
+  const transformedImageConfig = transformRectToLocation(imageConfig);
+  const transformedUserConfig = transformRectToLocation(userConfig);
   //#region Test
   if (type === PromptType.Test) {
     return `
-      第一张图是模板图，已经对模板图做了标记，参数是${imageConfig}
+      第一张图是模板图，已经对模板图做了标记，参数是${transformedImageConfig}
       删除商品图和赠品图
       `;
   }
@@ -35,8 +71,8 @@ export const FORMAT_PROMPT = (
   //#region 图片元素全部抹除 -Custom
   if (type === PromptType.EraseAllCustom) {
     return `
-  第一张图是模板图，已经对模板图做了标记，参数是${imageConfig}
-  用户按照参数进行修改，用户的修改是${userConfig}
+  第一张图是模板图，已经对模板图做了标记，参数是${transformedImageConfig}
+  用户按照参数进行修改，用户的修改是${transformedUserConfig}
   请返回修改后的图片，图片要实现用户修改的内容
    `;
   }
@@ -49,8 +85,8 @@ export const FORMAT_PROMPT = (
   你是一个专业的图像编辑 AI，负责根据配置参数修改模板图。
   Input Data
   【模板图】：[此处系统自动插入第一张图]
-  【模板参数】：${imageConfig}
-  【用户修改参数】：${userConfig}
+  【模板参数】：${transformedImageConfig}
+  【用户修改参数】：${transformedUserConfig}
   核心规则（必须严格执行）
   📌 图片元素处理规则
   对于【用户修改参数】中所有 type="image" 的元素：
@@ -88,8 +124,8 @@ export const FORMAT_PROMPT = (
   //#region 自定义是否保留/是否抹除  -Custom
   if (type === PromptType.SelectiveCustom) {
     return `
-  第一张图是模板图，已经对模板图做了标记，参数是${imageConfig}
-  用户按照参数进行修改，用户的修改是${userConfig}
+  第一张图是模板图，已经对模板图做了标记，参数是${transformedImageConfig}
+  用户按照参数进行修改，用户的修改是${transformedUserConfig}
   其中如果 image 字段为 null 但 keep 字段为 true，则代表用户需要保留该图片元素
   如果 image 字段为 null 但 keep 字段不存在或为 false，则代表用户需要删除该图片元素，删除后要和底图和谐
   如果 image 字段不为 null，则会在 image 字段中说明需要使用给你的图片素材里的第几张图，使用告知的图片替换原来的图片元素
@@ -107,8 +143,8 @@ export const FORMAT_PROMPT = (
   请根据提供的【模板图】、【模板参数】和【用户修改参数】，输出一张严格符合修改要求的最终图片。
   Input Data
   【模板图】：[此处系统自动插入第一张图]
-  【模板参数】：${imageConfig}
-  【用户修改参数】：${userConfig}
+  【模板参数】：${transformedImageConfig}
+  【用户修改参数】：${transformedUserConfig}
   【可选素材图】：[此处系统自动插入后续提供的素材图片，按顺序编号为素材 2、素材 2…]
   Execution Rules (必须严格按以下规则执行，按优先级排序)
   对于【用户修改参数】中的每一个元素，严格按照以下判断逻辑执行：
@@ -154,6 +190,68 @@ export const FORMAT_PROMPT = (
   - ⚠️ 重要：如果用户明确要求删除商品图（keep=false），而你在结果中保留了商品图，这次生成就判定为失败
   - ⚠️ 再次警告：不要自作聪明地判断哪些元素"应该保留"，严格按参数执行
     `;
+  }
+  //#endregion
+
+  //#region 自定义是否保留/是否抹除 修订版  -AI
+  if (type === PromptType.SelectiveAIPro) {
+    return `
+  Role
+  你是一个专业的电商模板文字编辑器，负责精准修改模板图片中的文字内容。
+  
+  Task
+  对比【模板参数】和【用户修改参数】，仅修改有差异的文字内容，保持其他所有元素100%不变。
+  
+  Input Data
+  【模板图】：[此处系统自动插入第一张图]
+  【模板参数】：${transformedImageConfig}
+  【用户修改参数】：${transformedUserConfig}
+  
+  Execution Rules
+  
+  📍【定位规则】
+     1. 使用 rect 参数定位元素位置（x, y 为左上角坐标，width, height 为区域大小）
+     2. rect 坐标为相对比例（0-1），例如 x=0.5 表示水平居中
+     3. **严禁在图上绘制 rect 框线**，仅供内部定位使用
+  
+  🔄【修改规则】
+     1. 逐一对比模板参数与修改参数中的 text 类型元素
+     2. 只有当 content 内容发生变化时，才执行修改
+     3. 修改时严格保持：
+        - 原文字的位置（rect 定位）
+        - 原文字的字体风格、大小、颜色、粗细
+        - 原文字的对齐方式（左对齐/居中/右对齐）
+        - 原文字区域的背景
+     4. 如果新文字更长，适当缩小字号以适应区域
+     5. 如果新文字更短，保持原字号
+  
+  🔒【禁止事项】(必须严格遵守)
+     1. ❌ 禁止修改内容未变化的文字元素
+     2. ❌ 禁止生成任何图片元素（产品图、赠品图、logo、装饰图等）
+     3. ❌ 禁止删除或修改任何图片元素
+     4. ❌ 禁止改变背景颜色、纹理、渐变、光影
+     5. ❌ 禁止改变整体布局和构图
+     6. ❌ 禁止添加任何装饰性元素
+     7. ❌ 禁止在输出图上绘制 rect 定位框、边框线、辅助标记
+     8. ❌ 禁止因为某些区域"看起来空"就自动填充内容
+     9. ❌ 禁止"脑补"生成模板中不存在的新元素
+  
+  🔍【对比逻辑示例】
+     模板参数："text": "买2送1"
+     修改参数："text": "买2送10"
+     → 检测到差异，执行修改
+     
+     模板参数："text": "25.4"
+     修改参数："text": "25.4"
+     → 无差异，保持原样
+  
+  Output Requirements
+  - 只输出修改文字后的图片
+  - 除有差异的文字内容外，图片必须与模板图100%一致
+  - 不输出任何解释说明
+  
+  ❗ 核心原则：对比差异，只改变化的部分，其他一切保持原样。
+`;
   }
   //#endregion
 };

@@ -585,8 +585,8 @@ const buildPrompt = (rowData: Record<string, any>) => {
 
   const prompt = FORMAT_PROMPT(
     JSON.stringify(props.imageConfig),
-    JSON.stringify(config)
-    // PromptType.Test
+    JSON.stringify(config),
+    PromptType.SelectiveAIPro
   );
 
   // 如果有备注字段，添加到 prompt 中

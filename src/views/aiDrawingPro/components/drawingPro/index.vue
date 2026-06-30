@@ -17,7 +17,7 @@ import ResultImg from "./resultImg.vue";
 import TableCard from "./tableCard.vue";
 import { getNameFromObjectName } from "../../utils/general";
 import MaterialSelectorWithThumb from "./materialSelectorWithThumb.vue";
-import { FORMAT_PROMPT } from "./utils/prompt";
+import { FORMAT_PROMPT, PromptType } from "./utils/prompt";
 
 const aiModel = ref(AI_MODEL_OPTIONS[0].value);
 
@@ -369,7 +369,8 @@ const handleGenerateImage = () => {
 const formatPrompt = (prompt: string, config: any[]) => {
   const temp = FORMAT_PROMPT(
     JSON.stringify(imageConfig.value),
-    JSON.stringify(config)
+    JSON.stringify(config),
+    PromptType.SelectiveAIPro
   );
   return temp + "\n" + prompt;
 };
