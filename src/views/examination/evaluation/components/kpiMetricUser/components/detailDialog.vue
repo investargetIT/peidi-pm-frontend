@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { match } from "pinyin-pro";
 import {
   getPmKpiGroupNodeConfigGroupApi,
+  getPmKpiGroupNodePage,
   updatePmKpiMetricUserApi
 } from "@/api/evaluation";
 
@@ -24,7 +25,7 @@ interface UserItem {
 
 interface ConfigInfo {
   calculationFormula?: string;
-  id?: number;
+  id?: number | string;
   kpiDepict?: string;
   rate?: string;
   targetName?: string;
@@ -33,7 +34,7 @@ interface ConfigInfo {
 
 interface NodeConfigGroup {
   configList?: ConfigInfo[];
-  nodeId?: number;
+  nodeId?: number | string;
   nodeName?: string;
 }
 
@@ -43,14 +44,14 @@ interface SqlExecItem {
 }
 
 interface MetricItem {
-  id?: number;
-  metricConfigId: number;
+  id?: number | string;
+  metricConfigId: number | string;
   metricType: number;
   targetName: string;
   metricId: string;
   kpiDepict: string;
   rate: string;
-  nodeId: number;
+  nodeId: number | string;
   nodeName: string;
   status?: number;
   sqlExecConfig?: string | SqlExecItem[];
@@ -66,7 +67,7 @@ interface RecordItem {
   userId: number;
   jobNum: string;
   username: string;
-  nodeId: number;
+  nodeId: number | string;
   nodeName: string;
   metricList: MetricItem[];
 }
@@ -98,14 +99,16 @@ const emit = defineEmits<Emits>();
 const loading = ref(false);
 const nodeLoading = ref(false);
 const userJobNum = ref("");
-const selectedNodeId = ref<number>();
+const selectedNodeId = ref<number | string>();
 const selectedNodeName = ref("");
 const nodeConfigGroups = ref<NodeConfigGroup[]>([]);
-const selectedUserId = ref<number>();
+const selectedUserId = ref<number | string>();
 const selectedUserName = ref("");
 const notifyUserList = ref<number[]>([]);
 const userSearchQuery = ref("");
 const notifyUserSearchQuery = ref("");
+const organizationTree = ref<any[]>([]);
+const orgLoading = ref(false);
 
 // 编辑态中指标列表的副本，支持独立修改
 const metricsEdit = ref<MetricItem[]>([]);
@@ -314,6 +317,43 @@ const fetchNodeConfigGroups = async () => {
   }
 };
 
+const fetchOrganizationTree = async () => {
+  orgLoading.value = true;
+  try {
+    const res = (await getPmKpiGroupNodePage({
+      pageNo: 1,
+      pageSize: 1000
+    })) as any;
+    if (res?.code === 200 || res?.success) {
+      organizationTree.value = res.data?.records || [];
+    }
+  } catch (error) {
+    console.error("获取组织架构失败", error);
+  } finally {
+    orgLoading.value = false;
+  }
+};
+
+const findNodePath = (nodeId: number | string, nodes: any[]): string => {
+  for (const node of nodes) {
+    if (node.id == nodeId) {
+      return node.nodeName;
+    }
+    if (node.children && node.children.length > 0) {
+      const childPath = findNodePath(nodeId, node.children);
+      if (childPath) {
+        return `${node.nodeName}/${childPath}`;
+      }
+    }
+  }
+  return "";
+};
+
+const getFullNodePath = (nodeId: number | string): string => {
+  const path = findNodePath(nodeId, organizationTree.value);
+  return path || nodeConfigGroups.value.find(n => n.nodeId == nodeId)?.nodeName || "";
+};
+
 const resetState = () => {
   userJobNum.value = "";
   selectedNodeId.value = undefined;
@@ -358,9 +398,14 @@ watch(
       resetState();
     }
 
+    const promises = [];
     if (!nodeConfigGroups.value.length) {
-      await fetchNodeConfigGroups();
+      promises.push(fetchNodeConfigGroups());
     }
+    if (!organizationTree.value.length) {
+      promises.push(fetchOrganizationTree());
+    }
+    await Promise.all(promises);
   }
 );
 
@@ -404,7 +449,9 @@ const sortMetrics = (metrics: MetricItem[]): MetricItem[] => {
       return statusB - statusA;
     }
     // 状态相同保持原顺序（通过metricConfigId或其他字段稳定排序）
-    return (a.metricConfigId || 0) - (b.metricConfigId || 0);
+    const idA = typeof a.metricConfigId === 'string' ? parseInt(a.metricConfigId, 10) || 0 : (a.metricConfigId || 0);
+    const idB = typeof b.metricConfigId === 'string' ? parseInt(b.metricConfigId, 10) || 0 : (b.metricConfigId || 0);
+    return idA - idB;
   });
 };
 
@@ -413,7 +460,7 @@ const handleStatusChange = () => {
   metricsEdit.value = sortMetrics(metricsEdit.value);
 };
 
-const handleNodeChange = (nodeId: number) => {
+const handleNodeChange = (nodeId: number | string) => {
   const nodeConfig = nodeConfigGroups.value.find(item => item.nodeId === nodeId);
   selectedNodeName.value = nodeConfig?.nodeName || "";
   // 切换考核组后，指标全部更新为所选考核组的最新指标配置
@@ -561,7 +608,7 @@ const userFilterMethod = (query: string, item: UserItem) => {
                   <el-option
                     v-for="item in nodeConfigGroups"
                     :key="item.nodeId"
-                    :label="item.nodeName"
+                    :label="getFullNodePath(item.nodeId)"
                     :value="item.nodeId"
                   />
                 </el-select>

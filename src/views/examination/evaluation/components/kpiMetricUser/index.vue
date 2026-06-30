@@ -27,14 +27,14 @@ interface OtherConfig {
 }
 
 interface MetricItem {
-  id: number;
-  metricConfigId: number;
+  id: number | string;
+  metricConfigId: number | string;
   metricType: number;
   targetName: string;
   metricId: string;
   kpiDepict: string;
   rate: string;
-  nodeId: number;
+  nodeId: number | string;
   nodeName: string;
   status?: number;
   sqlExecConfig?: string | SqlExecItem[];
@@ -46,7 +46,7 @@ interface RecordItem {
   userId: number;
   jobNum: string;
   username: string;
-  nodeId: number;
+  nodeId: number | string;
   nodeName: string;
   metricList: MetricItem[];
 }
@@ -55,7 +55,7 @@ interface FlatRow {
   userId: number;
   jobNum: string;
   username: string;
-  nodeId: number;
+  nodeId: number | string;
   nodeName: string;
   rowSpan: number;
   isFirst: boolean;
