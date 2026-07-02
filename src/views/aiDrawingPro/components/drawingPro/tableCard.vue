@@ -18,7 +18,13 @@ import { imageCache } from "../../utils/imageCache";
 import { downloadFile } from "@/api/aiDraw";
 import ResultDialog from "./resultDialog.vue";
 import OnlineImg from "../../common/onlineImg.vue";
-import { Delete, Download, Refresh, Upload } from "@element-plus/icons-vue";
+import {
+  Delete,
+  Download,
+  Refresh,
+  Upload,
+  Loading
+} from "@element-plus/icons-vue";
 import { FORMAT_PROMPT, PromptType } from "./utils/prompt";
 import {
   compositeImage,
@@ -34,6 +40,8 @@ const exportHeight = ref<number | null>(null);
 const exportMaxSizeMB = ref<number | null>(null);
 const exportPreferPNG = ref(false);
 const showExportDialog = ref(false);
+const showPreviewDialog = ref(false);
+const regeneratingIndex = ref<number | null>(null);
 
 const props = defineProps({
   imageConfig: {
@@ -1185,7 +1193,7 @@ const generateCompositeFromRowData = async (
 };
 
 /**
- * 批量导出所有结果图
+ * 打开预览对话框（先检查结果图）
  */
 const exportAllResults = async () => {
   if (importedDataList.value.length === 0) {
@@ -1193,6 +1201,42 @@ const exportAllResults = async () => {
     return;
   }
 
+  // 检查是否有生成结果
+  const hasResults = importedDataList.value.some(
+    row => generatedResults.value[row._id]?.length > 0
+  );
+  if (!hasResults) {
+    ElMessage.warning("请先生成图片后再导出");
+    return;
+  }
+
+  showPreviewDialog.value = true;
+};
+
+/**
+ * 在预览对话框中重新生成单张图片
+ */
+const regenerateInPreview = async (index: number) => {
+  const row = importedDataList.value[index];
+  regeneratingIndex.value = index;
+
+  try {
+    ElMessage.info(`正在重新生成第 ${index + 1} 张图片...`);
+    const resultBase64 = await generateSingleImage(row);
+    generatedResults.value[row._id] = [resultBase64];
+    ElMessage.success(`第 ${index + 1} 张图片重新生成成功`);
+  } catch (error: any) {
+    ElMessage.error(`第 ${index + 1} 张图片重新生成失败：${error.message}`);
+  } finally {
+    regeneratingIndex.value = null;
+  }
+};
+
+/**
+ * 从预览对话框确认导出
+ */
+const confirmFromPreview = () => {
+  showPreviewDialog.value = false;
   showExportDialog.value = true;
 };
 
@@ -1589,6 +1633,82 @@ defineExpose({
 
   <ResultDialog ref="resultDialogRef" />
 
+  <!-- 结果图预览检查对话框 -->
+  <el-dialog
+    v-model="showPreviewDialog"
+    title="检查生成结果图"
+    width="1000px"
+    :close-on-click-modal="false"
+  >
+    <div class="preview-dialog-content">
+      <div class="mb-4 text-sm text-gray-600">
+        请检查以下生成的结果图，如有需要可点击刷新按钮重新生成，确认无误后点击"确定导出"
+      </div>
+
+      <div
+        class="preview-images-list"
+        style="max-height: 600px; overflow-y: auto"
+      >
+        <div
+          v-for="(row, index) in importedDataList"
+          :key="row._id"
+          class="preview-item flex items-center gap-6 p-5 mb-4 bg-gray-50 rounded-lg"
+        >
+          <div
+            class="preview-number flex items-center justify-center w-14 h-14 bg-purple-600 text-white rounded-full font-bold text-2xl flex-shrink-0"
+          >
+            {{ index + 1 }}
+          </div>
+
+          <div class="preview-image-wrapper flex-1">
+            <div
+              v-if="regeneratingIndex === index"
+              class="flex items-center justify-center w-full h-64 bg-gray-200 rounded-lg"
+            >
+              <el-icon class="is-loading text-6xl text-purple-600"
+                ><loading
+              /></el-icon>
+            </div>
+            <img
+              v-else-if="generatedResults[row._id]?.[0]"
+              :src="generatedResults[row._id][0]"
+              :alt="`第${index + 1}张结果图`"
+              class="w-full h-64 object-contain border border-gray-200 rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+              @click="handlePreviewImage(generatedResults[row._id][0], row)"
+            />
+            <div
+              v-else
+              class="flex items-center justify-center w-full h-64 bg-gray-100 rounded-lg text-gray-400 text-lg"
+            >
+              暂无结果
+            </div>
+          </div>
+
+          <div class="preview-action flex-shrink-0">
+            <el-button
+              type="primary"
+              size="default"
+              :icon="Refresh"
+              :loading="regeneratingIndex === index"
+              @click="regenerateInPreview(index)"
+            >
+              重新生成
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="showPreviewDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmFromPreview"
+          >确定导出</el-button
+        >
+      </span>
+    </template>
+  </el-dialog>
+
   <el-dialog
     v-model="showExportDialog"
     title="批量导出设置"
@@ -1663,6 +1783,26 @@ defineExpose({
 <style scoped>
 .empty-data-tip {
   color: #909399;
+}
+
+.preview-dialog-content {
+  padding: 10px 0;
+}
+
+.preview-item {
+  transition: all 0.2s ease;
+}
+
+.preview-item:hover {
+  background-color: #f0f4ff !important;
+}
+
+.preview-number {
+  box-shadow: 0 2px 8px rgba(83, 76, 231, 0.3);
+}
+
+.preview-image-wrapper {
+  position: relative;
 }
 
 .progress-container {
