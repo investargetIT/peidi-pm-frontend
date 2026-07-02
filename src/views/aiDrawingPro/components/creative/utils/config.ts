@@ -1,3 +1,6 @@
+// 测试模式开关：true=测试模式（生成图片不计数），false=正常模式
+export const TEST_MODE = false;
+
 export const AI_MODEL_OPTIONS_WITH_PARAMS = [
   // {
   //   labelName: "阿里 wan2.7-image",

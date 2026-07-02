@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import dayjs from "dayjs";
 
+import { TEST_MODE } from "./utils/config";
 import { getDrawRecordPage, getDrawRecordNew, uploadDraw } from "@/api/aiDraw";
 
 import { processImageCompression } from "../../utils/compressImage/index";
@@ -119,6 +120,12 @@ onMounted(() => {
 
 // 传入绝对路径地址 例"https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=800&fit=crop" 或 base64 字符串
 const addDrawRecord = async (url: string, imgName: string) => {
+  // 测试模式：不记录使用次数
+  if (TEST_MODE) {
+    ElMessage.success("测试模式：不记录使用次数");
+    return true;
+  }
+
   const randomId = generateID();
 
   try {
