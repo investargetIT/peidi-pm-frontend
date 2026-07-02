@@ -68,6 +68,7 @@ const generatedResults = ref<Record<number, string[]>>({});
 const batchGenerating = ref(false);
 const generatingProgress = ref(0);
 const currentGeneratingId = ref<number | null>(null);
+const currentGeneratingIndex = ref(0);
 
 // 动态生成表头列
 const tableColumns = computed(() => {
@@ -872,6 +873,7 @@ const handleBatchGenerate = async () => {
 
   batchGenerating.value = true;
   generatingProgress.value = 0;
+  currentGeneratingIndex.value = 0;
   generatedResults.value = {};
 
   const total = importedDataList.value.length;
@@ -881,10 +883,7 @@ const handleBatchGenerate = async () => {
   for (let i = 0; i < importedDataList.value.length; i++) {
     const row = importedDataList.value[i];
     currentGeneratingId.value = row._id;
-
-    if (i === 0) {
-      generatingProgress.value = Math.round((1 / total) * 50);
-    }
+    currentGeneratingIndex.value = i + 1;
 
     try {
       const resultBase64 = await generateSingleImage(row);
@@ -905,8 +904,12 @@ const handleBatchGenerate = async () => {
     }
   }
 
+  // 生成完成后保持 100% 显示一小会儿
+  await new Promise(resolve => setTimeout(resolve, 500));
+
   batchGenerating.value = false;
   currentGeneratingId.value = null;
+  currentGeneratingIndex.value = 0;
   generatingProgress.value = 0;
 
   ElMessage.success(
@@ -1388,6 +1391,22 @@ defineExpose({
           </div>
         </div>
       </template>
+      <!-- 批量生成进度条区域 -->
+      <div v-if="batchGenerating" class="progress-container mb-4">
+        <div class="progress-title">
+          目前生成序号 {{ currentGeneratingIndex }}，进度
+          {{ currentGeneratingIndex }}/{{ importedDataList.length }}
+        </div>
+        <el-progress
+          :percentage="generatingProgress"
+          :stroke-width="12"
+          :show-text="true"
+          :text-inside="false"
+          color="#534CE7"
+          class="animated-progress"
+        />
+      </div>
+
       <div class="flex items-center justify-between mb-4 flex-wrap">
         <div class="text-base font-bold text-gray-800">
           配置表
@@ -1646,6 +1665,71 @@ defineExpose({
   color: #909399;
 }
 
+.progress-container {
+  background: linear-gradient(135deg, #f0f4ff 0%, #f5f7fa 100%);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(83, 76, 231, 0.1);
+  border: 1px solid rgba(83, 76, 231, 0.1);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.progress-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #534ce7;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-title::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background-color: #534ce7;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+.animated-progress :deep(.el-progress-bar__outer) {
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: #e6e9f0;
+}
+
+.animated-progress :deep(.el-progress-bar__inner) {
+  border-radius: 6px;
+  background: linear-gradient(90deg, #534ce7 0%, #7a6ff0 100%);
+  transition: width 0.4s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.animated-progress :deep(.el-progress-bar__inner::after) {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+.animated-progress :deep(.el-progress__text) {
+  font-size: 14px;
+  font-weight: 600;
+  color: #534ce7;
+}
+
 .rotating-progress-circle :deep(.el-progress-circle__track),
 .rotating-progress-circle :deep(.el-progress-circle__path) {
   animation: rotate 2s linear infinite;
@@ -1658,6 +1742,38 @@ defineExpose({
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
   }
 }
 </style>

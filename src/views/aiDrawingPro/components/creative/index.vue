@@ -73,6 +73,18 @@ const handleModelChange = () => {
     item => item.modelName === aiModel.value
   ).imageNumber[0];
 };
+
+const handleSizeRatioChange = (type: "size" | "ratio") => {
+  if (aiModel.value !== "openai/gpt-image-2") return;
+
+  if (type === "size" && configForm.size !== "自动") {
+    // 选择了具体尺寸，把宽高比设为自动
+    configForm.ratio = "自动";
+  } else if (type === "ratio" && configForm.ratio !== "自动") {
+    // 选择了具体宽高比，把尺寸设为自动
+    configForm.size = "自动";
+  }
+};
 //#region 素材图片相关逻辑
 const handleFileChange: UploadProps["onChange"] = (uploadFile, uploadFiles) => {
   if (uploadFiles.length > MAX_IMAGE_COUNT) {
@@ -339,8 +351,8 @@ const formatParams = async () => {
     const enhancedPrompt = `${configForm.prompt}
 
 【要求】
-- 图片尺寸：${configForm.size}
-- 图片宽高比：${configForm.ratio === "自动" ? "1:1" : configForm.ratio}`;
+- 图片尺寸：${configForm.size === "自动" ? "auto" : configForm.size}
+- 图片宽高比：${configForm.ratio === "自动" ? "auto" : configForm.ratio}`;
 
     return {
       model: aiModel.value,
@@ -522,6 +534,11 @@ onUnmounted(() => {
                       v-model="configForm.size"
                       placeholder="请选择图片尺寸"
                       style="width: 160px"
+                      :disabled="
+                        aiModel === 'openai/gpt-image-2' &&
+                        configForm.ratio !== '自动'
+                      "
+                      @change="handleSizeRatioChange('size')"
                     >
                       <el-option
                         v-for="item in AI_MODEL_OPTIONS_WITH_PARAMS.find(
@@ -538,6 +555,11 @@ onUnmounted(() => {
                       v-model="configForm.ratio"
                       placeholder="请选择宽高比"
                       style="width: 160px"
+                      :disabled="
+                        aiModel === 'openai/gpt-image-2' &&
+                        configForm.size !== '自动'
+                      "
+                      @change="handleSizeRatioChange('ratio')"
                     >
                       <el-option
                         v-for="item in AI_MODEL_OPTIONS_WITH_PARAMS.find(
