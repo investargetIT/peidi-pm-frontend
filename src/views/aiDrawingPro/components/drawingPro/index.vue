@@ -367,9 +367,22 @@ const handleGenerateImage = () => {
 };
 
 const formatPrompt = (prompt: string, config: any[]) => {
+  // 演示模式：只过滤掉需要抹除的 type="image" 的元素
+  const filteredImageConfig = imageConfig.value.filter(item => {
+    if (item.type !== "image") return true;
+    // 保留不需要抹除的 image 元素
+    return !isEraseStatus.value[item.id];
+  });
+
+  const filteredConfig = config.filter(item => {
+    if (item.type !== "image") return true;
+    // 保留不需要抹除的 image 元素
+    return !isEraseStatus.value[item.id];
+  });
+
   const temp = FORMAT_PROMPT(
-    JSON.stringify(imageConfig.value),
-    JSON.stringify(config),
+    JSON.stringify(filteredImageConfig),
+    JSON.stringify(filteredConfig),
     PromptType.SelectiveAIPro
   );
   let fullPrompt = temp;

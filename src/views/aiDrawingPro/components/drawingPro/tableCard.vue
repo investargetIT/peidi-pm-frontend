@@ -579,9 +579,24 @@ const buildPrompt = (rowData: Record<string, any>) => {
     return baseItem;
   });
 
+  // 批量模式：只过滤掉是否抹除为 "是" 的 type="image" 的元素
+  const filteredImageConfig = props.imageConfig.filter(item => {
+    if (item.type !== "image") return true;
+    // 保留不需要抹除的 image 元素
+    const eraseRefKey = `${item.id}_eraseRef`;
+    return !rowData[eraseRefKey];
+  });
+
+  const filteredConfig = config.filter(item => {
+    if (item.type !== "image") return true;
+    // 保留不需要抹除的 image 元素
+    const eraseRefKey = `${item.id}_eraseRef`;
+    return !rowData[eraseRefKey];
+  });
+
   let prompt = FORMAT_PROMPT(
-    JSON.stringify(props.imageConfig),
-    JSON.stringify(config),
+    JSON.stringify(filteredImageConfig),
+    JSON.stringify(filteredConfig),
     PromptType.SelectiveAIPro
   );
 
@@ -1056,9 +1071,10 @@ const generateCompositeFromRowData = async (
 
     console.log(`\n准备加载 ${loadImageTasks.length} 个图片素材...`);
 
+    // 如果没有需要合成的素材，直接返回原图片
     if (loadImageTasks.length === 0) {
-      console.warn("✗ 没有可合成的素材元素，返回 null");
-      return null;
+      console.log("⊘ 没有可合成的素材元素，直接返回原图片");
+      return imageUrl;
     }
 
     const elements: Array<{
@@ -1250,13 +1266,20 @@ const confirmExport = async () => {
 
         if (compositeBase64) {
           // 查找rowData对象里是否有属性名带有产品名称的属性
-          const productName = Object.keys(rowData).find(key =>
+          const productNameKey = Object.keys(rowData).find(key =>
             key.includes("产品名称")
           );
           // 根据 base64 头判断图片格式，选择正确的扩展名
           const isPNG = compositeBase64.startsWith("data:image/png");
           const extension = isPNG ? "png" : "jpg";
-          const fileName = `${rowData[productName] || `AI_Image_${i + 1}`}.${extension}`;
+
+          // 构建文件名：如果有产品名称，就用"产品名称_序号"的格式，防止重名覆盖
+          let fileName: string;
+          if (productNameKey && rowData[productNameKey]) {
+            fileName = `${rowData[productNameKey]}_${i + 1}.${extension}`;
+          } else {
+            fileName = `AI_Image_${i + 1}.${extension}`;
+          }
 
           const base64Data = compositeBase64.split(",")[1];
           const binaryString = atob(base64Data);
