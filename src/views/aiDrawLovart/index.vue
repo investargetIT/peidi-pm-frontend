@@ -651,21 +651,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
-:global(html),
-:global(body) {
-  margin: 0;
-  padding: 0;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-}
-
-:global(#app) {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -673,32 +658,13 @@ onUnmounted(() => {
 .lovart-page {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
   width: 100%;
+  min-height: 100vh; /* 确保至少占满一屏 */
   background: #f0f2f5;
-  overflow: hidden;
+  overflow: visible;
   margin: 0;
   padding: 0;
-}
-
-:global(.main-content) {
-  margin: 0 !important;
-  height: 100% !important;
-  overflow: hidden !important;
-}
-
-:global(.app-main) {
-  height: calc(100vh - 48px) !important;
-  overflow: hidden !important;
-}
-
-:global(.app-main .el-scrollbar__wrap) {
-  overflow: hidden !important;
-}
-
-:global(.app-main .grow) {
-  height: 100% !important;
-  overflow: hidden !important;
 }
 
 .page-header {
@@ -769,16 +735,16 @@ onUnmounted(() => {
 .page-main {
   flex: 1;
   display: flex;
-  overflow: hidden;
-  min-height: 0;
-  height: 0;
+  overflow: visible;
+  min-height: calc(100vh - 100px); /* 减去头部高度 */
+  height: auto;
 }
 
 .canvas-wrapper {
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
-  min-height: 0;
+  min-height: 600px;
 
   .canvas-toolbar {
     position: absolute;
@@ -805,7 +771,7 @@ onUnmounted(() => {
   background: #fff;
   border-left: 1px solid #e4e7ed;
   flex-shrink: 0;
-  min-height: 0;
+  min-height: calc(100vh - 100px);
 }
 
 .panel-tabs {
@@ -845,19 +811,22 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  position: relative;
 }
 
 .properties-panel {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 14px;
-  min-height: 0;
+  min-height: 400px;
+  max-height: none;
 
   .no-selection {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex: 1;
+    padding: 40px 0;
   }
 
   .properties-content {

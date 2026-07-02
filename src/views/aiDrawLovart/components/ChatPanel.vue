@@ -561,7 +561,8 @@ export default {
   width: 100%;
   background: #fff;
   overflow: hidden;
-  min-height: 0;
+  min-height: 400px;
+  max-height: none;
 }
 
 .top-controls {
@@ -677,7 +678,8 @@ export default {
   overflow-x: hidden;
   padding: 14px;
   background: #f5f7fa;
-  min-height: 0;
+  min-height: 200px;
+  max-height: none;
 }
 
 .empty-chat {

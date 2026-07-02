@@ -327,7 +327,8 @@ const handleEditText = (evt: Event, layerId: string) => {
   width: 100%;
   background: #fff;
   overflow: hidden;
-  min-height: 0;
+  min-height: 400px;
+  max-height: none;
 }
 
 .panel-header {
@@ -368,7 +369,8 @@ const handleEditText = (evt: Event, layerId: string) => {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 8px;
-  min-height: 0;
+  min-height: 200px;
+  max-height: none;
 
   .empty-state {
     padding: 30px 0;
