@@ -217,6 +217,44 @@ const handleGenerateClick = async () => {
     });
 };
 
+// 解析尺寸字符串为像素值
+const parseImageSize = (size: string) => {
+  // 处理 "1024x1024" 格式
+  if (size.includes("x")) {
+    const [w, h] = size.split("x").map(Number);
+    return { width: w || 1024, height: h || 1024 };
+  }
+  // 处理 "512", "1K", "2K", "4K" 格式
+  const sizeMap: { [key: string]: number } = {
+    "512": 512,
+    "1K": 1024,
+    "2K": 2048,
+    "4K": 4096
+  };
+  const baseSize = sizeMap[size] || 1024;
+  return { width: baseSize, height: baseSize };
+};
+
+// 根据尺寸和比例计算最终宽高
+const calculateDimensions = (size: string, ratio: string) => {
+  const { width: baseWidth, height: baseHeight } = parseImageSize(size);
+
+  if (ratio === "自动") {
+    return { width: baseWidth, height: baseHeight };
+  }
+
+  const [wRatio, hRatio] = ratio.split(":").map(Number);
+  const ratioValue = wRatio / hRatio;
+
+  if (ratioValue > 1) {
+    // 宽屏
+    return { width: baseWidth, height: Math.round(baseWidth / ratioValue) };
+  } else {
+    // 竖屏或正方形
+    return { width: Math.round(baseHeight * ratioValue), height: baseHeight };
+  }
+};
+
 // 生成空白图片的 base64
 const generateBlankImageBase64 = (width = 512, height = 512) => {
   const canvas = document.createElement("canvas");
@@ -249,9 +287,13 @@ const formatParams = async () => {
       console.error("转换图片为 base64 失败:", error);
       ElMessage.error("图片转换失败:" + error.message);
     }
-  } else if (aiModel.value === "openai/gpt-image-2") {
-    // 如果是七牛云 gpt-image-2 且没有上传图片，生成空白图片
-    base64Urls = [generateBlankImageBase64()];
+  } else {
+    // 没有上传素材图时，根据用户选择的尺寸和比例生成空白图片
+    const { width, height } = calculateDimensions(
+      configForm.size,
+      configForm.ratio
+    );
+    base64Urls = [generateBlankImageBase64(width, height)];
   }
 
   // 图片配置
@@ -293,11 +335,18 @@ const formatParams = async () => {
       );
     });
 
+    // 在 prompt 中添加上尺寸和比例的要求
+    const enhancedPrompt = `${configForm.prompt}
+
+【要求】
+- 图片尺寸：${configForm.size}
+- 图片宽高比：${configForm.ratio === "自动" ? "1:1" : configForm.ratio}`;
+
     return {
       model: aiModel.value,
-      prompt: configForm.prompt,
+      prompt: enhancedPrompt,
       image: processedImageList, // 数组格式
-      quality: "low" // 可以改为 "low", "standard", "high"
+      quality: "auto" // 可以改为 "low", "medium", "high" 或 "auto"
     };
   } else {
     // 其他七牛云模型（如 nano-banana-2）
