@@ -42,6 +42,7 @@ const exportPreferPNG = ref(false);
 const showExportDialog = ref(false);
 const showPreviewDialog = ref(false);
 const regeneratingIndex = ref<number | null>(null);
+const previewRemarks = ref<Record<number, string>>({});
 
 const props = defineProps({
   imageConfig: {
@@ -1222,8 +1223,22 @@ const regenerateInPreview = async (index: number) => {
 
   try {
     ElMessage.info(`正在重新生成第 ${index + 1} 张图片...`);
-    const resultBase64 = await generateSingleImage(row);
+
+    // 复制行数据，添加临时备注
+    const rowWithRemark = { ...row };
+    if (previewRemarks.value[index] && previewRemarks.value[index].trim()) {
+      // 如果已有备注，追加新备注
+      if (rowWithRemark.remark) {
+        rowWithRemark.remark =
+          rowWithRemark.remark + "；" + previewRemarks.value[index].trim();
+      } else {
+        rowWithRemark.remark = previewRemarks.value[index].trim();
+      }
+    }
+
+    const resultBase64 = await generateSingleImage(rowWithRemark);
     generatedResults.value[row._id] = [resultBase64];
+
     ElMessage.success(`第 ${index + 1} 张图片重新生成成功`);
   } catch (error: any) {
     ElMessage.error(`第 ${index + 1} 张图片重新生成失败：${error.message}`);
@@ -1238,6 +1253,45 @@ const regenerateInPreview = async (index: number) => {
 const confirmFromPreview = () => {
   showPreviewDialog.value = false;
   showExportDialog.value = true;
+};
+
+/**
+ * 获取语义化的配置显示对象
+ */
+const getConfigDisplay = (row: Record<string, any>) => {
+  const display: Record<string, any> = {};
+
+  for (const key in row) {
+    if (key === "_id" || key === "remark") continue;
+
+    // 处理键名，去掉前面的 id 部分，只保留后面的标签
+    let label = key;
+    const underscoreIndex = key.indexOf("_");
+    if (underscoreIndex !== -1) {
+      label = key.substring(underscoreIndex + 1);
+    }
+
+    // 处理值
+    let value = row[key];
+    if (value === null || value === undefined) {
+      continue;
+    } else if (typeof value === "boolean") {
+      if (!value) continue; // 不显示"否"的值
+      value = "是";
+    }
+
+    // 只显示有意义的值
+    if (value !== "" && value !== "否") {
+      display[label] = value;
+    }
+  }
+
+  // 添加备注（如果有）
+  if (row.remark) {
+    display["原备注"] = row.remark;
+  }
+
+  return display;
 };
 
 const confirmExport = async () => {
@@ -1637,63 +1691,107 @@ defineExpose({
   <el-dialog
     v-model="showPreviewDialog"
     title="检查生成结果图"
-    width="1000px"
+    width="1700px"
     :close-on-click-modal="false"
   >
     <div class="preview-dialog-content">
       <div class="mb-4 text-sm text-gray-600">
-        请检查以下生成的结果图，如有需要可点击刷新按钮重新生成，确认无误后点击"确定导出"
+        请检查以下生成的结果图，旁边是配置信息方便核对，如有需要可添加备注后点击重新生成，确认无误后点击"确定导出"
       </div>
 
       <div
         class="preview-images-list"
-        style="max-height: 600px; overflow-y: auto"
+        style="max-height: 700px; overflow-y: auto"
       >
         <div
           v-for="(row, index) in importedDataList"
           :key="row._id"
-          class="preview-item flex items-center gap-6 p-5 mb-4 bg-gray-50 rounded-lg"
+          class="preview-item flex gap-4 p-5 mb-4 bg-gray-50 rounded-lg"
         >
           <div
-            class="preview-number flex items-center justify-center w-14 h-14 bg-purple-600 text-white rounded-full font-bold text-2xl flex-shrink-0"
+            class="preview-number flex items-center justify-center w-12 h-12 bg-purple-600 text-white rounded-full font-bold text-xl flex-shrink-0"
           >
             {{ index + 1 }}
           </div>
 
-          <div class="preview-image-wrapper flex-1">
-            <div
-              v-if="regeneratingIndex === index"
-              class="flex items-center justify-center w-full h-64 bg-gray-200 rounded-lg"
-            >
-              <el-icon class="is-loading text-6xl text-purple-600"
-                ><loading
-              /></el-icon>
+          <div class="preview-image-config-wrapper flex-1 flex gap-4">
+            <div class="flex-1">
+              <div
+                v-if="regeneratingIndex === index"
+                class="flex items-center justify-center w-full h-80 bg-gray-200 rounded-lg"
+              >
+                <el-icon class="is-loading text-7xl text-purple-600"
+                  ><loading
+                /></el-icon>
+              </div>
+              <img
+                v-else-if="generatedResults[row._id]?.[0]"
+                :src="generatedResults[row._id][0]"
+                :alt="`第${index + 1}张结果图`"
+                class="w-full h-80 object-contain border border-gray-200 rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+                @click="handlePreviewImage(generatedResults[row._id][0], row)"
+              />
+              <div
+                v-else
+                class="flex items-center justify-center w-full h-80 bg-gray-100 rounded-lg text-gray-400 text-lg"
+              >
+                暂无结果
+              </div>
             </div>
-            <img
-              v-else-if="generatedResults[row._id]?.[0]"
-              :src="generatedResults[row._id][0]"
-              :alt="`第${index + 1}张结果图`"
-              class="w-full h-64 object-contain border border-gray-200 rounded-lg cursor-pointer hover:shadow-md transition-shadow"
-              @click="handlePreviewImage(generatedResults[row._id][0], row)"
-            />
+
             <div
-              v-else
-              class="flex items-center justify-center w-full h-64 bg-gray-100 rounded-lg text-gray-400 text-lg"
+              class="preview-config-wrapper w-64 flex-shrink-0 bg-white p-3 rounded-lg border border-gray-200"
             >
-              暂无结果
+              <h4 class="font-bold text-gray-800 mb-2 text-xs">配置信息</h4>
+              <div class="config-items space-y-1">
+                <div
+                  v-for="(value, key) in getConfigDisplay(row)"
+                  :key="key"
+                  class="config-item flex gap-1"
+                >
+                  <span
+                    class="config-label font-medium text-gray-500 w-16 flex-shrink-0 text-right text-[11px]"
+                    >{{ key }}：</span
+                  >
+                  <span
+                    class="config-value text-gray-700 break-all text-[11px]"
+                    >{{ value }}</span
+                  >
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="preview-action flex-shrink-0">
-            <el-button
-              type="primary"
-              size="default"
-              :icon="Refresh"
-              :loading="regeneratingIndex === index"
-              @click="regenerateInPreview(index)"
+          <div
+            class="preview-right-wrapper w-64 flex-shrink-0 flex flex-col gap-4"
+          >
+            <div
+              class="remark-section bg-white p-4 rounded-lg border border-gray-200"
             >
-              重新生成
-            </el-button>
+              <label class="block text-xs font-medium text-gray-700 mb-2">
+                生成效果备注（重新生成时生效）
+              </label>
+              <el-input
+                v-model="previewRemarks[index]"
+                type="textarea"
+                :rows="4"
+                placeholder="例如：颜色调亮一点，风格更写实..."
+                class="text-xs"
+                size="small"
+              />
+            </div>
+
+            <div class="preview-action flex justify-end">
+              <el-button
+                type="primary"
+                size="default"
+                :icon="Refresh"
+                :loading="regeneratingIndex === index"
+                @click="regenerateInPreview(index)"
+              >
+                重新生成
+              </el-button>
+            </div>
           </div>
         </div>
       </div>
@@ -1802,6 +1900,22 @@ defineExpose({
 }
 
 .preview-image-wrapper {
+  position: relative;
+}
+
+.preview-right-wrapper {
+  position: relative;
+}
+
+.preview-config-wrapper {
+  position: relative;
+}
+
+.config-item {
+  padding: 2px 0;
+}
+
+.remark-section {
   position: relative;
 }
 
