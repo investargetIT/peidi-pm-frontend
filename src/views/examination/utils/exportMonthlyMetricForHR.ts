@@ -186,7 +186,7 @@ export const processAndExportMonthlyMetricForHR = async (
   year?: number
 ) => {
   try {
-    const fileName = sourceFileName || "考核应用报表导出模板_202604091814.xlsx";
+    const fileName = sourceFileName || "考核应用报表导出模板_202607031452.xlsx";
 
     // 获取月度指标数据并转换格式
     const rawData = await fetchMonthlyMetricFullData(year);
@@ -426,6 +426,9 @@ export const processAndExportMonthlyMetricForHR = async (
       currentRowNum++;
       });
     });
+
+    // 删除 E 列（第 5 列）
+    worksheet.spliceColumns(5, 1);
 
     // 由于添加了分组标题行，保留列的数据无法正确对应，所以暂不恢复保留列数据
     // 确保指标ID列（第5列，原F列）的所有单元格背景色都为空

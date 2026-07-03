@@ -142,5 +142,5 @@ Excel 模板按行号分为 **三种计算模式**：
 
 ## 七、文件位置
 
-- **模板文件**：`public/Examination/考核应用报表导出模板_202604091814.xlsx`
+- **模板文件**：`public/Examination/考核应用报表导出模板_202607031452.xlsx`
 - **入口页面**：`reportExport.vue` → "人事导出" 按钮
