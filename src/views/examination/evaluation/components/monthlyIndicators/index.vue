@@ -543,7 +543,7 @@ const confirmTodoNotify = async () => {
   try {
     todoNotifyLoading.value = true;
     todoNotifyDialogVisible.value = false;
-    const res = (await notifyUserApi({ id: Number(currentTodoRow.value.id) })) as any;
+    const res = (await notifyUserApi([Number(currentTodoRow.value.id)])) as any;
     if (res?.code === 200 || res?.success) {
       ElMessage.success("通知成功");
     } else {
@@ -834,14 +834,18 @@ const handleExport = async () => {
   try {
     exportLoading.value = true;
     // 获取当前年份
-    const currentYear = dayjs(searchParams.value.startDate || new Date()).year();
+    const currentYear = dayjs(
+      searchParams.value.startDate || new Date()
+    ).year();
 
     // 收集12个月的数据
     const allYearRecords: ApiRecordItem[] = [];
 
     // 循环请求12个月的数据
     for (let month = 1; month <= 12; month++) {
-      const monthDate = dayjs(`${currentYear}-${month}-01`).format('YYYY-MM-DD');
+      const monthDate = dayjs(`${currentYear}-${month}-01`).format(
+        "YYYY-MM-DD"
+      );
 
       const res = (await getPmKpiMonthMetricTargetPage({
         username: searchParams.value.username || undefined,
@@ -878,14 +882,17 @@ const handleExport = async () => {
 
     const rowDataMap = new Map<string, RowData>();
 
-    allYearRecords.forEach((record) => {
+    allYearRecords.forEach(record => {
       const filteredMetrics = (record.metricTargetList || []).filter(
         metric => metric.status !== 0
       );
 
-      filteredMetrics.forEach((metric) => {
+      filteredMetrics.forEach(metric => {
         // 提取部门和考核组
-        const treePathParts = (metric.treePathName || "").split(",").map(s => s.trim()).filter(Boolean);
+        const treePathParts = (metric.treePathName || "")
+          .split(",")
+          .map(s => s.trim())
+          .filter(Boolean);
         const department = treePathParts[1] || "";
         const assessmentGroup = treePathParts[treePathParts.length - 1] || "";
 
@@ -960,7 +967,7 @@ const handleExport = async () => {
 
     // 添加数据行
     let currentRow = 2;
-    rowDataMap.forEach((rowData) => {
+    rowDataMap.forEach(rowData => {
       // 计算合计
       let total = 0;
       const monthlyValues: (number | string)[] = [];
@@ -1064,6 +1071,11 @@ const todoNotifyChecked = ref(false);
 const currentTodoRow = ref<RecordItem | null>(null);
 const todoNotifyLoading = ref(false);
 
+// 批量通知相关
+const batchTodoNotifyDialogVisible = ref(false);
+const batchTodoNotifyChecked = ref(false);
+const batchTodoNotifyLoading = ref(false);
+
 const handleNotifyUserConfirm = async () => {
   confirmChecked.value = false;
   notifyConfirmDialogVisible.value = true;
@@ -1116,6 +1128,55 @@ const confirmNotify = async () => {
   }
 };
 
+// 批量通知填写
+const handleBatchTodoNotify = () => {
+  if (!visibleRecords.value || visibleRecords.value.length === 0) {
+    ElMessage.warning("当前筛选条件下没有数据");
+    return;
+  }
+  batchTodoNotifyDialogVisible.value = true;
+};
+
+const confirmBatchTodoNotify = async () => {
+  if (!batchTodoNotifyChecked.value) {
+    ElMessage.warning("请先勾选确认发送钉钉待办");
+    return;
+  }
+
+  try {
+    // 收集所有唯一的记录id
+    const idSet = new Set<number>();
+    visibleRecords.value.forEach(record => {
+      if (record.metricTargetList) {
+        record.metricTargetList.forEach(metric => {
+          if (metric.id && metric.status !== 0) {
+            idSet.add(Number(metric.id));
+          }
+        });
+      }
+    });
+
+    if (idSet.size === 0) {
+      ElMessage.warning("没有可通知的记录");
+      return;
+    }
+
+    batchTodoNotifyLoading.value = true;
+    batchTodoNotifyDialogVisible.value = false;
+    const res = (await notifyUserApi(Array.from(idSet))) as any;
+    if (res?.code === 200 || res?.success) {
+      ElMessage.success("批量通知成功");
+    } else {
+      ElMessage.error(res?.msg || "批量通知失败");
+    }
+  } catch (error) {
+    console.error("批量通知用户失败:", error);
+    ElMessage.error("批量通知用户失败");
+  } finally {
+    batchTodoNotifyLoading.value = false;
+  }
+};
+
 // 监听 startDate，确保始终有值
 watch(
   () => searchParams.value.startDate,
@@ -1136,248 +1197,293 @@ onMounted(() => {
   <div class="monthly-indicators-container">
     <!-- 搜索区域 -->
     <div class="search-section">
-      <el-form :model="searchParams" inline size="default">
-        <el-form-item label="负责人">
-          <el-autocomplete
-            v-model="searchParams.username"
-            :fetch-suggestions="queryUserSuggestions"
-            placeholder="请输入负责人"
-            clearable
-            style="width: 200px"
-            :trigger-on-focus="true"
-          />
-        </el-form-item>
-        <el-form-item label="组织路径">
-          <el-input
-            v-model="searchParams.treePathName"
-            placeholder="请输入组织路径"
-            clearable
-            style="width: 200px"
-          />
-        </el-form-item>
-        <el-form-item label="月度">
-          <el-date-picker
-            v-model="searchParams.startDate"
-            type="month"
-            placeholder="选择月度"
-            value-format="YYYY-MM-DD"
-            style="width: 200px"
-            :clearable="false"
-          />
-        </el-form-item>
-        <el-form-item label="数据类型">
-          <el-select
-            v-model="searchParams.dataType"
-            placeholder="请选择数据类型"
-            clearable
-            style="width: 220px"
-          >
-            <el-option label="手填类型" value="manual" />
-            <el-option
-              label="手填类型（未填写完成值）"
-              value="manual_unfilled_achieved"
+      <div class="section-title">搜索筛选</div>
+      <el-card shadow="never" class="search-card">
+        <el-form :model="searchParams" inline size="default">
+          <el-form-item label="负责人">
+            <el-autocomplete
+              v-model="searchParams.username"
+              :fetch-suggestions="queryUserSuggestions"
+              placeholder="请输入负责人"
+              clearable
+              style="width: 200px"
+              :trigger-on-focus="true"
             />
-            <el-option
-              label="手填类型（未填写目标值）"
-              value="manual_unfilled_target"
+          </el-form-item>
+          <el-form-item label="组织路径">
+            <el-input
+              v-model="searchParams.treePathName"
+              placeholder="请输入组织路径"
+              clearable
+              style="width: 200px"
             />
-            <el-option label="自动计算类型" value="auto" />
-            <el-option
-              label="自动计算类型（未填写完成值）"
-              value="auto_unfilled_achieved"
+          </el-form-item>
+          <el-form-item label="月度">
+            <el-date-picker
+              v-model="searchParams.startDate"
+              type="month"
+              placeholder="选择月度"
+              value-format="YYYY-MM-DD"
+              style="width: 200px"
+              :clearable="false"
             />
-            <el-option
-              label="自动计算类型（未填写目标值）"
-              value="auto_unfilled_target"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">查询</el-button>
-          <el-button @click="handleReset">重置</el-button>
-          <el-button
-            type="success"
-            :loading="batchUpdating"
-            @click="handleBatchUpdateMetricData"
-          >
-            批量更新指标数据
-          </el-button>
-        </el-form-item>
-      </el-form>
+          </el-form-item>
+          <el-form-item label="数据类型">
+            <el-select
+              v-model="searchParams.dataType"
+              placeholder="请选择数据类型"
+              clearable
+              style="width: 220px"
+            >
+              <el-option label="手填类型" value="manual" />
+              <el-option
+                label="手填类型（未填写完成值）"
+                value="manual_unfilled_achieved"
+              />
+              <el-option
+                label="手填类型（未填写目标值）"
+                value="manual_unfilled_target"
+              />
+              <el-option label="自动计算类型" value="auto" />
+              <el-option
+                label="自动计算类型（未填写完成值）"
+                value="auto_unfilled_achieved"
+              />
+              <el-option
+                label="自动计算类型（未填写目标值）"
+                value="auto_unfilled_target"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleSearch">查询</el-button>
+            <el-button @click="handleReset">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
+    </div>
+
+    <!-- 操作栏区域 -->
+    <div class="action-bar-section">
+      <div class="section-title">快捷操作</div>
+      <el-card shadow="never" class="action-card">
+        <div class="action-bar justify-end">
+          <div>
+            <el-button
+              type="success"
+              :loading="batchUpdating"
+              @click="handleBatchUpdateMetricData"
+            >
+              批量更新指标数据
+            </el-button>
+            <el-tooltip
+              content="向当前筛选条件下的所有用户发送钉钉待办提醒填写"
+              placement="top"
+            >
+              <el-button
+                class="dingtalk-blue-btn"
+                :loading="batchTodoNotifyLoading"
+                @click="handleBatchTodoNotify"
+              >
+                批量通知填写
+              </el-button>
+            </el-tooltip>
+            <el-tooltip
+              content="向当前可见用户发送钉钉消息，通知其确认绩效信息"
+              placement="top"
+            >
+              <el-button
+                type="primary"
+                :loading="notifyConfirmLoading"
+                @click="handleNotifyUserConfirm"
+              >
+                <el-icon><Bell /></el-icon>
+                通知用户确认绩效信息
+              </el-button>
+            </el-tooltip>
+            <template v-if="isDeveloper()">
+              <el-button
+                class="excel-export-btn"
+                :loading="hrExportLoading"
+                @click="handleExportForHR"
+              >
+                <el-icon><Download /></el-icon>
+                人事导出
+              </el-button>
+              <el-tooltip
+                content="导出选中月份所在年份1-12月的目标业绩表"
+                placement="top"
+              >
+                <el-button
+                  class="excel-export-btn"
+                  :loading="exportLoading"
+                  @click="handleExport"
+                >
+                  <el-icon><Download /></el-icon>
+                  导出目标业绩表
+                </el-button>
+              </el-tooltip>
+            </template>
+          </div>
+        </div>
+      </el-card>
     </div>
 
     <!-- 表格区域 -->
     <div class="table-section">
-      <div class="table-actions">
+      <div class="section-title">数据列表</div>
+      <el-card shadow="never" class="table-card">
         <div class="table-tip">
           <el-tag size="small" type="warning" effect="light">提示</el-tag>
           <span class="tip-text"
             >黄色背景行为手填数据，浅灰色背景的目标值可随时编辑</span
           >
         </div>
-        <div class="export-buttons">
-          <template v-if="isDeveloper()">
-            <el-button
-              class="excel-export-btn"
-              :loading="hrExportLoading"
-              @click="handleExportForHR"
-            >
-              <el-icon><Download /></el-icon>
-              人事导出
-            </el-button>
-            <el-tooltip content="导出选中月份所在年份1-12月的目标业绩表" placement="top">
-              <el-button class="excel-export-btn" :loading="exportLoading" @click="handleExport">
-                <el-icon><Download /></el-icon>
-                导出目标业绩表
-              </el-button>
-            </el-tooltip>
-          </template>
-          <el-tooltip
-            content="向当前可见用户发送钉钉消息，通知其确认绩效信息"
-            placement="top"
-          >
-            <el-button
-              type="primary"
-              :loading="notifyConfirmLoading"
-              @click="handleNotifyUserConfirm"
-            >
-              <el-icon><Bell /></el-icon>
-              通知用户确认绩效信息
-            </el-button>
-          </el-tooltip>
-        </div>
-      </div>
-      <el-table
-        v-loading="loading"
-        :data="tableData"
-        border
-        stripe
-        style="width: 100%"
-        :span-method="objectSpanMethod"
-        :cell-style="tableCellStyle"
-      >
-        <el-table-column label="序号" width="60" align="center">
-          <template #default="{ $index }">
-            {{ getGroupIndex($index) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="month" label="月份" width="120" align="center">
-          <template #default="{ row }">
-            {{ row.groupIndex === 0 ? formatMonth(row.month) : "" }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="username"
-          label="负责人"
-          width="100"
-          align="center"
+        <el-table
+          v-loading="loading"
+          :data="tableData"
+          border
+          stripe
+          style="width: 100%"
+          :span-method="objectSpanMethod"
+          :cell-style="tableCellStyle"
         >
-          <template #default="{ row }">
-            {{ row.groupIndex === 0 ? row.username : "" }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="targetName"
-          label="指标名称"
-          min-width="200"
-          show-overflow-tooltip
-        />
-        <el-table-column prop="target" label="目标值" width="160" align="right">
-          <template #default="{ row }">
-            <el-input
-              v-if="isEditing(row, 'target')"
-              v-model="editingValue"
-              :class="`editable-cell-input-${row.id}-target`"
-              style="width: 120px"
-              @blur="confirmEdit(row, 'target')"
-              @keydown="handleEditKeydown($event, row, 'target')"
-            />
-            <span
-              v-else
-              v-loading="isSaving(row, 'target')"
-              class="editable-cell"
-              :title="'双击修改'"
-              @dblclick="startEdit(row, 'target')"
-            >
-              {{ formatNumber(row.target) }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="achieved"
-          label="完成值"
-          width="160"
-          align="right"
-        >
-          <template #default="{ row }">
-            <el-input
-              v-if="isEditing(row, 'achieved')"
-              v-model="editingValue"
-              :class="`editable-cell-input-${row.id}-achieved`"
-              style="width: 120px"
-              @blur="confirmEdit(row, 'achieved')"
-              @keydown="handleEditKeydown($event, row, 'achieved')"
-            />
-            <span
-              v-else
-              v-loading="isSaving(row, 'achieved')"
-              class="editable-cell"
-              :class="{ 'editable-cell-disabled': !isManualRow(row) }"
-              :title="isManualRow(row) ? '双击修改' : '不可编辑'"
-              @dblclick="
-                isManualRow(row) ? startEdit(row, 'achieved') : undefined
-              "
-            >
-              {{ formatNumber(row.achieved) }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="完成率" width="140" align="center">
-          <template #default="{ row }">
-            <span :class="getRateClass(row.target, row.achieved)">
-              {{ getCompletionRate(row.target, row.achieved) }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column fixed="right" label="操作" width="280" align="center">
-          <template #default="{ row }">
-            <template v-if="row.groupIndex === 0">
-              <div class="action-buttons">
-                <el-button
-                  type="success"
-                  size="small"
-                  :loading="isUpdating(row.userId || '')"
-                  @click="handleUpdateMetricData(row)"
-                >
-                  更新指标数据
-                </el-button>
-                <el-tooltip content="提醒该负责人的填写人填写指标信息" placement="top">
-                  <el-button
-                    class="dingtalk-blue-btn"
-                    size="small"
-                    @click="handleNotifyUser(row)"
-                  >
-                    提醒填写
-                  </el-button>
-                </el-tooltip>
-              </div>
+          <el-table-column label="序号" width="60" align="center">
+            <template #default="{ $index }">
+              {{ getGroupIndex($index) }}
             </template>
-          </template>
-        </el-table-column>
-      </el-table>
+          </el-table-column>
+          <el-table-column prop="month" label="月份" width="120" align="center">
+            <template #default="{ row }">
+              {{ row.groupIndex === 0 ? formatMonth(row.month) : "" }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="username"
+            label="负责人"
+            width="100"
+            align="center"
+          >
+            <template #default="{ row }">
+              {{ row.groupIndex === 0 ? row.username : "" }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="targetName"
+            label="指标名称"
+            min-width="200"
+            show-overflow-tooltip
+          />
+          <el-table-column
+            prop="target"
+            label="目标值"
+            width="160"
+            align="right"
+          >
+            <template #default="{ row }">
+              <el-input
+                v-if="isEditing(row, 'target')"
+                v-model="editingValue"
+                :class="`editable-cell-input-${row.id}-target`"
+                style="width: 120px"
+                @blur="confirmEdit(row, 'target')"
+                @keydown="handleEditKeydown($event, row, 'target')"
+              />
+              <span
+                v-else
+                v-loading="isSaving(row, 'target')"
+                class="editable-cell"
+                :title="'双击修改'"
+                @dblclick="startEdit(row, 'target')"
+              >
+                {{ formatNumber(row.target) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="achieved"
+            label="完成值"
+            width="160"
+            align="right"
+          >
+            <template #default="{ row }">
+              <el-input
+                v-if="isEditing(row, 'achieved')"
+                v-model="editingValue"
+                :class="`editable-cell-input-${row.id}-achieved`"
+                style="width: 120px"
+                @blur="confirmEdit(row, 'achieved')"
+                @keydown="handleEditKeydown($event, row, 'achieved')"
+              />
+              <span
+                v-else
+                v-loading="isSaving(row, 'achieved')"
+                class="editable-cell"
+                :class="{ 'editable-cell-disabled': !isManualRow(row) }"
+                :title="isManualRow(row) ? '双击修改' : '不可编辑'"
+                @dblclick="
+                  isManualRow(row) ? startEdit(row, 'achieved') : undefined
+                "
+              >
+                {{ formatNumber(row.achieved) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="完成率" width="140" align="center">
+            <template #default="{ row }">
+              <span :class="getRateClass(row.target, row.achieved)">
+                {{ getCompletionRate(row.target, row.achieved) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            fixed="right"
+            label="操作"
+            width="280"
+            align="center"
+          >
+            <template #default="{ row }">
+              <template v-if="row.groupIndex === 0">
+                <div class="action-buttons">
+                  <el-button
+                    type="success"
+                    size="small"
+                    :loading="isUpdating(row.userId || '')"
+                    @click="handleUpdateMetricData(row)"
+                  >
+                    更新指标数据
+                  </el-button>
+                  <el-tooltip
+                    content="提醒该负责人的填写人填写指标信息"
+                    placement="top"
+                  >
+                    <el-button
+                      class="dingtalk-blue-btn"
+                      size="small"
+                      @click="handleNotifyUser(row)"
+                    >
+                      提醒填写
+                    </el-button>
+                  </el-tooltip>
+                </div>
+              </template>
+            </template>
+          </el-table-column>
+        </el-table>
 
-      <!-- 分页 -->
-      <div class="pagination-section">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[5, 10, 20, 100]"
-          :total="total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @current-change="handleCurrentChange"
-          @size-change="handleSizeChange"
-        />
-      </div>
+        <!-- 分页 -->
+        <div class="pagination-section">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[5, 10, 20, 100]"
+            :total="total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @current-change="handleCurrentChange"
+            @size-change="handleSizeChange"
+          />
+        </div>
+      </el-card>
     </div>
 
     <!-- 执行结果对话框 -->
@@ -1449,7 +1555,9 @@ onMounted(() => {
         </div>
         <div class="notify-info">
           <div class="notify-title">发送钉钉通知</div>
-          <div class="notify-desc">即将向当前筛选条件下可见的用户发送绩效确认通知</div>
+          <div class="notify-desc">
+            即将向当前筛选条件下可见的用户发送绩效确认通知
+          </div>
         </div>
       </div>
       <div class="notify-features">
@@ -1467,12 +1575,23 @@ onMounted(() => {
         </div>
       </div>
       <div class="notify-checkbox">
-        <el-checkbox v-model="confirmChecked" size="large">我确认发送钉钉消息</el-checkbox>
+        <el-checkbox v-model="confirmChecked" size="large"
+          >我确认发送钉钉消息</el-checkbox
+        >
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button size="large" @click="notifyConfirmDialogVisible = false">取消</el-button>
-          <el-button type="primary" size="large" :loading="notifyConfirmLoading" :disabled="!confirmChecked" @click="confirmNotify">确定发送</el-button>
+          <el-button size="large" @click="notifyConfirmDialogVisible = false"
+            >取消</el-button
+          >
+          <el-button
+            type="primary"
+            size="large"
+            :loading="notifyConfirmLoading"
+            :disabled="!confirmChecked"
+            @click="confirmNotify"
+            >确定发送</el-button
+          >
         </div>
       </template>
     </el-dialog>
@@ -1491,7 +1610,9 @@ onMounted(() => {
         </div>
         <div class="notify-info">
           <div class="notify-title">发送待办提醒</div>
-          <div class="notify-desc">即将向「{{ currentTodoRow?.username }}」的填写人发送钉钉待办通知</div>
+          <div class="notify-desc">
+            即将向「{{ currentTodoRow?.username }}」的填写人发送钉钉待办通知
+          </div>
         </div>
       </div>
       <div class="notify-features">
@@ -1505,12 +1626,74 @@ onMounted(() => {
         </div>
       </div>
       <div class="notify-checkbox">
-        <el-checkbox v-model="todoNotifyChecked" size="large">我确认发送钉钉待办</el-checkbox>
+        <el-checkbox v-model="todoNotifyChecked" size="large"
+          >我确认发送钉钉待办</el-checkbox
+        >
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button size="large" @click="todoNotifyDialogVisible = false">取消</el-button>
-          <el-button class="dingtalk-blue-btn" size="large" :loading="todoNotifyLoading" :disabled="!todoNotifyChecked" @click="confirmTodoNotify">确定发送</el-button>
+          <el-button size="large" @click="todoNotifyDialogVisible = false"
+            >取消</el-button
+          >
+          <el-button
+            class="dingtalk-blue-btn"
+            size="large"
+            :loading="todoNotifyLoading"
+            :disabled="!todoNotifyChecked"
+            @click="confirmTodoNotify"
+            >确定发送</el-button
+          >
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 批量发送钉钉待办确认对话框 -->
+    <el-dialog
+      v-model="batchTodoNotifyDialogVisible"
+      title="批量发送钉钉待办"
+      width="520px"
+      :close-on-click-modal="false"
+      class="todo-notify-dialog"
+    >
+      <div class="notify-confirm-content">
+        <div class="notify-icon">
+          <el-icon :size="48" color="#0089FF"><Bell /></el-icon>
+        </div>
+        <div class="notify-info">
+          <div class="notify-title">批量发送待办提醒</div>
+          <div class="notify-desc" style="color: red">
+            即将向当前筛选条件下的所有用户发送钉钉待办通知
+          </div>
+        </div>
+      </div>
+      <div class="notify-features">
+        <div class="feature-item">
+          <el-icon color="#67C23A"><CircleCheck /></el-icon>
+          <span>批量提醒用户填写指标信息</span>
+        </div>
+        <div class="feature-item">
+          <el-icon color="#E6A23C"><Warning /></el-icon>
+          <span>24小时内只能发送一次</span>
+        </div>
+      </div>
+      <div class="notify-checkbox">
+        <el-checkbox v-model="batchTodoNotifyChecked" size="large"
+          >我确认发送钉钉待办</el-checkbox
+        >
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button size="large" @click="batchTodoNotifyDialogVisible = false"
+            >取消</el-button
+          >
+          <el-button
+            class="dingtalk-blue-btn"
+            size="large"
+            :loading="batchTodoNotifyLoading"
+            :disabled="!batchTodoNotifyChecked"
+            @click="confirmBatchTodoNotify"
+            >确定发送</el-button
+          >
         </div>
       </template>
     </el-dialog>
@@ -1640,16 +1823,50 @@ onMounted(() => {
   margin-top: 20px;
 }
 
-.table-actions {
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
+  gap: 8px;
 }
 
-.export-buttons {
+.section-title::before {
+  content: "";
+  width: 4px;
+  height: 16px;
+  background: #409eff;
+  border-radius: 2px;
+}
+
+.action-bar-section {
+  margin-bottom: 20px;
+}
+
+.action-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
+.action-bar .action-buttons {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.table-section {
+  margin-bottom: 20px;
+}
+
+.table-section .table-tip {
+  margin-bottom: 12px;
 }
 
 .table-tip {
@@ -1700,10 +1917,13 @@ onMounted(() => {
 }
 
 .search-section {
-  padding: 16px;
-  border: 1px solid var(--el-border-color);
+  margin-bottom: 20px;
+}
+
+.search-card,
+.action-card,
+.table-card {
   border-radius: 8px;
-  background: #fff;
 }
 
 .search-section :deep(.el-form) {
@@ -1719,13 +1939,6 @@ onMounted(() => {
 
 .search-section :deep(.el-form-item:last-child) {
   margin-left: auto;
-}
-
-.table-section {
-  border: 1px solid var(--el-border-color);
-  border-radius: 8px;
-  padding: 16px;
-  background: #fff;
 }
 
 .pagination-section {

@@ -365,15 +365,12 @@ export const generateKpiMonthMetricTargetByUserId = (data: {
 };
 
 // 通知用户填写指标信息
-export const notifyUserApi = (params: {
-  id: number;
-  [property: string]: any;
-}) => {
+export const notifyUserApi = (data: number[]) => {
   return http.request(
     "post",
     baseUrlApi("/pm/kpi-month-metric-target/notifyUser"),
     {
-      params
+      data
     }
   );
 };
