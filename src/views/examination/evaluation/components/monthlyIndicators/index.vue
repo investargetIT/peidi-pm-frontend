@@ -543,7 +543,7 @@ const confirmTodoNotify = async () => {
   try {
     todoNotifyLoading.value = true;
     todoNotifyDialogVisible.value = false;
-    const res = (await notifyUserApi({ id: [Number(currentTodoRow.value.id)] })) as any;
+    const res = (await notifyUserApi([Number(currentTodoRow.value.id)])) as any;
     if (res?.code === 200 || res?.success) {
       ElMessage.success("通知成功");
     } else {
@@ -1058,7 +1058,25 @@ const handleExportForHR = async () => {
     ElMessage.success("人事导出成功");
   } catch (error) {
     console.error("人事导出失败:", error);
-    ElMessage.error("人事导出失败，请查看控制台日志");
+    // 显示详细错误信息
+    const errorMsg =
+      error instanceof Error ? error.message : "人事导出失败，请查看控制台日志";
+
+    if (errorMsg.includes("上月数据中存在手填类型数据不符合要求")) {
+      // 如果是我们的检查错误，使用简洁的展示方式
+      const match = errorMsg.match(/发现 (\d+) 条/);
+      const count = match ? match[1] : "若干";
+      ElMessageBox.alert(
+        `发现 ${count} 条上月手填数据不符合要求，请先补填完整后再导出。`,
+        "导出检查失败",
+        {
+          confirmButtonText: "知道了",
+          type: "error"
+        }
+      );
+    } else {
+      ElMessage.error(errorMsg);
+    }
   } finally {
     hrExportLoading.value = false;
   }
@@ -1164,7 +1182,7 @@ const confirmBatchTodoNotify = async () => {
 
     batchTodoNotifyLoading.value = true;
     batchTodoNotifyDialogVisible.value = false;
-    const res = (await notifyUserApi({ id: Array.from(idSet) })) as any;
+    const res = (await notifyUserApi(Array.from(idSet))) as any;
     if (res?.code === 200 || res?.success) {
       ElMessage.success("批量通知成功");
     } else {

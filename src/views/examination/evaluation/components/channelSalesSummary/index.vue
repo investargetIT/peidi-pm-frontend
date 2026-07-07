@@ -1,7 +1,11 @@
 <script lang="ts" setup>
 import { ref, onMounted, computed, watch } from "vue";
-import { getPmKpiShopExaminationGroupStatistics, type ShopExaminationGroupRes, type MonthData } from "@/api/evaluation";
-import { processAndExportChannelSales, debugExcelTemplate } from "@/views/examination/utils/exportChannelSales";
+import {
+  getPmKpiShopExaminationGroupStatistics,
+  type ShopExaminationGroupRes,
+  type MonthData
+} from "@/api/evaluation";
+import { processAndExportChannelSales } from "@/views/examination/utils/exportChannelSales";
 import { ElMessage, ElTooltip } from "element-plus";
 import { Download } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
@@ -31,17 +35,6 @@ const handleExportChannelSales = async () => {
     ElMessage.error("导出失败，请查看控制台");
   } finally {
     exportLoading.value = false;
-  }
-};
-
-// 调试Excel模板
-const handleDebugExcel = async () => {
-  try {
-    await debugExcelTemplate();
-    ElMessage.success("调试完成，请查看控制台");
-  } catch (error) {
-    console.error("调试失败:", error);
-    ElMessage.error("调试失败，请查看控制台");
   }
 };
 
@@ -87,7 +80,7 @@ const handleReset = () => {
 // 监听 selectedYear，确保始终有值
 watch(
   () => selectedYear.value,
-  (newVal) => {
+  newVal => {
     if (!newVal) {
       selectedYear.value = String(dayjs().year());
     }
@@ -147,11 +140,15 @@ onMounted(() => {
         </el-form-item>
         <el-form-item>
           <el-tooltip
-            content="导出各渠道销售收款及OBM总营收数据（需要先配置映射表）"
+            content="导出各渠道销售收款及OBM总营收数据"
             placement="top"
           >
             <el-button
-              style="background-color: #217346; border-color: #217346; color: #ffffff;"
+              style="
+                background-color: #217346;
+                border-color: #217346;
+                color: #ffffff;
+              "
               :loading="exportLoading"
               @click="handleExportChannelSales"
             >
@@ -159,9 +156,6 @@ onMounted(() => {
               导出Excel
             </el-button>
           </el-tooltip>
-        </el-form-item>
-        <el-form-item>
-          <el-button @click="handleDebugExcel">调试Excel模板</el-button>
         </el-form-item>
       </el-form>
     </div>
