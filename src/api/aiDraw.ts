@@ -184,3 +184,25 @@ export const getDrawRecordNew = (data: { path: string; type: string }) => {
     data
   });
 };
+
+// 中转 coding plan（AI检测）
+export const transferCodingPlan = (data: {
+  createAt?: string;
+  fields?: string;
+  id?: number;
+  imgs?: string;
+  maxRetries?: number;
+  remark?: string;
+  resultImage?: string;
+  size?: number;
+  status?: number;
+  updateAt?: string;
+  urlParam?: string;
+  uuid?: string;
+  [key: string]: any;
+}) => {
+  return http.request("post", baseUrlApi("/ai/draw/transfer/coding/plan"), {
+    data,
+    timeout: 0
+  });
+};

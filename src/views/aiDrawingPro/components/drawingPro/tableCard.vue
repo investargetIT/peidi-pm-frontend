@@ -9,7 +9,8 @@ import { AI_MODEL_OPTIONS } from "./utils/config";
 import {
   transferDraw,
   transferDrawAliyun,
-  transferDrawQnaigc
+  transferDrawQnaigc,
+  transferCodingPlan
 } from "@/api/aiDraw";
 import imageUrl1 from "@/views/debug/assets/绘图1.png";
 import imageUrl2 from "@/views/debug/assets/绘图2.jpg";
@@ -23,7 +24,8 @@ import {
   Download,
   Refresh,
   Upload,
-  Loading
+  Loading,
+  CircleCheck
 } from "@element-plus/icons-vue";
 import { FORMAT_PROMPT, PromptType } from "./utils/prompt";
 import {
@@ -43,6 +45,13 @@ const showExportDialog = ref(false);
 const showPreviewDialog = ref(false);
 const regeneratingIndex = ref<number | null>(null);
 const previewRemarks = ref<Record<number, string>>({});
+
+// AI校验相关
+const validatingIndex = ref<number | null>(null);
+const isAllValidating = ref(false);
+const validationResults = ref<
+  Record<number, { passed: boolean; issues: string[]; suggestion: string }>
+>({});
 
 const props = defineProps({
   imageConfig: {
@@ -1294,6 +1303,272 @@ const getConfigDisplay = (row: Record<string, any>) => {
   return display;
 };
 
+/**
+ * AI校验单张图片
+ */
+const validateSingleImage = async (index: number) => {
+  const row = importedDataList.value[index];
+  const resultImageUrl = generatedResults.value[row._id]?.[0];
+
+  if (!resultImageUrl) {
+    ElMessage.warning(`第 ${index + 1} 张图片没有生成结果，无法校验`);
+    return;
+  }
+
+  validatingIndex.value = index;
+
+  try {
+    // 构建校验提示词 - 只提取文字类型的配置，忽略图片类型（图片是后面自己拼接的）
+    const configDisplay = getConfigDisplay(row);
+
+    // 只把文字类型的配置整理出来
+    let configText = "";
+
+    // 先从 props.imageConfig 中找出哪些是 text 类型的
+    const textConfigKeys = new Set<string>();
+    props.imageConfig.forEach(item => {
+      if (item.type === "text" && item.content) {
+        item.content.forEach(field => {
+          // 生成对应的 key，和 getConfigDisplay 里的逻辑一致
+          const underscoreIndex = `${item.id}_${field.label}`.indexOf("_");
+          if (underscoreIndex !== -1) {
+            const displayKey = `${item.id}_${field.label}`.substring(
+              underscoreIndex + 1
+            );
+            textConfigKeys.add(displayKey);
+          }
+        });
+      }
+    });
+
+    // 只添加文字类型的配置
+    for (const key in configDisplay) {
+      if (key !== "原备注" && textConfigKeys.has(key)) {
+        configText += `${key}：${configDisplay[key]}\n`;
+      }
+    }
+
+    const validatePrompt = `你是一个严格的广告图审核助手，负责对生成的图片进行质量把关。
+
+【重要原则】
+1. **只检查文字！**：图片是分两步制作的 - AI 只负责改文字区域，产品图片是后面人工拼接的，所以不要去检查产品图有没有显示！
+2. 重点关注【预期配置】中列出的文字内容。
+3. 对于未在配置中列出的区域，如果它们保持了原有的模板样式，请忽略；但如果出现了明显的视觉错误（如遮挡、乱绘），必须指出。
+4. **不要因为空白区域报错**：空白区域是正常的，是留给后面拼接产品图用的！
+
+【预期配置的文字信息】
+${configText}
+
+【审核维度】
+1. **文字内容准确性**：
+   - 检查配置中的文字是否正确显示，无错别字、无多余符号（如乱码、多余货币符号）。
+
+2. **排版质量（关键）**：
+   - 检查文字是否被截断、显示不全。
+   - **遮挡检查**：检查目标文字是否溢出并遮挡了旁边的元素（如数字过大盖住了单位"起"、"元"）。
+   - 如果配置中的文字较长，检查是否进行了合理的缩放以适应版面。
+
+3. **画面纯净度**：
+   - 检查是否存在明显的AI幻觉产物（如奇怪的装饰块、不该有的矩形框）。
+   - 注意：模板原有的背景纹理、装饰元素不算错误，只有明显的违和生成物才算问题。
+   - 再次强调：空白区域是正常的，是留给后面拼接产品图用的，不要因为空白报错！
+
+【返回格式】
+请**严格**返回纯 JSON 字符串，不要包含 markdown 标记（如 \`\`\`json），不要包含任何解释性文字。
+返回结构如下：
+{
+  "passed": true,
+  "issues": [],
+  "suggestion": "审核通过"
+}
+如果存在问题：
+{
+  "passed": false,
+  "issues": ["问题1：数字'200'字号过大，遮挡了右侧的'起'字", "问题2：图片中间出现了不存在的黑色方块"],
+  "suggestion": "建议缩小数字字号，去除多余图形"
+}
+`;
+
+    // 调用AI校验 - 使用新接口
+    const params = {
+      model: "qwen3.7-plus",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: {
+                url: resultImageUrl
+              }
+            },
+            {
+              type: "text",
+              text: validatePrompt
+            }
+          ]
+        }
+      ],
+      enable_thinking: false
+    };
+
+    const response = await transferCodingPlan({
+      urlParam: JSON.stringify(params)
+    });
+
+    if (response.code === 200) {
+      // 尝试解析AI返回的JSON
+      let result;
+      try {
+        let content = response.data || response;
+        let responseData;
+
+        if (typeof content === "string") {
+          try {
+            responseData = JSON.parse(content);
+          } catch {
+            responseData = { content };
+          }
+        } else {
+          responseData = content;
+        }
+
+        // 提取实际的文本内容
+        let aiText =
+          responseData?.output?.choices?.[0]?.message?.content?.[0]?.text ||
+          responseData?.output?.choices?.[0]?.message?.content ||
+          responseData?.choices?.[0]?.message?.content ||
+          responseData?.message?.content ||
+          responseData?.content ||
+          responseData;
+
+        // 如果 content 是数组，处理它
+        if (Array.isArray(aiText)) {
+          aiText =
+            aiText.find(item => item.type === "text")?.text ||
+            aiText[0]?.text ||
+            aiText;
+        }
+
+        console.log("AI返回的原始文本:", aiText);
+
+        if (!aiText) {
+          throw new Error("未找到 AI 返回的文本内容");
+        }
+
+        // 从 AI 文本中提取 JSON（处理 ```json 包裹的情况）
+        let jsonStr = "";
+        if (typeof aiText === "string") {
+          const jsonBlockMatch = aiText.match(/```json\s*([\s\S]*?)```/);
+          if (jsonBlockMatch && jsonBlockMatch[1]) {
+            jsonStr = jsonBlockMatch[1].trim();
+          } else {
+            // 尝试直接解析整个字符串
+            jsonStr = aiText.trim();
+          }
+        } else if (typeof aiText === "object" && aiText.passed !== undefined) {
+          // 如果 aiText 本身就是我们需要的对象
+          result = aiText;
+        }
+
+        if (jsonStr && !result) {
+          try {
+            result = JSON.parse(jsonStr);
+          } catch (parseError) {
+            console.error("JSON 解析失败:", parseError, "原始字符串:", jsonStr);
+            throw new Error("解析 JSON 失败");
+          }
+        }
+      } catch (e) {
+        // 如果解析失败，做一个默认的结果
+        console.error("解析AI返回失败:", e);
+        result = {
+          passed: false,
+          issues: ["AI返回格式异常，需要人工检查"],
+          suggestion: "请人工检查图片"
+        };
+      }
+
+      validationResults.value[index] = result;
+
+      if (result.passed) {
+        ElMessage.success(`第 ${index + 1} 张图片校验通过`);
+      } else {
+        ElMessage.warning(
+          `第 ${index + 1} 张图片发现问题：${result.issues[0]}`
+        );
+      }
+    } else {
+      throw new Error(response?.msg || "AI校验失败");
+    }
+  } catch (error: any) {
+    console.error("AI校验失败:", error);
+    ElMessage.error(`第 ${index + 1} 张图片校验失败：${error.message}`);
+  } finally {
+    validatingIndex.value = null;
+  }
+};
+
+/**
+ * AI校验全部图片
+ */
+const validateAllImages = async () => {
+  const hasResults = importedDataList.value.some(
+    row => generatedResults.value[row._id]?.length > 0
+  );
+
+  if (!hasResults) {
+    ElMessage.warning("请先生成图片后再校验");
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要使用AI校验所有生成的图片吗？`,
+      "AI校验确认",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "info"
+      }
+    );
+  } catch {
+    return;
+  }
+
+  isAllValidating.value = true;
+  validationResults.value = {};
+
+  try {
+    for (let i = 0; i < importedDataList.value.length; i++) {
+      const row = importedDataList.value[i];
+      if (generatedResults.value[row._id]?.[0]) {
+        await validateSingleImage(i);
+        // 加个小延迟避免请求过快
+        if (i < importedDataList.value.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+      }
+    }
+
+    // 统计结果
+    const passedCount = Object.values(validationResults.value).filter(
+      r => r.passed
+    ).length;
+    const failedCount = Object.values(validationResults.value).filter(
+      r => !r.passed
+    ).length;
+
+    ElMessage.success(
+      `AI校验完成！通过 ${passedCount} 张，发现问题 ${failedCount} 张`
+    );
+  } catch (error) {
+    console.error("批量校验失败:", error);
+  } finally {
+    isAllValidating.value = false;
+  }
+};
+
 const confirmExport = async () => {
   showExportDialog.value = false;
 
@@ -1691,12 +1966,39 @@ defineExpose({
   <el-dialog
     v-model="showPreviewDialog"
     title="检查生成结果图"
-    width="1700px"
+    width="1400px"
     :close-on-click-modal="false"
   >
     <div class="preview-dialog-content">
-      <div class="mb-4 text-sm text-gray-600">
-        请检查以下生成的结果图，旁边是配置信息方便核对，如有需要可添加备注后点击重新生成，确认无误后点击"确定导出"
+      <div class="mb-4 flex items-center justify-between">
+        <div class="text-sm text-gray-600">
+          请检查以下生成的结果图，旁边是配置信息方便核对，如有需要可添加备注后点击重新生成，确认无误后点击"确定导出"
+        </div>
+        <div class="flex items-center gap-3">
+          <div v-if="Object.keys(validationResults).length > 0" class="text-sm">
+            <span class="text-green-600">
+              ✓ 通过:
+              {{
+                Object.values(validationResults).filter(r => r.passed).length
+              }}
+            </span>
+            <span class="mx-2">|</span>
+            <span class="text-red-500">
+              ✗ 问题:
+              {{
+                Object.values(validationResults).filter(r => !r.passed).length
+              }}
+            </span>
+          </div>
+          <el-button
+            type="warning"
+            :icon="CircleCheck"
+            :loading="isAllValidating"
+            @click="validateAllImages"
+          >
+            {{ isAllValidating ? "AI校验中..." : "AI校验" }}
+          </el-button>
+        </div>
       </div>
 
       <div
@@ -1707,18 +2009,57 @@ defineExpose({
           v-for="(row, index) in importedDataList"
           :key="row._id"
           class="preview-item flex gap-4 p-5 mb-4 bg-gray-50 rounded-lg"
+          :class="{
+            'border-2 border-green-400 bg-green-50':
+              validationResults[index]?.passed,
+            'border-2 border-red-400 bg-red-50':
+              validationResults[index] && !validationResults[index]?.passed
+          }"
         >
-          <div
-            class="preview-number flex items-center justify-center w-12 h-12 bg-purple-600 text-white rounded-full font-bold text-xl flex-shrink-0"
-          >
-            {{ index + 1 }}
+          <div class="flex flex-col items-center gap-2">
+            <div
+              class="preview-number flex items-center justify-center w-12 h-12 bg-purple-600 text-white rounded-full font-bold text-xl flex-shrink-0"
+            >
+              {{ index + 1 }}
+            </div>
+
+            <!-- 校验结果标识 -->
+            <div
+              v-if="validationResults[index]"
+              class="flex flex-col items-center"
+            >
+              <div
+                v-if="validationResults[index].passed"
+                class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-xl font-bold"
+              >
+                ✓
+              </div>
+              <div
+                v-else
+                class="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center text-xl font-bold"
+              >
+                ✗
+              </div>
+            </div>
+
+            <!-- 单个校验按钮 -->
+            <el-button
+              v-else
+              type="info"
+              size="small"
+              :loading="validatingIndex === index"
+              class="text-xs"
+              @click="validateSingleImage(index)"
+            >
+              校验
+            </el-button>
           </div>
 
-          <div class="preview-image-config-wrapper flex-1 flex gap-4">
+          <div class="preview-image-config-wrapper flex-[2.5] flex gap-4">
             <div class="flex-1">
               <div
                 v-if="regeneratingIndex === index"
-                class="flex items-center justify-center w-full h-80 bg-gray-200 rounded-lg"
+                class="flex items-center justify-center w-full h-96 bg-gray-200 rounded-lg"
               >
                 <el-icon class="is-loading text-7xl text-purple-600"
                   ><loading
@@ -1728,45 +2069,121 @@ defineExpose({
                 v-else-if="generatedResults[row._id]?.[0]"
                 :src="generatedResults[row._id][0]"
                 :alt="`第${index + 1}张结果图`"
-                class="w-full h-80 object-contain border border-gray-200 rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+                class="w-full h-96 object-contain border border-gray-200 rounded-lg cursor-pointer hover:shadow-md transition-shadow"
                 @click="handlePreviewImage(generatedResults[row._id][0], row)"
               />
               <div
                 v-else
-                class="flex items-center justify-center w-full h-80 bg-gray-100 rounded-lg text-gray-400 text-lg"
+                class="flex items-center justify-center w-full h-96 bg-gray-100 rounded-lg text-gray-400 text-lg"
               >
                 暂无结果
               </div>
             </div>
 
             <div
-              class="preview-config-wrapper w-64 flex-shrink-0 bg-white p-3 rounded-lg border border-gray-200"
+              class="preview-config-wrapper w-56 flex-shrink-0 flex flex-col h-96"
             >
-              <h4 class="font-bold text-gray-800 mb-2 text-xs">配置信息</h4>
-              <div class="config-items space-y-1">
+              <!-- 配置信息 -->
+              <div
+                class="bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col flex-1"
+              >
                 <div
-                  v-for="(value, key) in getConfigDisplay(row)"
-                  :key="key"
-                  class="config-item flex gap-1"
+                  class="px-3 pt-3 pb-2 bg-white border-b border-gray-100 flex-shrink-0"
                 >
-                  <span
-                    class="config-label font-medium text-gray-500 w-16 flex-shrink-0 text-right text-[11px]"
-                    >{{ key }}：</span
+                  <h4 class="font-bold text-gray-800 text-xs">配置信息</h4>
+                </div>
+                <div class="px-3 pb-3 overflow-y-auto flex-1">
+                  <div class="config-items space-y-1 pt-1">
+                    <div
+                      v-for="(value, key) in getConfigDisplay(row)"
+                      :key="key"
+                      class="config-item flex gap-1"
+                    >
+                      <span
+                        class="config-label font-medium text-gray-500 w-14 flex-shrink-0 text-right text-[10px]"
+                        >{{ key }}：</span
+                      >
+                      <span
+                        class="config-value text-gray-700 break-all text-[10px]"
+                        >{{ value }}</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI校验结果 -->
+              <div
+                v-if="validationResults[index]"
+                class="rounded-lg border p-3 mt-3 flex-shrink-0"
+                :class="
+                  validationResults[index].passed
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-red-50 border-red-200'
+                "
+              >
+                <h4
+                  class="font-bold mb-2 text-xs"
+                  :class="
+                    validationResults[index].passed
+                      ? 'text-green-800'
+                      : 'text-red-800'
+                  "
+                >
+                  {{
+                    validationResults[index].passed
+                      ? "✓ 校验通过"
+                      : "✗ 发现问题"
+                  }}
+                </h4>
+
+                <div
+                  v-if="
+                    !validationResults[index].passed &&
+                    validationResults[index].issues.length > 0
+                  "
+                  class="mb-2"
+                >
+                  <p class="text-xs text-red-700 font-medium mb-1">
+                    问题列表：
+                  </p>
+                  <ul
+                    class="text-[10px] text-red-600 list-disc list-inside space-y-1"
                   >
-                  <span
-                    class="config-value text-gray-700 break-all text-[11px]"
-                    >{{ value }}</span
+                    <li
+                      v-for="(issue, issueIndex) in validationResults[index]
+                        .issues"
+                      :key="issueIndex"
+                    >
+                      {{ issue }}
+                    </li>
+                  </ul>
+                </div>
+
+                <div v-if="validationResults[index].suggestion">
+                  <p class="text-[10px] text-gray-600 font-medium mb-1">
+                    建议：
+                  </p>
+                  <p
+                    class="text-[10px]"
+                    :class="
+                      validationResults[index].passed
+                        ? 'text-green-700'
+                        : 'text-red-700'
+                    "
                   >
+                    {{ validationResults[index].suggestion }}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
           <div
-            class="preview-right-wrapper w-64 flex-shrink-0 flex flex-col gap-4"
+            class="preview-right-wrapper w-52 flex-shrink-0 flex flex-col gap-4"
           >
             <div
-              class="remark-section bg-white p-4 rounded-lg border border-gray-200"
+              class="remark-section bg-white p-3 rounded-lg border border-gray-200"
             >
               <label class="block text-xs font-medium text-gray-700 mb-2">
                 生成效果备注（重新生成时生效）
