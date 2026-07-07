@@ -543,7 +543,7 @@ const confirmTodoNotify = async () => {
   try {
     todoNotifyLoading.value = true;
     todoNotifyDialogVisible.value = false;
-    const res = (await notifyUserApi([Number(currentTodoRow.value.id)])) as any;
+    const res = (await notifyUserApi({ id: [Number(currentTodoRow.value.id)] })) as any;
     if (res?.code === 200 || res?.success) {
       ElMessage.success("通知成功");
     } else {
@@ -1045,6 +1045,7 @@ const handleExport = async () => {
 
 const hrExportLoading = ref(false);
 const exportLoading = ref(false);
+
 const handleExportForHR = async () => {
   if (!isDeveloper()) {
     ElMessage.warning("只有开发者可以导出");
@@ -1163,7 +1164,7 @@ const confirmBatchTodoNotify = async () => {
 
     batchTodoNotifyLoading.value = true;
     batchTodoNotifyDialogVisible.value = false;
-    const res = (await notifyUserApi(Array.from(idSet))) as any;
+    const res = (await notifyUserApi({ id: Array.from(idSet) })) as any;
     if (res?.code === 200 || res?.success) {
       ElMessage.success("批量通知成功");
     } else {

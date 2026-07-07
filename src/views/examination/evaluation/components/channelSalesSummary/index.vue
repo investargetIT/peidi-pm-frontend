@@ -1,6 +1,9 @@
 <script lang="ts" setup>
 import { ref, onMounted, computed, watch } from "vue";
 import { getPmKpiShopExaminationGroupStatistics, type ShopExaminationGroupRes, type MonthData } from "@/api/evaluation";
+import { processAndExportChannelSales, debugExcelTemplate } from "@/views/examination/utils/exportChannelSales";
+import { ElMessage, ElTooltip } from "element-plus";
+import { Download } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
 
 interface TableRecordItem {
@@ -9,8 +12,38 @@ interface TableRecordItem {
 }
 
 const loading = ref(false);
+const exportLoading = ref(false);
 const groupData = ref<ShopExaminationGroupRes[]>([]);
 const selectedYear = ref<string | number>(String(dayjs().year()));
+
+// 导出各渠道销售数据
+const handleExportChannelSales = async () => {
+  try {
+    exportLoading.value = true;
+    const result = await processAndExportChannelSales(
+      undefined,
+      undefined,
+      Number(selectedYear.value)
+    );
+    ElMessage.success(result.message || "各渠道销售数据导出成功");
+  } catch (error) {
+    console.error("各渠道销售数据导出失败:", error);
+    ElMessage.error("导出失败，请查看控制台");
+  } finally {
+    exportLoading.value = false;
+  }
+};
+
+// 调试Excel模板
+const handleDebugExcel = async () => {
+  try {
+    await debugExcelTemplate();
+    ElMessage.success("调试完成，请查看控制台");
+  } catch (error) {
+    console.error("调试失败:", error);
+    ElMessage.error("调试失败，请查看控制台");
+  }
+};
 
 // 获取所有月份列表
 const allMonths = computed(() => {
@@ -111,6 +144,24 @@ onMounted(() => {
         <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
+        </el-form-item>
+        <el-form-item>
+          <el-tooltip
+            content="导出各渠道销售收款及OBM总营收数据（需要先配置映射表）"
+            placement="top"
+          >
+            <el-button
+              style="background-color: #217346; border-color: #217346; color: #ffffff;"
+              :loading="exportLoading"
+              @click="handleExportChannelSales"
+            >
+              <el-icon><Download /></el-icon>
+              导出Excel
+            </el-button>
+          </el-tooltip>
+        </el-form-item>
+        <el-form-item>
+          <el-button @click="handleDebugExcel">调试Excel模板</el-button>
         </el-form-item>
       </el-form>
     </div>
