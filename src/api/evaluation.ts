@@ -446,6 +446,10 @@ export interface MonthData {
    * 销售回款总额
    */
   salesCollection?: number;
+  /**
+   * 当月到账
+   */
+  taxedIncome?: number;
   [property: string]: any;
 }
 

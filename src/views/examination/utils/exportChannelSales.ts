@@ -22,7 +22,8 @@ export const CATEGORY_MAPPING: Record<string, string> = {
   销售三组: "销售三组",
   哈宠: "哈宠团队",
   AAT: "AAT孵化项目组",
-  Vivaland品牌项目组: "Vivaland品牌项目组"
+  Vivaland品牌项目组: "Vivaland品牌项目组",
+  瑞驰派特: "瑞驰派特"
 };
 
 /**
@@ -31,6 +32,9 @@ export const CATEGORY_MAPPING: Record<string, string> = {
 export const EXCEL_CONFIG = {
   // 分类名称所在的列号（从1开始）
   CATEGORY_COLUMN: 1,
+
+  // 数据类型所在的列号
+  DATA_TYPE_COLUMN: 2,
 
   // 数据从第几行开始
   DATA_START_ROW: 6,
@@ -49,10 +53,7 @@ export const EXCEL_CONFIG = {
     12: 10,
     13: 11,
     14: 12
-  },
-
-  // API数据中需要填充的字段名
-  DATA_FIELD: "salesCollection"
+  }
 };
 
 //#endregion
@@ -113,7 +114,7 @@ export const processAndExportChannelSales = async (
 ) => {
   try {
     const fileName =
-      sourceFileName || "各渠道销售收款及OBM总营收数据模板_202607071419.xlsx";
+      sourceFileName || "各渠道销售收款及OBM总营收数据模板_202607081206.xlsx";
 
     // 获取各渠道销售汇总数据
     const apiData = await fetchChannelSalesData(year);
@@ -153,6 +154,10 @@ export const processAndExportChannelSales = async (
     let modifiedCount = 0;
     let skippedCount = 0;
 
+    // 当前正在处理的分类
+    let currentCategory = "";
+    let currentMatchedData: any = null;
+
     // 遍历Excel行
     for (
       let rowNumber = EXCEL_CONFIG.DATA_START_ROW;
@@ -162,10 +167,32 @@ export const processAndExportChannelSales = async (
       const row = worksheet.getRow(rowNumber);
 
       // 获取分类名称
-      const categoryName =
+      let categoryName =
         row.getCell(EXCEL_CONFIG.CATEGORY_COLUMN).value?.toString() || "";
 
+      // 获取数据类型
+      const dataType =
+        row.getCell(EXCEL_CONFIG.DATA_TYPE_COLUMN).value?.toString() || "";
+
+      // 如果当前行没有分类名称，尝试使用上一行的分类（因为新模板有合并单元格）
       if (!categoryName || categoryName.trim() === "") {
+        categoryName = currentCategory;
+      } else {
+        currentCategory = categoryName;
+        // 新的分类，重新查找匹配数据
+        const mappedGroupName = CATEGORY_MAPPING[categoryName];
+        if (mappedGroupName) {
+          currentMatchedData = dataMap.get(mappedGroupName);
+        } else {
+          currentMatchedData = null;
+        }
+      }
+
+      if (!categoryName || categoryName.trim() === "") {
+        continue;
+      }
+
+      if (!dataType || dataType.trim() === "") {
         continue;
       }
 
@@ -179,7 +206,7 @@ export const processAndExportChannelSales = async (
       }
 
       // 在API数据中查找匹配的groupName
-      const matchedData = dataMap.get(mappedGroupName);
+      const matchedData = currentMatchedData || dataMap.get(mappedGroupName);
 
       if (!matchedData) {
         console.log(
@@ -189,8 +216,20 @@ export const processAndExportChannelSales = async (
         continue;
       }
 
+      // 确定要填充的字段
+      let dataField = "";
+      if (dataType.includes("含税")) {
+        dataField = "taxedIncome";
+      } else if (dataType.includes("收款")) {
+        dataField = "salesCollection";
+      } else {
+        console.log(`跳过行 ${rowNumber}：数据类型 "${dataType}" 无法识别`);
+        skippedCount++;
+        continue;
+      }
+
       // 找到了匹配数据，开始填充
-      console.log(`处理行 ${rowNumber}：${categoryName} -> ${mappedGroupName}`);
+      console.log(`处理行 ${rowNumber}：${categoryName} - ${dataType} -> ${mappedGroupName}`);
 
       const monthData = matchedData.monthData || [];
 
@@ -200,8 +239,8 @@ export const processAndExportChannelSales = async (
         const monthStr = getFirstDayOfMonth(targetYear, Number(monthNum));
         const monthItem = monthData.find((m: any) => m.month === monthStr);
 
-        if (monthItem && monthItem[EXCEL_CONFIG.DATA_FIELD] !== undefined) {
-          const value = monthItem[EXCEL_CONFIG.DATA_FIELD];
+        if (monthItem && monthItem[dataField] !== undefined) {
+          const value = monthItem[dataField];
           // 数据是元，转换为万元
           const valueInWan = toNumber(value) / 10000;
           row.getCell(Number(colNum)).value = valueInWan;
@@ -247,7 +286,7 @@ export const processAndExportChannelSales = async (
  * 调试函数：打印Excel模板的完整结构
  */
 export const debugExcelTemplate = async (fileName?: string) => {
-  const targetFileName = fileName || "各渠道销售收款及OBM总营收数据模板_202607071419.xlsx";
+  const targetFileName = fileName || "各渠道销售收款及OBM总营收数据模板_202607081206.xlsx";
   const filePath = `/Examination/${targetFileName}`;
 
   console.log("========== 调试Excel模板结构 ==========");

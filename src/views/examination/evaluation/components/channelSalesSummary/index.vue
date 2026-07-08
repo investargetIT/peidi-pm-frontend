@@ -12,6 +12,8 @@ import dayjs from "dayjs";
 
 interface TableRecordItem {
   groupName: string;
+  dataType: string;
+  rowKey: string;
   [key: string]: any;
 }
 
@@ -97,21 +99,81 @@ const formatCurrency = (value: number | string) => {
   });
 };
 
-// 将数据转换为表格格式
+// 计算需要合并的行
+const getSpanMethod = ({ row, column, rowIndex, columnIndex }: any) => {
+  if (columnIndex === 0) {
+    // 第一列（序号）需要合并
+    const dataType = row.dataType;
+    if (dataType === "含税收入") {
+      // 含税收入行占2行
+      return {
+        rowspan: 2,
+        colspan: 1
+      };
+    } else {
+      // 销售收款行不显示（被合并）
+      return {
+        rowspan: 0,
+        colspan: 0
+      };
+    }
+  }
+  if (columnIndex === 1) {
+    // 第二列（分组名称）需要合并
+    const dataType = row.dataType;
+    if (dataType === "含税收入") {
+      // 含税收入行占2行
+      return {
+        rowspan: 2,
+        colspan: 1
+      };
+    } else {
+      // 销售收款行不显示（被合并）
+      return {
+        rowspan: 0,
+        colspan: 0
+      };
+    }
+  }
+  // 其他列正常显示
+  return {
+    rowspan: 1,
+    colspan: 1
+  };
+};
+
+// 将数据转换为表格格式（每个渠道两行：含税收入、销售收款）
 const tableData = computed<TableRecordItem[]>(() => {
-  return groupData.value.map(group => {
-    const record: TableRecordItem = {
-      groupName: group.groupName || ""
+  const result: TableRecordItem[] = [];
+
+  groupData.value.forEach(group => {
+    const groupName = group.groupName || "";
+
+    // 第一行：含税收入
+    const taxedIncomeRow: TableRecordItem = {
+      groupName,
+      dataType: "含税收入",
+      rowKey: `${groupName}-taxedIncome`
+    };
+
+    // 第二行：销售收款
+    const salesCollectionRow: TableRecordItem = {
+      groupName,
+      dataType: "销售收款",
+      rowKey: `${groupName}-salesCollection`
     };
 
     // 为每个月份添加数据
     allMonths.value.forEach(month => {
       const monthData = group.monthData?.find(m => m.month === month);
-      record[month] = monthData?.salesCollection;
+      taxedIncomeRow[month] = monthData?.taxedIncome;
+      salesCollectionRow[month] = monthData?.salesCollection;
     });
 
-    return record;
+    result.push(taxedIncomeRow, salesCollectionRow);
   });
+
+  return result;
 });
 
 onMounted(() => {
@@ -165,12 +227,19 @@ onMounted(() => {
       <el-table
         v-loading="loading"
         :data="tableData"
+        :span-method="getSpanMethod"
         border
         stripe
         style="width: 100%"
+        :row-key="'rowKey'"
       >
-        <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column label="序号" width="60" align="center">
+          <template #default="{ $index }">
+            {{ Math.floor($index / 2) + 1 }}
+          </template>
+        </el-table-column>
         <el-table-column prop="groupName" label="分组名称" min-width="200" />
+        <el-table-column prop="dataType" label="数据类型" width="120" />
 
         <!-- 动态生成月份列 -->
         <el-table-column
