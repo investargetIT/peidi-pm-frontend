@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted, nextTick, watch, h } from "vue";
+import { ref, onMounted, nextTick, watch, h, computed } from "vue";
 import {
   getPmKpiMonthMetricTargetPage,
   updatePmKpiMonthMetricTargetApi,
@@ -10,7 +10,7 @@ import {
   notifyUserApi,
   notifyUserConfirmApi
 } from "@/api/evaluation";
-import { processAndExportMonthlyMetricForHR } from "@/views/examination/utils/exportMonthlyMetricForHR";
+import { processAndExportMonthlyMetricForHR, calculateMonthlyMetricData } from "@/views/examination/utils/exportMonthlyMetricForHR";
 import { ElMessage, ElMessageBox, ElCheckbox } from "element-plus";
 import { Download, Bell, CircleCheck, Warning } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
@@ -37,6 +37,7 @@ interface MetricTargetItem {
   status?: number;
   existSqlConfig?: number;
   otherConfig?: string | null;
+  isEdit?: number;
 }
 
 interface RecordItem extends MetricTargetItem {
@@ -107,17 +108,21 @@ const initialPagination = savedPagination
 const currentPage = ref(initialPagination.currentPage);
 const pageSize = ref(initialPagination.pageSize);
 const ALL_PAGE_SIZE = 99999;
-const DEVELOPER_USER_IDS = [
+// 核心开发人员（更高权限）
+const CORE_DEVELOPER_USER_IDS = [
   "1846392647319093250", // Summer
   "1926449443739600965", // 沈皓钰
   "1850741012504838145", // 张思宇
-  "1926449443739601629", // 杨世豪
+  "1926449443739601629" // 杨世豪
+];
+const DEVELOPER_USER_IDS = [
+  ...CORE_DEVELOPER_USER_IDS,
   "1869635118983348225", // 肖嘉玲
   "1870023775338692610", // 任琪琳
   "1926449443739601538" // 王晓莹
 ];
 const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
-  邓苏: ["王永蝶", "夏立明", "潘明旺", "缪欣瑶"],
+  邓苏: ["邓苏", "王永蝶", "夏立明", "潘明旺", "缪欣瑶"],
   孙舒欣: ["孙舒欣"],
   方云: ["侯子洋", "王琳"],
   付阳: ["黄文豪"],
@@ -179,6 +184,16 @@ const isManualRow = (row: RecordItem): boolean => {
   return row.existSqlConfig === 0;
 };
 
+// 判断是否可以编辑：isEdit为0时绝对不能编辑
+const canEditRow = (row: RecordItem): boolean => {
+  return row.isEdit !== 0;
+};
+
+// 判断当前月份是否被锁定（只要有一条数据isEdit=0就表示整个月份被锁）
+const isMonthLocked = computed(() => {
+  return tableData.value.some(row => row.isEdit === 0);
+});
+
 // 表格单元格样式
 const tableCellStyle = ({
   row,
@@ -189,11 +204,13 @@ const tableCellStyle = ({
 }) => {
   // 目标值列(4)总是可以编辑，所以在手填数据行显示黄色背景，在自动计算行也可以有浅背景色
   // 完成值(5)、完成率(6)只在手填数据行显示黄色背景
+  // 黄色背景只和isManualRow关联，不受isEdit影响
+  // 浅灰色背景(目标值可编辑)受isEdit影响
   let bgColor = "#ffffff";
   if (isManualRow(row) && [3, 4, 5, 6].includes(columnIndex)) {
     bgColor = "#fff3cd";
-  } else if (columnIndex === 4) {
-    // 目标值列在自动计算数据行也显示一个浅灰色，表示可以编辑
+  } else if (columnIndex === 4 && canEditRow(row)) {
+    // 目标值列在自动计算数据行也显示一个浅灰色，表示可以编辑，但只有在isEdit不为0时才显示
     bgColor = "#f8f9fa";
   }
   return {
@@ -267,6 +284,9 @@ const getCurrentUserIds = () => {
 
 const isDeveloper = () =>
   getCurrentUserIds().some(userId => DEVELOPER_USER_IDS.includes(userId));
+
+const isCoreDeveloper = () =>
+  getCurrentUserIds().some(userId => CORE_DEVELOPER_USER_IDS.includes(userId));
 
 const fetchVisibleUsernameSet = async () => {
   if (isDeveloper()) return null;
@@ -638,6 +658,11 @@ const isSaving = (row: RecordItem, field: "target" | "achieved") => {
 
 const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
   if (savingCellKey.value) return;
+  // 如果isEdit为0，绝对不能编辑
+  if (!canEditRow(row)) {
+    ElMessage.warning("当前数据已锁定，不可编辑");
+    return;
+  }
   // 目标值可以随时编辑，完成值只有手填数据才可以编辑
   if (field === "achieved" && !isManualRow(row)) {
     ElMessage.warning("只有手填数据的完成值才可以修改");
@@ -688,6 +713,12 @@ const handleEditKeydown = (
 
 const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
   if (!isEditing(row, field)) return;
+  // 如果isEdit为0，绝对不能编辑
+  if (!canEditRow(row)) {
+    ElMessage.warning("当前数据已锁定，不可编辑");
+    cancelEdit();
+    return;
+  }
   // 目标值可以随时编辑，完成值只有手填数据才可以编辑
   if (field === "achieved" && !isManualRow(row)) {
     ElMessage.warning("只有手填数据的完成值才可以修改");
@@ -1113,26 +1144,30 @@ const confirmNotify = async () => {
   }
 
   try {
-    // 注意：通知的是 visibleRecords.value，即所有筛选后的数据，不受分页影响
-    // 收集可见用户的 userId 和 month（去重）
-    const userMonthSet = new Set<string>();
-    const args: Array<{ userId: string; month: string }> = [];
-
-    visibleRecords.value.forEach(record => {
-      if (record.userId && record.month) {
-        const key = `${record.userId}-${record.month}`;
-        if (!userMonthSet.has(key)) {
-          userMonthSet.add(key);
-          args.push({
-            userId: String(record.userId),
-            month: record.month
-          });
-        }
-      }
-    });
-
     notifyConfirmLoading.value = true;
     notifyConfirmDialogVisible.value = false;
+
+    // 调用 calculateMonthlyMetricData 获取数组
+    console.log("🔄 调用 calculateMonthlyMetricData 获取数据...");
+    const metricDataArray = await calculateMonthlyMetricData();
+    console.log("✅ 获取到的计算数据：", metricDataArray);
+
+    // 构建新的数组，确保有 month 字段
+    // 传上个月，比如当前是2026-07，就传2026-06-01
+    const lastMonth = dayjs().subtract(1, 'month').startOf('month').format("YYYY-MM-DD");
+    console.log("📅 使用的月份（上个月）：", lastMonth);
+
+    const args = metricDataArray.map(item => {
+      return {
+        userId: String(item.userId), // 确保 userId 是字符串
+        month: lastMonth, // 添加 month 字段（上个月）
+        // 保留其他原有字段也一起传过去
+        ...item
+      };
+    });
+
+    console.log("📤 传给 notifyUserConfirmApi 的参数：", { args });
+
     const res = (await notifyUserConfirmApi({ args })) as any;
     if (res?.code === 200 || res?.success) {
       ElMessage.success("通知成功");
@@ -1307,19 +1342,21 @@ onMounted(() => {
                 批量通知填写
               </el-button>
             </el-tooltip>
-            <el-tooltip
-              content="向当前可见用户发送钉钉消息，通知其确认绩效信息"
-              placement="top"
-            >
-              <el-button
-                type="primary"
-                :loading="notifyConfirmLoading"
-                @click="handleNotifyUserConfirm"
+            <template v-if="isCoreDeveloper()">
+              <el-tooltip
+                content="向当前可见用户发送钉钉消息，通知其确认绩效信息"
+                placement="top"
               >
-                <el-icon><Bell /></el-icon>
-                通知用户确认绩效信息
-              </el-button>
-            </el-tooltip>
+                <el-button
+                  type="primary"
+                  :loading="notifyConfirmLoading"
+                  @click="handleNotifyUserConfirm"
+                >
+                  <el-icon><Bell /></el-icon>
+                  通知用户确认绩效信息
+                </el-button>
+              </el-tooltip>
+            </template>
             <template v-if="isDeveloper()">
               <el-button
                 class="excel-export-btn"
@@ -1358,6 +1395,12 @@ onMounted(() => {
             >黄色背景行为手填数据，浅灰色背景的目标值可随时编辑</span
           >
         </div>
+        <div v-if="isMonthLocked" class="table-lock-tip">
+          <el-icon color="#f56c6c" style="margin-right: 5px"
+            ><Warning
+          /></el-icon>
+          <span class="lock-tip-text">当前月份数据已锁定，不可修改</span>
+        </div>
         <el-table
           v-loading="loading"
           :data="tableData"
@@ -1395,7 +1438,7 @@ onMounted(() => {
           />
           <el-table-column
             prop="target"
-            label="目标值"
+            label="目标值（元）"
             width="160"
             align="right"
           >
@@ -1412,8 +1455,11 @@ onMounted(() => {
                 v-else
                 v-loading="isSaving(row, 'target')"
                 class="editable-cell"
-                :title="'双击修改'"
-                @dblclick="startEdit(row, 'target')"
+                :class="{ 'editable-cell-disabled': !canEditRow(row) }"
+                :title="canEditRow(row) ? '双击修改' : '已锁定，不可编辑'"
+                @dblclick="
+                  canEditRow(row) ? startEdit(row, 'target') : undefined
+                "
               >
                 {{ formatNumber(row.target) }}
               </span>
@@ -1421,7 +1467,7 @@ onMounted(() => {
           </el-table-column>
           <el-table-column
             prop="achieved"
-            label="完成值"
+            label="完成值（元）"
             width="160"
             align="right"
           >
@@ -1438,10 +1484,21 @@ onMounted(() => {
                 v-else
                 v-loading="isSaving(row, 'achieved')"
                 class="editable-cell"
-                :class="{ 'editable-cell-disabled': !isManualRow(row) }"
-                :title="isManualRow(row) ? '双击修改' : '不可编辑'"
+                :class="{
+                  'editable-cell-disabled':
+                    !canEditRow(row) || !isManualRow(row)
+                }"
+                :title="
+                  !canEditRow(row)
+                    ? '已锁定，不可编辑'
+                    : isManualRow(row)
+                      ? '双击修改'
+                      : '不可编辑'
+                "
                 @dblclick="
-                  isManualRow(row) ? startEdit(row, 'achieved') : undefined
+                  canEditRow(row) && isManualRow(row)
+                    ? startEdit(row, 'achieved')
+                    : undefined
                 "
               >
                 {{ formatNumber(row.achieved) }}
@@ -1575,22 +1632,23 @@ onMounted(() => {
         <div class="notify-info">
           <div class="notify-title">发送钉钉通知</div>
           <div class="notify-desc">
-            即将向当前筛选条件下可见的用户发送绩效确认通知
+            向上个月所有考核用户发送钉钉消息<br>
+            通知用户确认其上个月绩效
           </div>
         </div>
       </div>
       <div class="notify-features">
         <div class="feature-item">
           <el-icon color="#67C23A"><CircleCheck /></el-icon>
-          <span>向当前可见的所有用户发送钉钉消息</span>
+          <span>向上个月所有考核用户发送钉钉消息</span>
         </div>
         <div class="feature-item">
           <el-icon color="#67C23A"><CircleCheck /></el-icon>
-          <span>通知用户确认其绩效信息</span>
+          <span>通知用户确认其上个月绩效</span>
         </div>
         <div class="feature-item">
           <el-icon color="#67C23A"><CircleCheck /></el-icon>
-          <span>仅通知当前筛选条件下可见的用户</span>
+          <span>包含所有考核用户，不受筛选条件限制</span>
         </div>
       </div>
       <div class="notify-checkbox">
@@ -1901,6 +1959,23 @@ onMounted(() => {
 .tip-text {
   font-size: 14px;
   color: #e6a23c;
+}
+
+.table-lock-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: #fef0f0;
+  border: 1px solid #f56c6c;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.lock-tip-text {
+  font-size: 14px;
+  color: #f56c6c;
+  font-weight: 500;
 }
 
 .excel-export-btn {

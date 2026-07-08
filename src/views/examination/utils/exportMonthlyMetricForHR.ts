@@ -1,4 +1,7 @@
-import { getPmKpiMonthMetricTargetResultList } from "@/api/evaluation";
+import {
+  getPmKpiMonthMetricTargetResultList,
+  updateEditStatusApi
+} from "@/api/evaluation";
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -85,6 +88,25 @@ interface MonthlyMetricResultRecord {
   username?: string;
   existSqlConfig?: number; // 0=手填，1=服务端计算
   [property: string]: any;
+}
+
+// 处理后的月度指标数据接口
+export interface ProcessedMonthlyMetricData {
+  userId?: number;
+  userName?: string;
+  jobNum?: string;
+  metricType?: number | string;
+  metricId?: string;
+  kpiDepict?: string;
+  rate?: string;
+  examinationType?: string;
+  examinationGroup?: string | null;
+  calculationType?: number;
+  // 计算后的值
+  previousMonthTarget?: number; // 上月目标值
+  previousMonthActual?: number; // 上月实际值
+  currentMonthTarget?: number; // 本月目标值
+  completionRate?: number; // 完成率
 }
 
 // 解析 otherConfig 为对象
@@ -211,10 +233,10 @@ const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
   const previousMonth = currentMonth - 1; // 6
   const previousMonthDate = getFirstDayOfMonth(currentYear, previousMonth); // 2026-06-01
 
-  console.log(
-    `检查 ${currentYear}年${previousMonth}月 (${previousMonthDate}) 的手填数据...`
-  );
-  console.log(`原始数据条数: ${rawData.length}`);
+  // console.log(
+  //   `检查 ${currentYear}年${previousMonth}月 (${previousMonthDate}) 的手填数据...`
+  // );
+  // console.log(`原始数据条数: ${rawData.length}`);
 
   const invalidRecords: Array<{
     username: string;
@@ -227,21 +249,21 @@ const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
     // 解析 otherConfig
     const otherConfig = parseMonthlyMetricOtherConfig(record.otherConfig);
 
-    console.log(`\n处理第 ${index + 1} 条记录:`, {
-      userId: record.userId,
-      username: record.username,
-      targetName: record.targetName,
-      existSqlConfig: record.existSqlConfig,
-      otherConfig: record.otherConfig
-    });
+    // console.log(`\n处理第 ${index + 1} 条记录:`, {
+    //   userId: record.userId,
+    //   username: record.username,
+    //   targetName: record.targetName,
+    //   existSqlConfig: record.existSqlConfig,
+    //   otherConfig: record.otherConfig
+    // });
 
     // 判断是否为手填数据：existSqlConfig === 0 表示人工填报
     const isManual = record.existSqlConfig === 0;
 
     if (isManual) {
-      console.log(
-        `✅ 发现手填类型指标: 用户=${record.username}, 指标=${record.targetName}`
-      );
+      // console.log(
+      //   `✅ 发现手填类型指标: 用户=${record.username}, 指标=${record.targetName}`
+      // );
 
       // 查找上月数据
       const metric = record.metric || [];
@@ -254,11 +276,11 @@ const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
           if (d.month === previousMonthDate) {
             if (m.dataType === "target" || m.dataType === "目标值") {
               targetValue = toNumber(d.value);
-              console.log(`  - 目标值 (${d.month}): ${targetValue}`);
+              // console.log(`  - 目标值 (${d.month}): ${targetValue}`);
             }
             if (m.dataType === "actual" || m.dataType === "实际达成值") {
               achievedValue = toNumber(d.value);
-              console.log(`  - 完成值 (${d.month}): ${achievedValue}`);
+              // console.log(`  - 完成值 (${d.month}): ${achievedValue}`);
             }
           }
         });
@@ -267,34 +289,199 @@ const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
       // 检查条件：目标值不等于0，且完成值为0或null
       if (targetValue !== null && targetValue !== 0) {
         if (achievedValue === null || achievedValue === 0) {
-          console.log(
-            `  ❌ 不符合要求: 目标值=${targetValue}, 完成值=${achievedValue}`
-          );
-          invalidRecords.push({
-            username: record.username || "未知用户",
-            targetName: record.targetName || "未知指标",
-            targetValue: targetValue,
-            achievedValue: achievedValue
-          });
+          // 忽略侯子洋的"好适嘉项目净毛利20%"这条数据
+          const isIgnoredRecord =
+            record.username === "侯子洋" &&
+            record.targetName === "好适嘉项目净毛利20%";
+
+          if (!isIgnoredRecord) {
+            // console.log(
+            //   `  ❌ 不符合要求: 目标值=${targetValue}, 完成值=${achievedValue}`
+            // );
+            invalidRecords.push({
+              username: record.username || "未知用户",
+              targetName: record.targetName || "未知指标",
+              targetValue: targetValue,
+              achievedValue: achievedValue
+            });
+          } else {
+            // console.log(`  - 忽略侯子洋的好适嘉项目净毛利20%数据`);
+          }
         } else {
-          console.log(`  ✅ 符合要求`);
+          // console.log(`  ✅ 符合要求`);
         }
       } else {
-        console.log(`  - 跳过（目标值为空或0）`);
+        // console.log(`  - 跳过（目标值为空或0）`);
       }
     } else {
-      console.log(
-        `- 非手填类型指标 (existSqlConfig=${record.existSqlConfig})，跳过`
-      );
+      // console.log(
+      //   `- 非手填类型指标 (existSqlConfig=${record.existSqlConfig})，跳过`
+      // );
     }
   });
 
-  console.log(`\n检查完成，发现 ${invalidRecords.length} 条不符合要求的记录`);
+  // console.log(`\n检查完成，发现 ${invalidRecords.length} 条不符合要求的记录`);
 
   return {
     isValid: invalidRecords.length === 0,
     invalidRecords
   };
+};
+
+/**
+ * 计算月度指标数据并返回处理后的数组（不导出Excel，不做校验）
+ * @param year 指定年份，默认当前年
+ * @returns 处理后的月度指标数据数组
+ */
+export const calculateMonthlyMetricData = async (
+  year?: number
+): Promise<ProcessedMonthlyMetricData[]> => {
+  try {
+    // 获取月度指标数据并转换格式
+    const rawData = await fetchMonthlyMetricFullData(year);
+    const apiTableData = transformMonthlyMetricData(rawData);
+
+    // 获取当前月份
+    const currentMonth = dayjs().month() + 1; // 当前月份（1-12）
+    const previousMonth = currentMonth - 1; // 上个月份
+
+    const result: ProcessedMonthlyMetricData[] = [];
+
+    apiTableData.forEach((dataItem: any) => {
+      const examination = dataItem.examination;
+      const calculationType = dataItem.calculationType;
+
+      // 确保有足够的 examination 数据
+      if (!examination || examination.length < 2) {
+        console.warn(
+          `examination 数据不足：${dataItem.userName} - ${dataItem.examinationType}`
+        );
+        return;
+      }
+
+      const targetData = examination[0]?.data || []; // 目标值
+      const actualData = examination[1]?.data || []; // 实际值
+
+      // 按月份排序数据
+      targetData.sort((a: any, b: any) => a.month.localeCompare(b.month));
+      actualData.sort((a: any, b: any) => a.month.localeCompare(b.month));
+
+      let valueI = 0; // 上月目标值
+      let valueK = 0; // 上月实际值
+      let valueO = 0; // 本月目标值
+
+      // 根据 calculationType 使用不同的计算逻辑
+      if (calculationType === 1) {
+        // 混合模式：目标值累计，实际值当月
+        valueI = targetData
+          .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
+          .reduce(sumDataValue, 0);
+
+        valueK =
+          findObjectByMonthWithFirstDay(actualData, previousMonth)?.value || 0;
+
+        valueO = targetData
+          .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
+          .reduce(sumDataValue, 0);
+      } else if (calculationType === 2) {
+        // 累计模式：目标值和实际值都累计
+        valueI = targetData
+          .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
+          .reduce(sumDataValue, 0);
+
+        valueK = actualData
+          .slice(0, findObjectByMonthIndex(actualData, previousMonth) + 1)
+          .reduce(sumDataValue, 0);
+
+        valueO = targetData
+          .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
+          .reduce(sumDataValue, 0);
+      } else if (calculationType === 3) {
+        // 当月模式：目标值和实际值都取当月
+        valueI =
+          findObjectByMonthWithFirstDay(targetData, previousMonth)?.value || 0;
+        valueK =
+          findObjectByMonthWithFirstDay(actualData, previousMonth)?.value || 0;
+        valueO =
+          findObjectByMonthWithFirstDay(targetData, currentMonth)?.value || 0;
+      } else if (calculationType === 4) {
+        // 自定义模式：需要在这里单独写逻辑的指标
+        if (
+          dataItem.userName === "侯子洋" &&
+          dataItem.examinationType === "好适嘉项目净毛利20%"
+        ) {
+          // 侯子洋 好适嘉项目净毛利20%：取上上个月
+          valueI = targetData
+            .slice(
+              0,
+              findObjectByMonthIndex(targetData, previousMonth - 1) + 1
+            )
+            .reduce(sumDataValue, 0);
+
+          valueK = actualData
+            .slice(
+              0,
+              findObjectByMonthIndex(actualData, previousMonth - 1) + 1
+            )
+            .reduce(sumDataValue, 0);
+
+          valueO = targetData
+            .slice(
+              0,
+              findObjectByMonthIndex(targetData, currentMonth - 1) + 1
+            )
+            .reduce(sumDataValue, 0);
+        } else {
+          // 其他 calculationType 为 4 但没有定义逻辑的指标，不计算
+          console.warn(
+            `未定义 calculationType 为 4 的指标逻辑：${dataItem.userName} - ${dataItem.examinationType}`
+          );
+          return;
+        }
+      } else if (calculationType === -1) {
+        // 人工填报：直接取上个月的目标值和实际值，以及当前月的目标值
+        valueI =
+          findObjectByMonthWithFirstDay(targetData, previousMonth)?.value || 0;
+        valueK =
+          findObjectByMonthWithFirstDay(actualData, previousMonth)?.value || 0;
+        valueO =
+          findObjectByMonthWithFirstDay(targetData, currentMonth)?.value || 0;
+      }
+
+      // 统一转成 number
+      valueI = toNumber(valueI);
+      valueK = toNumber(valueK);
+      valueO = toNumber(valueO);
+
+      // 计算完成率
+      let completionRate = 0;
+      if (valueI !== 0) {
+        completionRate = (valueK / valueI) * 100;
+      }
+
+      result.push({
+        userId: dataItem.userId,
+        userName: dataItem.userName,
+        jobNum: dataItem.jobNum,
+        metricType: dataItem.metricType,
+        metricId: dataItem.metricId,
+        kpiDepict: dataItem.kpiDepict,
+        rate: dataItem.rate,
+        examinationType: dataItem.examinationType,
+        examinationGroup: dataItem.examinationGroup,
+        calculationType: dataItem.calculationType,
+        previousMonthTarget: valueI,
+        previousMonthActual: valueK,
+        currentMonthTarget: valueO,
+        completionRate: Number(Math.max(0, completionRate).toFixed(2))
+      });
+    });
+
+    return result;
+  } catch (error) {
+    console.error("计算月度指标数据失败:", error);
+    throw error;
+  }
 };
 
 /**
@@ -337,11 +524,11 @@ export const processAndExportMonthlyMetricForHR = async (
         const previousMonth = currentMonth - 1;
 
         let errorMsg = `${currentYear}年${previousMonth}月数据中存在手填类型数据不符合要求：共发现 ${checkResult.invalidRecords.length} 条`;
-        console.log("详细不符合要求的记录:", checkResult.invalidRecords);
+        // console.log("详细不符合要求的记录:", checkResult.invalidRecords);
         throw new Error(errorMsg);
       }
     } else {
-      console.log("✅ 当前登录用户在白名单中，跳过数据检查");
+      // console.log("✅ 当前登录用户在白名单中，跳过数据检查");
     }
 
     const apiTableData = transformMonthlyMetricData(rawData);
@@ -390,6 +577,9 @@ export const processAndExportMonthlyMetricForHR = async (
       rowNumber++;
     }
 
+    // 先计算好所有数据
+    const processedData = await calculateMonthlyMetricData(year);
+
     // 获取当前月份
     const currentMonth = dayjs().month() + 1; // 当前月份（1-12）
     const previousMonth = currentMonth - 1; // 上个月份
@@ -413,6 +603,13 @@ export const processAndExportMonthlyMetricForHR = async (
         groupedData[type] = [];
       }
       groupedData[type].push(item);
+    });
+
+    // 创建 processedData 的索引，方便快速查找
+    const processedDataMap = new Map();
+    processedData.forEach(item => {
+      const key = `${item.userId}-${item.examinationType}`;
+      processedDataMap.set(key, item);
     });
 
     // 从第 3 行开始填充数据
@@ -462,143 +659,30 @@ export const processAndExportMonthlyMetricForHR = async (
         // G 列（原 H 列）：权重
         row.getCell(7).value = dataItem.rate;
 
-        // 恢复保留列的数据（注意：因为添加了标题行，行号可能不匹配，这里暂不恢复保留列数据）
-        // 如果需要保留列数据，需要更复杂的行号映射逻辑
-        // 这里先清空保留列的数据，因为行号已经改变
+        // 清空保留列的数据
         [9, 11, 13, 15, 16, 17].forEach(colNum => {
           row.getCell(colNum).value = null;
         });
 
-        const examination = dataItem.examination;
-        const calculationType = dataItem.calculationType;
+        // 从 processedDataMap 中获取计算好的数据
+        const key = `${dataItem.userId}-${dataItem.examinationType}`;
+        const processedItem = processedDataMap.get(key);
 
-        // 确保有足够的 examination 数据
-        if (!examination || examination.length < 2) {
+        if (!processedItem) {
           console.warn(
-            `examination 数据不足：${dataItem.userName} - ${dataItem.examinationType}`
+            `找不到计算后的数据：${dataItem.userName} - ${dataItem.examinationType}`
           );
-          modifiedCount++;
           return;
         }
 
-        const targetData = examination[0]?.data || []; // 目标值
-        const actualData = examination[1]?.data || []; // 实际值
-
-        // 按月份排序数据
-        targetData.sort((a: any, b: any) => a.month.localeCompare(b.month));
-        actualData.sort((a: any, b: any) => a.month.localeCompare(b.month));
-
-        let valueI = 0;
-        let valueK = 0;
-        let valueO = 0;
-
-        // 根据 calculationType 使用不同的计算逻辑
-        if (calculationType === 1) {
-          // 混合模式：目标值累计，实际值当月
-          valueI = targetData
-            .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
-            .reduce(sumDataValue, 0);
-
-          valueK =
-            findObjectByMonthWithFirstDay(actualData, previousMonth)?.value ||
-            0;
-
-          valueO = targetData
-            .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
-            .reduce(sumDataValue, 0);
-        } else if (calculationType === 2) {
-          // 累计模式：目标值和实际值都累计
-          valueI = targetData
-            .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
-            .reduce(sumDataValue, 0);
-
-          valueK = actualData
-            .slice(0, findObjectByMonthIndex(actualData, previousMonth) + 1)
-            .reduce(sumDataValue, 0);
-
-          valueO = targetData
-            .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
-            .reduce(sumDataValue, 0);
-        } else if (calculationType === 3) {
-          // 当月模式：目标值和实际值都取当月
-          valueI =
-            findObjectByMonthWithFirstDay(targetData, previousMonth)?.value ||
-            0;
-          valueK =
-            findObjectByMonthWithFirstDay(actualData, previousMonth)?.value ||
-            0;
-          valueO =
-            findObjectByMonthWithFirstDay(targetData, currentMonth)?.value || 0;
-        } else if (calculationType === 4) {
-          // 自定义模式：需要在这里单独写逻辑的指标
-          if (
-            dataItem.userName === "侯子洋" &&
-            dataItem.examinationType === "好适嘉项目净毛利20%"
-          ) {
-            // 侯子洋 好适嘉项目净毛利20%：取上上个月
-            valueI = targetData
-              .slice(
-                0,
-                findObjectByMonthIndex(targetData, previousMonth - 1) + 1
-              )
-              .reduce(sumDataValue, 0);
-
-            valueK = actualData
-              .slice(
-                0,
-                findObjectByMonthIndex(actualData, previousMonth - 1) + 1
-              )
-              .reduce(sumDataValue, 0);
-
-            valueO = targetData
-              .slice(
-                0,
-                findObjectByMonthIndex(targetData, currentMonth - 1) + 1
-              )
-              .reduce(sumDataValue, 0);
-          } else {
-            // 其他 calculationType 为 4 但没有定义逻辑的指标，不计算
-            console.warn(
-              `未定义 calculationType 为 4 的指标逻辑：${dataItem.userName} - ${dataItem.examinationType}`
-            );
-            modifiedCount++;
-            return;
-          }
-        } else if (calculationType === -1) {
-          // 人工填报：直接取上个月的目标值和实际值，以及当前月的目标值
-          valueI =
-            findObjectByMonthWithFirstDay(targetData, previousMonth)?.value ||
-            0;
-          valueK =
-            findObjectByMonthWithFirstDay(actualData, previousMonth)?.value ||
-            0;
-          valueO =
-            findObjectByMonthWithFirstDay(targetData, currentMonth)?.value || 0;
-        }
-
-        // 统一转成 number，避免接口返回字符串/null 导致 toFixed 报错
-        valueI = toNumber(valueI);
-        valueK = toNumber(valueK);
-        valueO = toNumber(valueO);
-
-        // 计算 M 列：完成率 (K/I*100)
-        let valueM = 0;
-        if (valueI !== 0) {
-          valueM = (valueK / valueI) * 100;
-        }
-
-        // 填充到对应列（因为删除了E列，所有列往前移动一列）
-        // 处理后的I列（原I列，现第8列）放数值，后一列（第9列）加元
-        row.getCell(8).value = valueI;
+        // 填充到对应列
+        row.getCell(8).value = processedItem.previousMonthTarget;
         row.getCell(9).value = "元";
-        // 处理后的K列（原K列，现第10列）放数值，后一列（第11列）加%
-        row.getCell(10).value = Number(valueK.toFixed(2));
+        row.getCell(10).value = Number(processedItem.previousMonthActual?.toFixed(2) || 0);
         row.getCell(11).value = "%";
-        // 处理后的M列（原M列，现第12列）放数值，后一列（第13列）加元
-        row.getCell(12).value = Number(Math.max(0, valueM).toFixed(2));
+        row.getCell(12).value = processedItem.completionRate;
         row.getCell(13).value = "元";
-        // 处理后的O列（原O列，现第14列）放数值，后一列（第15列）加元
-        row.getCell(14).value = valueO;
+        row.getCell(14).value = processedItem.currentMonthTarget;
         row.getCell(15).value = "元";
 
         modifiedCount++;
@@ -631,7 +715,24 @@ export const processAndExportMonthlyMetricForHR = async (
 
     saveAs(blob, finalFileName);
 
-    console.log(`月度指标人事数据处理完成，共添加 ${modifiedCount} 行数据`);
+    // console.log(`月度指标人事数据处理完成，共添加 ${modifiedCount} 行数据`);
+
+    // 非白名单用户调用锁表接口
+    if (!SKIP_CHECK_USER_IDS.includes(currentUserId)) {
+      try {
+        // 获取当前月份作为锁表月份，格式为 "YYYY-MM-01"
+        const monthStr = dayjs().format("YYYY-MM-01");
+
+        await updateEditStatusApi({
+          isEdit: 0,
+          month: monthStr
+        });
+      } catch (error) {
+        console.error("锁表调用失败:", error);
+        // 这里不抛出错误，避免影响导出功能
+      }
+    }
+
     return { success: true, count: modifiedCount };
   } catch (error) {
     console.error("处理和导出月度指标人事数据失败:", error);

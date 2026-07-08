@@ -65,16 +65,18 @@ const PERMISSION_ID_LIST = {
 
 const route = useRoute();
 const router = useRouter();
-const userInfo: any = localStorage.getItem("user-check-info") ? JSON.parse(localStorage.getItem("user-check-info")!) : null;
+const userInfo: any = localStorage.getItem("user-check-info")
+  ? JSON.parse(localStorage.getItem("user-check-info")!)
+  : null;
 const userId = ref(userInfo?.id ?? "");
 
 // 从路由参数读取选项卡，没有则使用默认值
-const activeName = ref<string>("excamination");
+const activeName = ref<string>("evaluation");
 
 const initActiveName = () => {
   // 从路由参数获取
   const tabFromQuery = route.query.tab as string;
-  activeName.value = tabFromQuery || "excamination";
+  activeName.value = tabFromQuery || "evaluation";
 };
 
 const handleClick = (tab: TabsPaneContext, event: Event) => {
@@ -94,17 +96,17 @@ const checkPermission = (name: string) => {
 // 监听路由参数变化
 watch(
   () => route.query.tab,
-  (newTab) => {
+  newTab => {
     if (newTab && typeof newTab === "string") {
       activeName.value = newTab;
     } else if (!newTab) {
-      activeName.value = "excamination";
+      activeName.value = "evaluation";
     }
   }
 );
 
 // 监听 tab 变化，同步到路由
-watch(activeName, (newVal) => {
+watch(activeName, newVal => {
   if (newVal !== route.query.tab) {
     router.replace({
       query: {
@@ -129,7 +131,7 @@ onMounted(() => {
       class="demo-tabs peidi-el-tabs-modern-tabs"
       @tab-click="handleClick"
     >
-      <el-tab-pane label="考核页面" name="excamination" lazy>
+      <el-tab-pane label="考核页面" name="excamination" lazy v-if="false">
         <Examination v-if="activeName === 'excamination'" />
       </el-tab-pane>
 
@@ -146,12 +148,7 @@ onMounted(() => {
         />
       </el-tab-pane>
 
-      <el-tab-pane
-        label="报表导出"
-        name="reportExport"
-        lazy
-        v-if="checkPermission('reportExport')"
-      >
+      <el-tab-pane label="报表导出" name="reportExport" lazy v-if="false">
         <ReportExport v-if="activeName === 'reportExport'" />
       </el-tab-pane>
 
@@ -165,11 +162,7 @@ onMounted(() => {
       </el-tab-pane>
 
       <!-- #region 自动化考核 -->
-      <el-tab-pane
-        label="自动化考核"
-        name="evaluation"
-        lazy
-      >
+      <el-tab-pane label="自动化考核" name="evaluation" lazy>
         <Evaluation v-if="activeName === 'evaluation'" />
       </el-tab-pane>
       <!-- #endregion 自动化考核 -->

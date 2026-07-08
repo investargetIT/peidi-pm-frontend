@@ -1,7 +1,7 @@
 import { http } from "@/utils/http";
 
 const baseUrlApi = (url: string) => {
-  return "http://12.18.1.36:8087" + url;
+  // return "http://12.18.1.36:8087" + url;
   return "https://api.peidigroup.cn" + url;
 };
 
@@ -415,6 +415,21 @@ export const getPmKpiMonthMetricTargetResultList = (params: {
   return http.request(
     "get",
     baseUrlApi("/pm/kpi-month-metric-target/result/list"),
+    {
+      params
+    }
+  );
+};
+
+// 修改编辑权限状态（锁表）
+export const updateEditStatusApi = (params: {
+  isEdit: number;
+  month: string;
+  [property: string]: any;
+}) => {
+  return http.request(
+    "post",
+    baseUrlApi("/pm/kpi-month-metric-target/updateEditStatus"),
     {
       params
     }
