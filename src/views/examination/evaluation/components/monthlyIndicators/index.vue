@@ -1368,92 +1368,90 @@ onMounted(() => {
     <div class="action-bar-section">
       <div class="section-title">快捷操作</div>
       <el-card shadow="never" class="action-card">
-        <div class="action-bar justify-end">
-          <div>
+        <div class="action-bar">
+          <el-button
+            type="success"
+            :loading="batchUpdating"
+            @click="handleBatchUpdateMetricData"
+          >
+            批量更新指标数据
+          </el-button>
+          <el-tooltip
+            content="向当前筛选条件下的所有用户发送钉钉待办提醒填写"
+            placement="top"
+          >
             <el-button
-              type="success"
-              :loading="batchUpdating"
-              @click="handleBatchUpdateMetricData"
+              class="dingtalk-blue-btn"
+              :loading="batchTodoNotifyLoading"
+              @click="handleBatchTodoNotify"
             >
-              批量更新指标数据
+              批量提醒填写
             </el-button>
+          </el-tooltip>
+          <template v-if="isCoreDeveloper()">
             <el-tooltip
-              content="向当前筛选条件下的所有用户发送钉钉待办提醒填写"
+              content="向当前可见用户发送钉钉消息，通知其确认绩效信息"
               placement="top"
             >
               <el-button
-                class="dingtalk-blue-btn"
-                :loading="batchTodoNotifyLoading"
-                @click="handleBatchTodoNotify"
+                type="primary"
+                :loading="notifyConfirmLoading"
+                @click="handleNotifyUserConfirm"
               >
-                批量提醒填写
+                <el-icon><Bell /></el-icon>
+                通知用户确认绩效信息
               </el-button>
             </el-tooltip>
-            <template v-if="isCoreDeveloper()">
-              <el-tooltip
-                content="向当前可见用户发送钉钉消息，通知其确认绩效信息"
-                placement="top"
+            <el-tooltip
+              content="锁定指定月份的表格填写权限"
+              placement="top"
+            >
+              <el-button
+                type="danger"
+                :loading="tableStatusLoading && tableStatusAction === 'lock'"
+                @click="handleTableStatus('lock')"
               >
-                <el-button
-                  type="primary"
-                  :loading="notifyConfirmLoading"
-                  @click="handleNotifyUserConfirm"
-                >
-                  <el-icon><Bell /></el-icon>
-                  通知用户确认绩效信息
-                </el-button>
-              </el-tooltip>
-              <el-tooltip
-                content="锁定指定月份的表格填写权限"
-                placement="top"
+                <el-icon><Warning /></el-icon>
+                表格填写加锁
+              </el-button>
+            </el-tooltip>
+            <el-tooltip
+              content="解锁指定月份的表格填写权限"
+              placement="top"
+            >
+              <el-button
+                type="warning"
+                :loading="tableStatusLoading && tableStatusAction === 'unlock'"
+                @click="handleTableStatus('unlock')"
               >
-                <el-button
-                  type="danger"
-                  :loading="tableStatusLoading && tableStatusAction === 'lock'"
-                  @click="handleTableStatus('lock')"
-                >
-                  <el-icon><Warning /></el-icon>
-                  表格填写加锁
-                </el-button>
-              </el-tooltip>
-              <el-tooltip
-                content="解锁指定月份的表格填写权限"
-                placement="top"
-              >
-                <el-button
-                  type="warning"
-                  :loading="tableStatusLoading && tableStatusAction === 'unlock'"
-                  @click="handleTableStatus('unlock')"
-                >
-                  <el-icon><CircleCheck /></el-icon>
-                  表格填写解锁
-                </el-button>
-              </el-tooltip>
-            </template>
-            <template v-if="isDeveloper()">
+                <el-icon><CircleCheck /></el-icon>
+                表格填写解锁
+              </el-button>
+            </el-tooltip>
+          </template>
+          <template v-if="isDeveloper()">
+            <el-button
+              class="excel-export-btn"
+              :loading="hrExportLoading"
+              @click="handleExportForHR"
+            >
+              <el-icon><Download /></el-icon>
+              人事导出
+            </el-button>
+            <el-tooltip
+              content="导出选中月份所在年份1-12月的目标业绩表"
+              placement="top"
+            >
               <el-button
                 class="excel-export-btn"
-                :loading="hrExportLoading"
-                @click="handleExportForHR"
+                :loading="exportLoading"
+                @click="handleExport"
               >
                 <el-icon><Download /></el-icon>
-                人事导出
+                导出目标业绩表
               </el-button>
-              <el-tooltip
-                content="导出选中月份所在年份1-12月的目标业绩表"
-                placement="top"
-              >
-                <el-button
-                  class="excel-export-btn"
-                  :loading="exportLoading"
-                  @click="handleExport"
-                >
-                  <el-icon><Download /></el-icon>
-                  导出目标业绩表
-                </el-button>
-              </el-tooltip>
-            </template>
-          </div>
+            </el-tooltip>
+          </template>
         </div>
       </el-card>
     </div>
@@ -2099,13 +2097,6 @@ onMounted(() => {
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  width: 100%;
-}
-
-.action-bar .action-buttons {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
   width: 100%;
   justify-content: flex-end;
 }

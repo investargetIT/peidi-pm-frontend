@@ -246,6 +246,9 @@ const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
   }> = [];
 
   rawData.forEach((record, index) => {
+    // 排除 status=0 的数据
+    if (record.status === 0) return;
+
     // 解析 otherConfig
     const otherConfig = parseMonthlyMetricOtherConfig(record.otherConfig);
 
@@ -261,9 +264,9 @@ const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
     const isManual = record.existSqlConfig === 0;
 
     if (isManual) {
-      // console.log(
-      //   `✅ 发现手填类型指标: 用户=${record.username}, 指标=${record.targetName}`
-      // );
+      console.log(
+        `✅ 发现手填类型指标: 用户=${record.username}, 指标=${record.targetName}`
+      );
 
       // 查找上月数据
       const metric = record.metric || [];
@@ -297,9 +300,9 @@ const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
               record.targetName === "自有产品净毛利");
 
           if (!isIgnoredRecord) {
-            // console.log(
-            //   `  ❌ 不符合要求: 目标值=${targetValue}, 完成值=${achievedValue}`
-            // );
+            console.log(
+              `  ❌ 不符合要求: 目标值=${targetValue}, 完成值=${achievedValue}`
+            );
             invalidRecords.push({
               username: record.username || "未知用户",
               targetName: record.targetName || "未知指标",
@@ -721,11 +724,11 @@ export const processAndExportMonthlyMetricForHR = async (
 
     // console.log(`月度指标人事数据处理完成，共添加 ${modifiedCount} 行数据`);
 
-    // 非白名单用户调用锁表接口
+    // 非白名单用户调用锁表接口，锁定上个月的数据
     if (!SKIP_CHECK_USER_IDS.includes(currentUserId)) {
       try {
-        // 获取当前月份作为锁表月份，格式为 "YYYY-MM-01"
-        const monthStr = dayjs().format("YYYY-MM-01");
+        // 获取上个月的第一天作为锁表月份
+        const monthStr = dayjs().subtract(1, "month").startOf("month").format("YYYY-MM-DD");
 
         await updateEditStatusApi({
           isEdit: 0,
