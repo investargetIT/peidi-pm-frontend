@@ -1859,8 +1859,8 @@ onMounted(() => {
       <div class="notify-confirm-content" :class="tableStatusAction === 'unlock' ? 'unlock-bg' : 'lock-bg'">
         <div class="notify-icon">
           <el-icon :size="48" :color="tableStatusAction === 'unlock' ? '#E6A23C' : '#F56C6C'">
-            <Warning v-if="tableStatusAction === 'unlock'" />
-            <CircleCheck v-else />
+            <CircleCheck v-if="tableStatusAction === 'unlock'" />
+            <Warning v-else />
           </el-icon>
         </div>
         <div class="notify-info">

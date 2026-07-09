@@ -289,10 +289,12 @@ const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
       // 检查条件：目标值不等于0，且完成值为0或null
       if (targetValue !== null && targetValue !== 0) {
         if (achievedValue === null || achievedValue === 0) {
-          // 忽略侯子洋的"好适嘉项目净毛利20%"这条数据
+          // 忽略侯子洋的"好适嘉项目净毛利20%"和王琳的"自有产品净毛利"这条数据
           const isIgnoredRecord =
-            record.username === "侯子洋" &&
-            record.targetName === "好适嘉项目净毛利20%";
+            (record.username === "侯子洋" &&
+              record.targetName === "好适嘉项目净毛利20%") ||
+            (record.username === "王琳" &&
+              record.targetName === "自有产品净毛利");
 
           if (!isIgnoredRecord) {
             // console.log(
@@ -305,7 +307,7 @@ const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
               achievedValue: achievedValue
             });
           } else {
-            // console.log(`  - 忽略侯子洋的好适嘉项目净毛利20%数据`);
+            // console.log(`  - 忽略特殊用户的指标数据`);
           }
         } else {
           // console.log(`  ✅ 符合要求`);
@@ -407,10 +409,12 @@ export const calculateMonthlyMetricData = async (
       } else if (calculationType === 4) {
         // 自定义模式：需要在这里单独写逻辑的指标
         if (
-          dataItem.userName === "侯子洋" &&
-          dataItem.examinationType === "好适嘉项目净毛利20%"
+          (dataItem.userName === "侯子洋" &&
+            dataItem.examinationType === "好适嘉项目净毛利20%") ||
+          (dataItem.userName === "王琳" &&
+            dataItem.examinationType === "自有产品净毛利")
         ) {
-          // 侯子洋 好适嘉项目净毛利20%：取上上个月
+          // 侯子洋 好适嘉项目净毛利20% 或 王琳 自有产品净毛利：取上上个月
           valueI = targetData
             .slice(
               0,
@@ -679,9 +683,9 @@ export const processAndExportMonthlyMetricForHR = async (
         row.getCell(8).value = processedItem.previousMonthTarget;
         row.getCell(9).value = "元";
         row.getCell(10).value = Number(processedItem.previousMonthActual?.toFixed(2) || 0);
-        row.getCell(11).value = "%";
+        row.getCell(11).value = "元";
         row.getCell(12).value = processedItem.completionRate;
-        row.getCell(13).value = "元";
+        row.getCell(13).value = "%";
         row.getCell(14).value = processedItem.currentMonthTarget;
         row.getCell(15).value = "元";
 

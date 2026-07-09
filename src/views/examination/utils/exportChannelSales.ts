@@ -241,9 +241,9 @@ export const processAndExportChannelSales = async (
 
         if (monthItem && monthItem[dataField] !== undefined) {
           const value = monthItem[dataField];
-          // 数据是元，转换为万元
-          const valueInWan = toNumber(value) / 10000;
-          row.getCell(Number(colNum)).value = valueInWan;
+          // 保留原数据（元），保留两位小数
+          const formattedValue = Number(toNumber(value).toFixed(2));
+          row.getCell(Number(colNum)).value = formattedValue;
           filledCount++;
         }
       }
