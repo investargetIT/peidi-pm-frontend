@@ -109,22 +109,33 @@ const finishingRateSqlList = ref<{ id?: string; name?: string }[]>([]);
 const generateDialogVisible = ref(false);
 const generateLoading = ref(false);
 const generateMonths = ref<string[]>([]);
-const selectedMonth = ref<string>('');
+const selectedMonths = ref<string[]>([]);
 const currentGenerateUser = ref<FlatRow | null>(null);
 
 // 添加月份
-const addMonth = () => {
-  if (!selectedMonth.value) {
+const addMonths = () => {
+  if (!selectedMonths.value || selectedMonths.value.length === 0) {
     ElMessage.warning('请先选择月份');
     return;
   }
-  if (!generateMonths.value.includes(selectedMonth.value)) {
-    generateMonths.value.push(selectedMonth.value);
-    generateMonths.value.sort();
+
+  let addedCount = 0;
+  selectedMonths.value.forEach(month => {
+    if (!generateMonths.value.includes(month)) {
+      generateMonths.value.push(month);
+      addedCount++;
+    }
+  });
+
+  generateMonths.value.sort();
+
+  if (addedCount > 0) {
+    ElMessage.success(`成功添加 ${addedCount} 个月份`);
   } else {
-    ElMessage.warning('该月份已选择');
+    ElMessage.warning('所选月份均已选择');
   }
-  selectedMonth.value = '';
+
+  selectedMonths.value = [];
 };
 
 // 删除月份
@@ -731,6 +742,7 @@ onMounted(() => {
       v-model="generateDialogVisible"
       title="生成指标数据"
       width="450px"
+      :close-on-click-modal="false"
     >
       <el-form :model="{}" label-position="top">
         <el-form-item label="选择用户">
@@ -743,14 +755,14 @@ onMounted(() => {
         <el-form-item label="添加月份">
           <div class="month-selector">
             <el-date-picker
-              v-model="selectedMonth"
-              type="month"
+              v-model="selectedMonths"
+              type="months"
               placeholder="选择月份"
               format="YYYY-MM"
               value-format="YYYY-MM"
               style="flex: 1"
             />
-            <el-button type="primary" @click="addMonth" style="margin-left: 8px">
+            <el-button type="primary" @click="addMonths" style="margin-left: 8px">
               添加
             </el-button>
           </div>
