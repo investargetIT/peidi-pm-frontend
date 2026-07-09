@@ -1220,6 +1220,9 @@ const exportAllResults = async () => {
     return;
   }
 
+  // 清空之前的校验结果
+  validationResults.value = {};
+
   showPreviewDialog.value = true;
 };
 
@@ -2111,71 +2114,6 @@ defineExpose({
                   </div>
                 </div>
               </div>
-
-              <!-- AI校验结果 -->
-              <div
-                v-if="validationResults[index]"
-                class="rounded-lg border p-3 mt-3 flex-shrink-0"
-                :class="
-                  validationResults[index].passed
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-red-50 border-red-200'
-                "
-              >
-                <h4
-                  class="font-bold mb-2 text-xs"
-                  :class="
-                    validationResults[index].passed
-                      ? 'text-green-800'
-                      : 'text-red-800'
-                  "
-                >
-                  {{
-                    validationResults[index].passed
-                      ? "✓ 校验通过"
-                      : "✗ 发现问题"
-                  }}
-                </h4>
-
-                <div
-                  v-if="
-                    !validationResults[index].passed &&
-                    validationResults[index].issues.length > 0
-                  "
-                  class="mb-2"
-                >
-                  <p class="text-xs text-red-700 font-medium mb-1">
-                    问题列表：
-                  </p>
-                  <ul
-                    class="text-[10px] text-red-600 list-disc list-inside space-y-1"
-                  >
-                    <li
-                      v-for="(issue, issueIndex) in validationResults[index]
-                        .issues"
-                      :key="issueIndex"
-                    >
-                      {{ issue }}
-                    </li>
-                  </ul>
-                </div>
-
-                <div v-if="validationResults[index].suggestion">
-                  <p class="text-[10px] text-gray-600 font-medium mb-1">
-                    建议：
-                  </p>
-                  <p
-                    class="text-[10px]"
-                    :class="
-                      validationResults[index].passed
-                        ? 'text-green-700'
-                        : 'text-red-700'
-                    "
-                  >
-                    {{ validationResults[index].suggestion }}
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -2208,6 +2146,66 @@ defineExpose({
               >
                 重新生成
               </el-button>
+            </div>
+
+            <!-- AI校验结果 - 移动到这里 -->
+            <div
+              v-if="validationResults[index]"
+              class="rounded-lg border p-3 flex-shrink-0"
+              :class="
+                validationResults[index].passed
+                  ? 'bg-green-50 border-green-200'
+                  : 'bg-red-50 border-red-200'
+              "
+              style="max-height: 300px; overflow-y: auto"
+            >
+              <h4
+                class="font-bold mb-2 text-xs"
+                :class="
+                  validationResults[index].passed
+                    ? 'text-green-800'
+                    : 'text-red-800'
+                "
+              >
+                {{
+                  validationResults[index].passed ? "✓ 校验通过" : "✗ 发现问题"
+                }}
+              </h4>
+
+              <div
+                v-if="
+                  !validationResults[index].passed &&
+                  validationResults[index].issues.length > 0
+                "
+                class="mb-2"
+              >
+                <p class="text-xs text-red-700 font-medium mb-1">问题列表：</p>
+                <ul
+                  class="text-[10px] text-red-600 list-disc list-inside space-y-1"
+                >
+                  <li
+                    v-for="(issue, issueIndex) in validationResults[index]
+                      .issues"
+                    :key="issueIndex"
+                  >
+                    {{ issue }}
+                  </li>
+                </ul>
+              </div>
+
+              <div v-if="validationResults[index].suggestion">
+                <p class="text-[10px] text-gray-600 font-medium mb-1">建议：</p>
+                <p
+                  class="text-[10px]"
+                  :class="
+                    validationResults[index].passed
+                      ? 'text-green-700'
+                      : 'text-red-700'
+                  "
+                >
+                  {{ validationResults[index].suggestion }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
