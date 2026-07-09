@@ -141,7 +141,14 @@ const fetchMonthlyMetricFullData = async (year?: number) => {
       throw new Error(res.msg || "获取月度指标数据失败");
     }
 
-    return res.data || [];
+    const data = res.data || [];
+
+    // 添加调试日志，看看梁钰的数据是否在接口返回的数据中
+    const liangYuData = data.filter((item: any) => item.username === "梁钰");
+    console.log("fetchMonthlyMetricFullData：梁钰的数据：", liangYuData);
+    console.log("fetchMonthlyMetricFullData：总数据条数：", data.length);
+
+    return data;
   } catch (error) {
     console.error("获取月度指标数据失败:", error);
     throw error;
@@ -175,13 +182,18 @@ const transformMonthlyMetricData = (records: MonthlyMetricResultRecord[]) => {
     // 所有 status=1 的指标都需要处理，不管有没有 calculationType
     const parsedOtherConfig = parseMonthlyMetricOtherConfig(otherConfig);
 
-    const key = `${userId}-${targetName}`;
+    // 将 userId 转换为字符串，虽然不用它作为 key 了，但还是保存起来
+    const userIdStr = String(userId);
+    // 使用 username + jobNum 组合作为 key，避免大整数精度丢失问题
+    const key = `${username}-${jobNum}-${targetName}`;
 
-    if (!groupedData[key]) {
+    // 对于梁钰的数据，或者 examination 数组为空的情况下，始终重新初始化
+    const isLiangYu = username === "梁钰";
+    if (!groupedData[key] || isLiangYu || groupedData[key].examination.length === 0) {
       groupedData[key] = {
         id: null,
         month: null,
-        userId: userId,
+        userId: userIdStr, // 存储字符串形式的 userId
         userName: username,
         jobNum: jobNum,
         metricType: metricType,
@@ -201,17 +213,34 @@ const transformMonthlyMetricData = (records: MonthlyMetricResultRecord[]) => {
         examination: []
       };
 
-      // 直接复用新接口返回的 examination 数据结构
-      metric.forEach(m => {
-        let dataType = m.dataType;
-        // 确保 dataType 符合老接口格式要求
-        if (dataType === "target") dataType = "目标值";
-        if (dataType === "actual") dataType = "实际达成值";
+      // 填充 examination 数组
+      if (metric && metric.length > 0) {
+        // 直接复用新接口返回的 examination 数据结构
+        metric.forEach(m => {
+          let dataType = m.dataType;
+          // 确保 dataType 符合老接口格式要求
+          if (dataType === "target") dataType = "目标值";
+          if (dataType === "actual") dataType = "实际达成值";
 
-        groupedData[key].examination.push({
-          dataType: dataType,
-          data: m.data || []
+          groupedData[key].examination.push({
+            dataType: dataType,
+            data: m.data || []
+          });
         });
+      }
+    }
+
+    // 输出调试日志，看看梁钰的数据是否被处理
+    if (username === "梁钰") {
+      console.log("处理梁钰的数据：", {
+        userId,
+        username,
+        jobNum,
+        targetName,
+        key,
+        metricLength: metric?.length,
+        examinationLength: groupedData[key].examination.length,
+        record
       });
     }
   });
@@ -353,6 +382,15 @@ export const calculateMonthlyMetricData = async (
     const result: ProcessedMonthlyMetricData[] = [];
 
     apiTableData.forEach((dataItem: any) => {
+      // 添加调试日志
+      if (dataItem.userName === "梁钰") {
+        console.log("calculateMonthlyMetricData 处理梁钰的数据：", {
+          dataItem,
+          examinationLength: dataItem.examination?.length,
+          examination: dataItem.examination
+        });
+      }
+
       const examination = dataItem.examination;
       const calculationType = dataItem.calculationType;
 
@@ -467,7 +505,7 @@ export const calculateMonthlyMetricData = async (
       }
 
       result.push({
-        userId: dataItem.userId,
+        userId: String(dataItem.userId), // 确保 userId 是字符串
         userName: dataItem.userName,
         jobNum: dataItem.jobNum,
         metricType: dataItem.metricType,
@@ -615,7 +653,8 @@ export const processAndExportMonthlyMetricForHR = async (
     // 创建 processedData 的索引，方便快速查找
     const processedDataMap = new Map();
     processedData.forEach(item => {
-      const key = `${item.userId}-${item.examinationType}`;
+      // 使用 username + jobNum + examinationType 作为 key，避免大整数精度丢失问题
+      const key = `${item.userName}-${item.jobNum}-${item.examinationType}`;
       processedDataMap.set(key, item);
     });
 
@@ -649,6 +688,14 @@ export const processAndExportMonthlyMetricForHR = async (
 
       // 填充该组的数据
       items.forEach((dataItem: any) => {
+        // 添加调试日志
+        if (dataItem.userName === "梁钰") {
+          console.log("processAndExportMonthlyMetricForHR 处理梁钰的数据：", {
+            dataItem,
+            type
+          });
+        }
+
         const row = worksheet.getRow(currentRowNum);
 
         // A 列：工号
@@ -672,8 +719,18 @@ export const processAndExportMonthlyMetricForHR = async (
         });
 
         // 从 processedDataMap 中获取计算好的数据
-        const key = `${dataItem.userId}-${dataItem.examinationType}`;
+        // 使用 username + jobNum + examinationType 作为 key，避免大整数精度丢失问题
+        const key = `${dataItem.userName}-${dataItem.jobNum}-${dataItem.examinationType}`;
         const processedItem = processedDataMap.get(key);
+
+        // 添加调试日志
+        if (dataItem.userName === "梁钰") {
+          console.log("查找梁钰的 processedItem：", {
+            key,
+            processedItem,
+            allKeys: Array.from(processedDataMap.keys())
+          });
+        }
 
         if (!processedItem) {
           console.warn(
@@ -691,6 +748,15 @@ export const processAndExportMonthlyMetricForHR = async (
         row.getCell(13).value = "%";
         row.getCell(14).value = processedItem.currentMonthTarget;
         row.getCell(15).value = "元";
+
+        // 添加调试日志
+        if (dataItem.userName === "梁钰") {
+          console.log("梁钰的数据已填充到 Excel，行号：", currentRowNum, {
+            targetName: dataItem.examinationType,
+            previousMonthTarget: processedItem.previousMonthTarget,
+            previousMonthActual: processedItem.previousMonthActual
+          });
+        }
 
         modifiedCount++;
         currentRowNum++;
