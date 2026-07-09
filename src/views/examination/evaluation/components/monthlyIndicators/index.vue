@@ -8,7 +8,8 @@ import {
   getDingAllDepartmentUsersApi,
   getUserListApi,
   notifyUserApi,
-  notifyUserConfirmApi
+  notifyUserConfirmApi,
+  updateEditStatusApi
 } from "@/api/evaluation";
 import { processAndExportMonthlyMetricForHR, calculateMonthlyMetricData } from "@/views/examination/utils/exportMonthlyMetricForHR";
 import { ElMessage, ElMessageBox, ElCheckbox } from "element-plus";
@@ -1121,6 +1122,13 @@ const todoNotifyChecked = ref(false);
 const currentTodoRow = ref<RecordItem | null>(null);
 const todoNotifyLoading = ref(false);
 
+// 表格状态设置功能相关（加锁/解锁）
+const tableStatusDialogVisible = ref(false);
+const tableStatusChecked = ref(false);
+const tableStatusLoading = ref(false);
+const tableStatusMonth = ref(getDefaultMonth());
+const tableStatusAction = ref<'lock' | 'unlock'>('unlock');
+
 // 批量通知相关
 const batchTodoNotifyDialogVisible = ref(false);
 const batchTodoNotifyChecked = ref(false);
@@ -1179,6 +1187,45 @@ const confirmNotify = async () => {
     ElMessage.error("通知用户确认绩效失败");
   } finally {
     notifyConfirmLoading.value = false;
+  }
+};
+
+// 打开表格状态设置对话框
+const handleTableStatus = (action: 'lock' | 'unlock') => {
+  tableStatusAction.value = action;
+  tableStatusChecked.value = false;
+  tableStatusMonth.value = getDefaultMonth();
+  tableStatusDialogVisible.value = true;
+};
+
+// 确认设置表格状态
+const confirmTableStatus = async () => {
+  if (!tableStatusChecked.value) {
+    ElMessage.warning("请先勾选确认");
+    return;
+  }
+
+  try {
+    tableStatusLoading.value = true;
+    tableStatusDialogVisible.value = false;
+
+    const isEdit = tableStatusAction.value === 'unlock' ? 1 : 0;
+    const res = (await updateEditStatusApi({
+      isEdit,
+      month: tableStatusMonth.value
+    })) as any;
+
+    if (res?.code === 200 || res?.success) {
+      ElMessage.success(tableStatusAction.value === 'unlock' ? "解锁成功" : "加锁成功");
+      fetchData(); // 重新获取数据以更新锁定状态
+    } else {
+      ElMessage.error(res?.msg || (tableStatusAction.value === 'unlock' ? "解锁失败" : "加锁失败"));
+    }
+  } catch (error) {
+    console.error("设置表格状态失败:", error);
+    ElMessage.error(tableStatusAction.value === 'unlock' ? "解锁失败" : "加锁失败");
+  } finally {
+    tableStatusLoading.value = false;
   }
 };
 
@@ -1339,7 +1386,7 @@ onMounted(() => {
                 :loading="batchTodoNotifyLoading"
                 @click="handleBatchTodoNotify"
               >
-                批量通知填写
+                批量提醒填写
               </el-button>
             </el-tooltip>
             <template v-if="isCoreDeveloper()">
@@ -1354,6 +1401,32 @@ onMounted(() => {
                 >
                   <el-icon><Bell /></el-icon>
                   通知用户确认绩效信息
+                </el-button>
+              </el-tooltip>
+              <el-tooltip
+                content="锁定指定月份的表格填写权限"
+                placement="top"
+              >
+                <el-button
+                  type="danger"
+                  :loading="tableStatusLoading && tableStatusAction === 'lock'"
+                  @click="handleTableStatus('lock')"
+                >
+                  <el-icon><Warning /></el-icon>
+                  表格填写加锁
+                </el-button>
+              </el-tooltip>
+              <el-tooltip
+                content="解锁指定月份的表格填写权限"
+                placement="top"
+              >
+                <el-button
+                  type="warning"
+                  :loading="tableStatusLoading && tableStatusAction === 'unlock'"
+                  @click="handleTableStatus('unlock')"
+                >
+                  <el-icon><CircleCheck /></el-icon>
+                  表格填写解锁
                 </el-button>
               </el-tooltip>
             </template>
@@ -1774,6 +1847,72 @@ onMounted(() => {
         </div>
       </template>
     </el-dialog>
+
+    <!-- 表格填写状态设置对话框 -->
+    <el-dialog
+      v-model="tableStatusDialogVisible"
+      :title="tableStatusAction === 'unlock' ? '表格填写解锁' : '表格填写加锁'"
+      width="520px"
+      :close-on-click-modal="false"
+      :class="tableStatusAction === 'unlock' ? 'unlock-dialog' : 'lock-dialog'"
+    >
+      <div class="notify-confirm-content" :class="tableStatusAction === 'unlock' ? 'unlock-bg' : 'lock-bg'">
+        <div class="notify-icon">
+          <el-icon :size="48" :color="tableStatusAction === 'unlock' ? '#E6A23C' : '#F56C6C'">
+            <Warning v-if="tableStatusAction === 'unlock'" />
+            <CircleCheck v-else />
+          </el-icon>
+        </div>
+        <div class="notify-info">
+          <div class="notify-title">{{ tableStatusAction === 'unlock' ? '表格填写解锁' : '表格填写加锁' }}</div>
+          <div class="notify-desc">
+            {{ tableStatusAction === 'unlock' ? '即将解锁指定月份的表格填写权限' : '即将锁定指定月份的表格填写权限' }}
+          </div>
+        </div>
+      </div>
+      <div class="notify-features">
+        <div class="feature-item">
+          <el-icon color="#67C23A"><CircleCheck /></el-icon>
+          <span>{{ tableStatusAction === 'unlock' ? '解锁后，用户可以编辑该月份的指标数据' : '加锁后，用户无法编辑该月份的指标数据' }}</span>
+        </div>
+        <div class="feature-item">
+          <el-icon color="#E6A23C"><Warning /></el-icon>
+          <span>{{ tableStatusAction === 'unlock' ? '请谨慎操作，解锁后数据可能被修改' : '加锁后可以保护数据不被意外修改' }}</span>
+        </div>
+      </div>
+      <div class="unlock-month-select">
+        <el-form-item label="选择月份">
+          <el-date-picker
+            v-model="tableStatusMonth"
+            type="month"
+            placeholder="选择月份"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </div>
+      <div class="notify-checkbox">
+        <el-checkbox v-model="tableStatusChecked" size="large">
+          我确认{{ tableStatusAction === 'unlock' ? '解锁' : '锁定' }}该月份的表格填写权限
+        </el-checkbox>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button size="large" @click="tableStatusDialogVisible = false">
+            取消
+          </el-button>
+          <el-button
+            :type="tableStatusAction === 'unlock' ? 'warning' : 'danger'"
+            size="large"
+            :loading="tableStatusLoading"
+            :disabled="!tableStatusChecked"
+            @click="confirmTableStatus"
+          >
+            确定{{ tableStatusAction === 'unlock' ? '解锁' : '加锁' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1802,6 +1941,39 @@ onMounted(() => {
 
 :deep(.todo-notify-dialog .notify-icon) {
   box-shadow: 0 4px 12px rgba(0, 137, 255, 0.15);
+}
+
+:deep(.unlock-dialog .el-dialog__header),
+:deep(.lock-dialog .el-dialog__header) {
+  text-align: center;
+  padding-bottom: 8px;
+}
+
+:deep(.unlock-dialog .el-dialog__title),
+:deep(.lock-dialog .el-dialog__title) {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+:deep(.unlock-dialog .notify-confirm-content) {
+  background: linear-gradient(135deg, #fff7e6 0%, #fff3cd 100%);
+}
+
+:deep(.lock-dialog .notify-confirm-content) {
+  background: linear-gradient(135deg, #fef0f0 0%, #fde2e2 100%);
+}
+
+:deep(.unlock-dialog .notify-icon) {
+  box-shadow: 0 4px 12px rgba(230, 162, 60, 0.15);
+}
+
+:deep(.lock-dialog .notify-icon) {
+  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.15);
+}
+
+.unlock-month-select {
+  padding: 0 20px;
+  margin-bottom: 16px;
 }
 
 .notify-confirm-content {
