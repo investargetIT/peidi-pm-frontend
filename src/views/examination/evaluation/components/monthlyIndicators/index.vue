@@ -186,7 +186,8 @@ const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
   孙舒欣: ["孙舒欣"],
   方云: ["侯子洋", "王琳"],
   付阳: ["黄文豪"],
-  范振吉: ["邓苏", "孙舒欣", "潘明旺"]
+  范振吉: ["邓苏", "孙舒欣", "潘明旺"],
+  黄向前: ["李源泰"],
 };
 const DEPARTMENT_LIST = [
   { name: "零食", deptId: 992836831 },
