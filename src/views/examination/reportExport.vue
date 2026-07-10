@@ -325,6 +325,8 @@ const handleExportForFinance = async () => {
   }
   :deep(.el-form-item:last-child) {
     margin-left: auto;
+    display: flex;
+    gap: 8px;
   }
 }
 </style>

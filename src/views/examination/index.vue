@@ -182,9 +182,15 @@ onMounted(() => {
   }
 }
 
-/* 全局清除 examination 模块下所有按钮的默认左边距 */
-:deep(.el-button) {
-  margin-left: 0 !important;
+/* 全局样式：对于使用 flex 布局的按钮容器，清除按钮自身的 margin-left */
+/* 这样可以完全依靠 gap 来控制间距，避免换行时的左边距问题 */
+:deep(.action-bar),
+:deep(.controls-bar),
+:deep(.search-form .el-form-item:last-child),
+:deep(.search-section .el-form-item:last-child) {
+  :deep(.el-button) {
+    margin-left: 0 !important;
+  }
 }
 
 .examination-tabs {

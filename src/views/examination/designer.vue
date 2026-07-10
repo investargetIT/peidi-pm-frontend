@@ -224,11 +224,6 @@ watch(
   flex-wrap: wrap;
   gap: 12px;
 
-  /* 清除按钮边距 */
-  :deep(.el-button) {
-    margin-left: 0 !important;
-  }
-
   @media (max-width: 768px) {
     margin: 10px 0;
     flex-direction: column;

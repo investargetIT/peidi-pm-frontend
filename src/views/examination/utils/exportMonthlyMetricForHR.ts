@@ -518,7 +518,7 @@ export const calculateMonthlyMetricData = async (
         previousMonthTarget: valueI,
         previousMonthActual: valueK,
         currentMonthTarget: valueO,
-        completionRate: Number(Math.max(0, completionRate).toFixed(2))
+        completionRate: Number(Math.max(0, completionRate).toFixed(4))
       });
     });
 
@@ -740,13 +740,13 @@ export const processAndExportMonthlyMetricForHR = async (
         }
 
         // 填充到对应列
-        row.getCell(8).value = processedItem.previousMonthTarget;
+        row.getCell(8).value = Number(processedItem.previousMonthTarget?.toFixed(4) || 0);
         row.getCell(9).value = "元";
-        row.getCell(10).value = Number(processedItem.previousMonthActual?.toFixed(2) || 0);
+        row.getCell(10).value = Number(processedItem.previousMonthActual?.toFixed(4) || 0);
         row.getCell(11).value = "元";
         row.getCell(12).value = processedItem.completionRate;
         row.getCell(13).value = "%";
-        row.getCell(14).value = processedItem.currentMonthTarget;
+        row.getCell(14).value = Number(processedItem.currentMonthTarget?.toFixed(4) || 0);
         row.getCell(15).value = "元";
 
         // 添加调试日志

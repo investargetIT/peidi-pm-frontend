@@ -13,7 +13,7 @@ import {
 } from "@/api/evaluation";
 import { processAndExportMonthlyMetricForHR, calculateMonthlyMetricData } from "@/views/examination/utils/exportMonthlyMetricForHR";
 import { ElMessage, ElMessageBox, ElCheckbox } from "element-plus";
-import { Download, Bell, CircleCheck, Warning } from "@element-plus/icons-vue";
+import { Download, Bell, CircleCheck, Warning, InfoFilled } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -348,6 +348,14 @@ const isDeveloper = () =>
 
 const isCoreDeveloper = () =>
   getCurrentUserIds().some(userId => CORE_DEVELOPER_USER_IDS.includes(userId));
+
+// 判断当前用户是否是黄向前，并且选择的月份是2026-09或2026-10
+const showHuangNotice = computed(() => {
+  const isHuang = getCurrentUsername() === "黄向前";
+  const selectedMonth = searchParams.value.startDate;
+  const isTargetMonth = selectedMonth === "2026-09-01" || selectedMonth === "2026-10-01";
+  return isHuang && isTargetMonth;
+});
 
 const fetchVisibleUsernameSet = async () => {
   if (isDeveloper()) return null;
@@ -1540,6 +1548,11 @@ onMounted(() => {
             >黄色背景行为手填数据，浅灰色背景的目标值可随时编辑</span
           >
         </div>
+        <!-- 黄向前的特殊通知 -->
+        <div v-if="showHuangNotice" class="huang-notice">
+          <el-icon color="#409eff" style="margin-right: 8px; font-size: 18px;"><InfoFilled /></el-icon>
+          <span class="huang-notice-text">请注意修改双十一期间李源泰的短视频出单量达成率指标目标值</span>
+        </div>
         <div v-if="isMonthLocked" class="table-lock-tip">
           <el-icon color="#f56c6c" style="margin-right: 5px"
             ><Warning
@@ -2187,11 +2200,6 @@ onMounted(() => {
   width: 100%;
   justify-content: flex-end;
 
-  /* 确保所有按钮没有额外的左边距 */
-  :deep(.el-button) {
-    margin-left: 0 !important;
-  }
-
   @media (max-width: 768px) {
     justify-content: flex-start;
   }
@@ -2234,6 +2242,24 @@ onMounted(() => {
 .lock-tip-text {
   font-size: 14px;
   color: #f56c6c;
+  font-weight: 500;
+}
+
+/* 黄向前的特殊通知样式 */
+.huang-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: #ecf5ff;
+  border: 1px solid #409eff;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.huang-notice-text {
+  font-size: 14px;
+  color: #409eff;
   font-weight: 500;
 }
 
@@ -2289,9 +2315,10 @@ onMounted(() => {
 .search-section :deep(.el-form-item) {
   margin-bottom: 0;
 
-  /* 清除所有按钮的左边距 */
-  :deep(.el-button) {
-    margin-left: 0 !important;
+  /* 对于最后一个表单项（包含按钮组），使用 gap 来控制间距 */
+  &:last-child {
+    display: flex;
+    gap: 8px;
   }
 }
 
