@@ -123,13 +123,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="px-[20px] py-[20px] pt-[70px]">
+  <div class="examination-main-container">
     <NavBar />
     <el-tabs
       v-model="activeName"
       type="card"
-      class="demo-tabs peidi-el-tabs-modern-tabs"
+      class="examination-tabs"
       @tab-click="handleClick"
+      stretch
     >
       <el-tab-pane label="考核页面" name="excamination" lazy v-if="false">
         <Examination v-if="activeName === 'excamination'" />
@@ -171,10 +172,88 @@ onMounted(() => {
 </template>
 
 <style lang="scss" scoped>
-.demo-tabs > .el-tabs__content {
-  padding: 32px;
-  color: #6b778c;
-  font-size: 32px;
-  font-weight: 600;
+.examination-main-container {
+  padding: 16px;
+  padding-top: 70px;
+
+  @media (max-width: 768px) {
+    padding: 10px;
+    padding-top: 60px;
+  }
+}
+
+/* 全局清除 examination 模块下所有按钮的默认左边距 */
+:deep(.el-button) {
+  margin-left: 0 !important;
+}
+
+.examination-tabs {
+  :deep(.el-tabs__header) {
+    margin-bottom: 16px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    padding: 0 8px;
+  }
+
+  :deep(.el-tabs__nav-wrap) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+
+    /* 隐藏滚动条 */
+    &::-webkit-scrollbar {
+      display: none;
+    }
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  :deep(.el-tabs__nav) {
+    display: flex;
+    border: none;
+  }
+
+  :deep(.el-tabs__item) {
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #606266;
+    border: none;
+    transition: all 0.3s ease;
+    height: auto;
+    line-height: 1.5;
+
+    &.is-active {
+      color: #409eff;
+      background: #ecf5ff;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    &:hover:not(.is-active) {
+      color: #409eff;
+      background: #f5f7fa;
+      border-radius: 6px;
+    }
+
+    @media (max-width: 768px) {
+      padding: 10px 14px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+  }
+
+  :deep(.el-tabs__active-bar) {
+    display: none;
+  }
+
+  :deep(.el-tabs__content) {
+    padding-top: 20px;
+
+    @media (max-width: 768px) {
+      padding-top: 16px;
+    }
+  }
 }
 </style>

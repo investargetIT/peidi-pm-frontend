@@ -20,6 +20,16 @@ interface TableRecordItem {
 const loading = ref(false);
 const exportLoading = ref(false);
 const groupData = ref<ShopExaminationGroupRes[]>([]);
+
+// 检测是否为移动端
+const isMobile = ref(window.innerWidth <= 768);
+
+// 监听窗口大小变化
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', () => {
+    isMobile.value = window.innerWidth <= 768;
+  });
+}
 const selectedYear = ref<string | number>(String(dayjs().year()));
 
 // 导出各渠道销售数据
@@ -224,37 +234,39 @@ onMounted(() => {
 
     <!-- 表格区域 -->
     <div class="table-section">
-      <el-table
-        v-loading="loading"
-        :data="tableData"
-        :span-method="getSpanMethod"
-        border
-        stripe
-        style="width: 100%"
-        :row-key="'rowKey'"
-      >
-        <el-table-column label="序号" width="60" align="center">
-          <template #default="{ $index }">
-            {{ Math.floor($index / 2) + 1 }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="groupName" label="分组名称" min-width="200" />
-        <el-table-column prop="dataType" label="数据类型" width="120" />
-
-        <!-- 动态生成月份列 -->
-        <el-table-column
-          v-for="month in allMonths"
-          :key="month"
-          :prop="month"
-          :label="month"
-          width="180"
-          align="right"
+      <div class="table-wrapper">
+        <el-table
+          v-loading="loading"
+          :data="tableData"
+          :span-method="getSpanMethod"
+          border
+          stripe
+          class="channel-table"
+          :row-key="'rowKey'"
         >
-          <template #default="{ row }">
-            {{ formatCurrency(row[month]) }}
-          </template>
-        </el-table-column>
-      </el-table>
+          <el-table-column label="序号" width="60" align="center">
+            <template #default="{ $index }">
+              {{ Math.floor($index / 2) + 1 }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="groupName" label="分组名称" min-width="200" />
+          <el-table-column prop="dataType" label="数据类型" width="120" />
+
+          <!-- 动态生成月份列 -->
+          <el-table-column
+            v-for="month in allMonths"
+            :key="month"
+            :prop="month"
+            :label="month"
+            width="180"
+            align="right"
+          >
+            <template #default="{ row }">
+              {{ formatCurrency(row[month]) }}
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </div>
   </div>
 </template>
@@ -282,10 +294,35 @@ onMounted(() => {
 
 .search-section :deep(.el-form-item) {
   margin-bottom: 0;
+
+  /* 清除所有按钮的左边距 */
+  :deep(.el-button) {
+    margin-left: 0 !important;
+  }
 }
 
 .search-section :deep(.el-form-item:last-child) {
   margin-left: auto;
+
+  @media (max-width: 768px) {
+    margin-left: 0;
+    width: 100%;
+    display: flex;
+    gap: 8px;
+
+    .el-button {
+      flex: 1;
+    }
+  }
+}
+
+/* 确保所有按钮在移动端都没有左边距 */
+@media (max-width: 768px) {
+  .search-section {
+    :deep(.el-button) {
+      margin-left: 0 !important;
+    }
+  }
 }
 
 .table-section {
@@ -299,5 +336,47 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .search-section {
+    padding: 12px;
+  }
+
+  .search-section :deep(.el-form) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+
+    :deep(.el-form-item) {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    :deep(.el-form-item:last-child) {
+      margin-left: 0;
+      margin-top: 4px;
+
+      .el-button {
+        flex: 1;
+      }
+    }
+  }
+
+  .search-section :deep(.el-date-picker),
+  .search-section :deep(.el-button) {
+    width: 100% !important;
+  }
+
+  .table-section {
+    padding: 12px;
+  }
+
+  .table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 </style>

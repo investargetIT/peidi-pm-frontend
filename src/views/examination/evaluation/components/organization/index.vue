@@ -241,5 +241,12 @@ onMounted(() => {
   height: calc(100vh - 200px);
   min-height: 600px;
   overflow: hidden;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    height: auto;
+    min-height: auto;
+    gap: 16px;
+  }
 }
 </style>

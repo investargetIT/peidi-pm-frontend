@@ -214,6 +214,11 @@ const handleAddRootNode = () => {
   display: flex;
   align-items: center;
   gap: 12px;
+
+  /* 清除按钮边距 */
+  :deep(.el-button) {
+    margin-left: 0 !important;
+  }
 }
 
 .search-input {
@@ -227,6 +232,18 @@ const handleAddRootNode = () => {
   overflow-x: hidden;
 }
 
+/* 树组件全局样式 - 修复节点重叠 */
+:deep(.el-tree) {
+  .el-tree-node {
+    .el-tree-node__content {
+      height: auto !important;
+      min-height: 48px;
+      align-items: flex-start;
+      padding: 8px 0;
+    }
+  }
+}
+
 .custom-tree-node {
   flex: 1;
   display: flex;
@@ -234,6 +251,8 @@ const handleAddRootNode = () => {
   justify-content: space-between;
   font-size: 14px;
   padding-right: 8px;
+  width: 100%;
+  min-height: 32px;
 }
 
 .node-info {
@@ -241,6 +260,8 @@ const handleAddRootNode = () => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .node-label {
@@ -326,5 +347,110 @@ const handleAddRootNode = () => {
 
 .tree-content::-webkit-scrollbar-track {
   background-color: transparent;
+}
+
+/* 响应式样式 - 彻底修复手机端节点重叠 */
+@media (max-width: 768px) {
+  .tree-section {
+    min-width: auto;
+    width: 100%;
+    padding: 12px;
+    min-height: 350px;
+    height: auto;
+    overflow: visible;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .section-header h3 {
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .header-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .header-actions .el-button {
+    width: 100%;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .tree-content {
+    overflow-y: auto;
+    overflow-x: auto;
+    max-height: 500px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 手机端树组件核心修复 */
+  :deep(.el-tree) {
+    .el-tree-node {
+      .el-tree-node__content {
+        height: auto !important;
+        min-height: 64px !important;
+        align-items: flex-start !important;
+        padding: 12px 0 !important;
+        flex-wrap: nowrap;
+      }
+
+      .el-tree-node__children {
+        padding-left: 16px !important;
+      }
+    }
+  }
+
+  .custom-tree-node {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 0;
+    width: 100%;
+    min-height: auto;
+  }
+
+  .node-info {
+    flex: none;
+    width: 100%;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .node-label {
+    font-size: 14px;
+    word-break: break-word;
+    line-height: 1.4;
+  }
+
+  .node-path {
+    font-size: 11px;
+    word-break: break-all;
+    width: 100%;
+    line-height: 1.4;
+  }
+
+  .node-actions {
+    flex-shrink: 0;
+    justify-content: flex-start;
+    padding-top: 4px;
+    border-top: 1px solid var(--el-border-color-lighter);
+    width: 100%;
+    gap: 12px;
+  }
+
+  .node-type-tag,
+  .metric-count-tag {
+    flex-shrink: 0;
+  }
 }
 </style>

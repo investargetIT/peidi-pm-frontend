@@ -64,24 +64,90 @@ const handleDownload = (objectName: string) => {
 };
 </script>
 
+<style lang="scss" scoped>
+.file-upload-container {
+  font-size: 14px;
+
+  @media (max-width: 768px) {
+    font-size: 13px;
+  }
+}
+
+.download-card {
+  border-radius: 10px;
+  margin-bottom: 20px;
+
+  @media (max-width: 768px) {
+    margin-bottom: 16px;
+  }
+}
+
+.card-title {
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.file-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.file-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  @media (max-width: 768px) {
+    padding: 10px 0;
+  }
+}
+
+.download-link {
+  color: #409eff;
+  cursor: pointer;
+  word-break: break-all;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.file-name {
+  word-break: break-all;
+  color: #606266;
+}
+
+.upload-grid {
+  @media (max-width: 768px) {
+    :deep(.el-col) {
+      margin-bottom: 12px;
+    }
+  }
+}
+</style>
+
 <template>
-  <div class="text-[14px]">
+  <div class="file-upload-container">
     <!-- 文件下载 -->
-    <el-card shadow="never" style="border-radius: 10px; margin-bottom: 20px">
-      <div>文件列表：</div>
-      <ul>
-        <li v-for="(item, index) in fileUrlList" :key="index">
+    <el-card shadow="never" class="download-card">
+      <div class="card-title">文件列表：</div>
+      <ul class="file-list">
+        <li v-for="(item, index) in fileUrlList" :key="index" class="file-item">
           <span
             v-if="
               item.includes('天猫分店铺spu毛利(财务上传)') ||
               props.DEV_ID.includes(props.userId)
             "
-            class="text-blue-500 cursor-pointer hover:underline"
+            class="download-link"
             @click="handleDownload(item)"
           >
             {{ item }}
           </span>
-          <span v-else class="">
+          <span v-else class="file-name">
             {{ item }}
           </span>
         </li>
@@ -89,8 +155,7 @@ const handleDownload = (objectName: string) => {
     </el-card>
 
     <!-- 文件上传 -->
-
-    <el-row :gutter="16">
+    <el-row :gutter="16" class="upload-grid">
       <el-col :xs="24" :sm="12" :md="12">
         <UploadCard
           idx="1"

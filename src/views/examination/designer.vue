@@ -174,6 +174,96 @@ watch(
 );
 </script>
 
+<style lang="scss" scoped>
+.designer-container {
+  width: 100%;
+}
+
+.rules-notice {
+  background-color: #ecf5ff;
+  border-left: 4px solid #409eff;
+  color: #409eff;
+  padding: 16px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+
+  @media (max-width: 768px) {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+}
+
+.notice-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 15px;
+
+  @media (max-width: 768px) {
+    font-size: 14px;
+  }
+}
+
+.notice-content {
+  font-size: 14px;
+  line-height: 1.6;
+
+  p {
+    margin: 4px 0;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 13px;
+  }
+}
+
+.controls-bar {
+  margin: 12px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  /* 清除按钮边距 */
+  :deep(.el-button) {
+    margin-left: 0 !important;
+  }
+
+  @media (max-width: 768px) {
+    margin: 10px 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.month-picker {
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+}
+
+.export-btn {
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+
+  @media (max-width: 768px) {
+    border-radius: 4px;
+  }
+}
+
+.designer-table {
+  width: 100%;
+  min-width: 400px;
+}
+</style>
+
 <template>
   <div>
     <!-- 规则说明 -->

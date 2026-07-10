@@ -34,23 +34,21 @@ onMounted(() => {
 
 <template>
   <div class="peidi-examination-navbar">
-    <div>
-      <img class="h-[32px] ml-[20px]" :src="getLogo()" alt="logo" />
+    <div class="navbar-left">
+      <img class="navbar-logo" :src="getLogo()" alt="logo" />
     </div>
 
-    <div class="mr-[20px]">
+    <div class="navbar-right">
       <el-dropdown trigger="click">
         <span class="el-dropdown-link">
-          <div
-            class="peidi-examination-navbar-user text-[16px] h-[50px] flex items-center justify-center px-[20px]"
-          >
+          <div class="navbar-user">
             {{ username }}
           </div>
         </span>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item @click="handleExit">
-              <span class="text-[14px] py-[5px]">退出登录</span>
+              <span class="dropdown-text">退出登录</span>
             </el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -72,17 +70,64 @@ onMounted(() => {
   height: 50px;
   background-color: #fff;
   border-bottom: 1px solid #e4e7ed;
-  // 底部阴影
   box-shadow: 0 -2px 4px rgb(0 0 0 / 50%);
 
-  .peidi-examination-navbar-user {
-    &:hover {
-      background-color: #f5f7fa;
-    }
+  @media (max-width: 768px) {
+    height: 46px;
   }
 }
 
-.el-tooltip__trigger:focus-visible {
+.navbar-left {
+  display: flex;
+  align-items: center;
+  padding-left: 20px;
+
+  @media (max-width: 768px) {
+    padding-left: 12px;
+  }
+}
+
+.navbar-logo {
+  height: 32px;
+
+  @media (max-width: 768px) {
+    height: 28px;
+  }
+}
+
+.navbar-right {
+  padding-right: 20px;
+
+  @media (max-width: 768px) {
+    padding-right: 12px;
+  }
+}
+
+.navbar-user {
+  font-size: 16px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+
+  &:hover {
+    background-color: #f5f7fa;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 14px;
+    height: 46px;
+    padding: 0 12px;
+  }
+}
+
+.dropdown-text {
+  font-size: 14px;
+  padding: 5px 0;
+}
+
+:deep(.el-tooltip__trigger:focus-visible) {
   outline: unset;
 }
 </style>

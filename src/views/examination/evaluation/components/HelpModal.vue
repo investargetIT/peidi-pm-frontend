@@ -379,4 +379,153 @@ watch(() => props.module, () => {
     }
   }
 }
+
+/* 手机端样式优化 */
+@media (max-width: 768px) {
+  .help-dialog {
+    :deep(.el-dialog__header) {
+      padding: 14px 16px;
+
+      .el-dialog__title {
+        font-size: 16px;
+      }
+
+      .el-dialog__headerbtn {
+        top: 14px;
+        right: 10px;
+      }
+    }
+
+    :deep(.el-dialog__body) {
+      padding: 0;
+      max-height: 75vh;
+    }
+  }
+
+  .help-content-wrapper {
+    flex-direction: column;
+    height: auto;
+    max-height: 70vh;
+  }
+
+  .help-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 12px 0;
+    max-height: 200px;
+    overflow-x: auto;
+
+    .sidebar-title {
+      font-size: 12px;
+      padding: 0 12px 10px;
+    }
+
+    .sidebar-content {
+      padding: 6px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+
+      .sidebar-item {
+        padding: 6px 12px;
+        font-size: 13px;
+        border-left: none;
+        border-radius: 16px;
+        background: #f1f5f9;
+        white-space: nowrap;
+
+        &.level-2 {
+          padding: 6px 12px;
+          font-weight: 600;
+          background: #e0f2fe;
+          color: #0369a1;
+        }
+
+        &.level-3 {
+          padding: 6px 10px;
+          font-size: 12px;
+        }
+
+        &:hover {
+          background: #667eea;
+          color: white;
+        }
+      }
+    }
+  }
+
+  .help-content {
+    padding: 16px 14px;
+    flex: none;
+    overflow-y: auto;
+    max-height: calc(70vh - 200px);
+
+    :deep(h1) {
+      font-size: 22px;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+    }
+
+    :deep(h2) {
+      font-size: 18px;
+      margin-top: 24px;
+      margin-bottom: 12px;
+
+      &::before {
+        height: 18px;
+        margin-right: 10px;
+      }
+    }
+
+    :deep(h3) {
+      font-size: 16px;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+
+    :deep(p) {
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    :deep(ul), :deep(ol) {
+      margin-left: 16px;
+      margin-bottom: 12px;
+
+      li {
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+    }
+
+    :deep(code) {
+      font-size: 13px;
+      padding: 2px 6px;
+    }
+
+    :deep(pre) {
+      padding: 14px;
+      font-size: 13px;
+      border-radius: 8px;
+    }
+
+    :deep(blockquote) {
+      padding: 12px 14px;
+      margin: 14px 0;
+    }
+
+    :deep(table) {
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      font-size: 13px;
+
+      th, td {
+        padding: 10px 12px;
+        white-space: nowrap;
+      }
+    }
+  }
+}
 </style>

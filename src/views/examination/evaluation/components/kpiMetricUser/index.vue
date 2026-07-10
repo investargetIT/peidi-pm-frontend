@@ -86,6 +86,16 @@ interface UserItem {
 const loading = ref(false);
 const tableData = ref<RecordItem[]>([]);
 const total = ref(0);
+
+// 检测是否为移动端
+const isMobile = ref(window.innerWidth <= 768);
+
+// 监听窗口大小变化
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', () => {
+    isMobile.value = window.innerWidth <= 768;
+  });
+}
 const PAGE_SIZE_STORAGE_KEY = "kpi-metric-user-page-size";
 const PAGE_STORAGE_KEY = "kpi-metric-user-current-page";
 
@@ -597,15 +607,16 @@ onMounted(() => {
           </div>
         </div>
       </div>
-      <el-table
-        v-loading="loading"
-        :data="flatTableData"
-        :span-method="spanMethod"
-        :cell-style="tableCellStyle"
-        :highlight-current-row="false"
-        border
-        style="width: 100%"
-      >
+      <div class="table-wrapper">
+        <el-table
+          v-loading="loading"
+          :data="flatTableData"
+          :span-method="spanMethod"
+          :cell-style="tableCellStyle"
+          :highlight-current-row="false"
+          border
+          class="kpi-table"
+        >
         <el-table-column label="序号" width="60" align="center">
           <template #default="{ row }">
             {{ row.isFirst ? row.userIndex : "" }}
@@ -668,7 +679,7 @@ onMounted(() => {
             </template>
           </template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="180" align="center">
+        <el-table-column :fixed="isMobile ? false : 'right'" label="操作" :width="isMobile ? 140 : 180" align="center">
           <template #default="{ row }">
             <template v-if="row.isFirst">
               <el-tooltip content="编辑" placement="top">
@@ -710,7 +721,8 @@ onMounted(() => {
             </template>
           </template>
         </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <!-- 分页 -->
       <div class="pagination-section">
@@ -843,6 +855,39 @@ onMounted(() => {
 
 .search-section :deep(.el-form-item) {
   margin-bottom: 0;
+
+  /* 清除所有按钮的左边距 */
+  :deep(.el-button) {
+    margin-left: 0 !important;
+  }
+}
+
+/* 移动端搜索表单优化 */
+@media (max-width: 768px) {
+  .search-section :deep(.el-form) {
+    flex-direction: column;
+    align-items: stretch;
+
+    .el-form-item {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    .el-form-item:last-child {
+      display: flex;
+      gap: 8px;
+
+      .el-button {
+        flex: 1;
+      }
+    }
+  }
+
+  .search-section {
+    :deep(.el-button) {
+      margin-left: 0 !important;
+    }
+  }
 }
 
 .table-section {
@@ -924,5 +969,118 @@ onMounted(() => {
   padding: 8px;
   background-color: #f5f7fa;
   border-radius: 4px;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .search-section {
+    padding: 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .search-section :deep(.el-form) {
+    width: 100%;
+    flex-direction: column;
+
+    :deep(.el-form-item) {
+      width: 100%;
+    }
+
+    :deep(.el-autocomplete),
+    :deep(.el-input) {
+      width: 100% !important;
+    }
+  }
+
+  .table-section {
+    padding: 12px;
+  }
+
+  .table-tip {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  .tip-text {
+    font-size: 12px;
+  }
+
+  .calculation-type-tip {
+    padding: 10px;
+  }
+
+  .types-container {
+    grid-template-columns: 1fr;
+  }
+
+  .table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pagination-section {
+    justify-content: center;
+    overflow-x: auto;
+
+    :deep(.el-pagination) {
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+
+      .el-pager,
+      .btn-prev,
+      .btn-next {
+        flex-shrink: 0;
+      }
+    }
+  }
+
+  /* 表格列在移动端不固定操作列 */
+  :deep(.el-table) {
+    .el-table__fixed-right {
+      display: none;
+    }
+  }
+
+  /* 对话框响应式 */
+  :deep(.el-dialog) {
+    width: 90% !important;
+    margin: 5vh auto !important;
+  }
+
+  /* 生成指标数据弹窗按钮优化 */
+  :deep(.el-dialog__footer) {
+    .dialog-footer {
+      flex-wrap: wrap;
+      gap: 8px;
+
+      .el-button {
+        flex: 1;
+        min-width: 100px;
+      }
+    }
+  }
+
+  .month-selector {
+    flex-wrap: wrap;
+    gap: 8px;
+
+    .el-date-picker {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .el-button {
+      margin-left: 0 !important;
+    }
+  }
+
+  .selected-months {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
 </style>

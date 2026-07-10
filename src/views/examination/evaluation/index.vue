@@ -219,13 +219,15 @@ onMounted(() => {
 <template>
   <div class="evaluation-container">
     <!-- 使用 ReSegmented 组件 -->
-    <ReSegmented
-      v-if="!permissionLoading && hasAnyPermission"
-      v-model="segmentedIndex"
-      :options="options"
-      block
-      @change="handleChange"
-    />
+    <div class="segmented-wrapper">
+      <ReSegmented
+        v-if="!permissionLoading && hasAnyPermission"
+        v-model="segmentedIndex"
+        :options="options"
+        block
+        @change="handleChange"
+      />
+    </div>
 
     <!-- 帮助按钮 -->
     <div v-if="!permissionLoading && hasAnyPermission" class="help-button-bar">
@@ -266,10 +268,31 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .evaluation-container {
-  // 您的外层自定义样式
   padding: 20px;
   background: #fff;
   border-radius: 8px;
+
+  @media (max-width: 768px) {
+    padding: 12px;
+  }
+}
+
+.segmented-wrapper {
+  :deep(.el-segmented) {
+    display: flex;
+    flex-wrap: wrap;
+    background: #f5f7fa;
+    padding: 4px;
+    border-radius: 8px;
+
+    @media (max-width: 768px) {
+      :deep(.el-segmented__item) {
+        font-size: 12px;
+        padding: 8px 10px;
+        white-space: nowrap;
+      }
+    }
+  }
 }
 
 .help-button-bar {
@@ -277,9 +300,62 @@ onMounted(() => {
   justify-content: flex-end;
   margin-top: 12px;
   margin-bottom: 20px;
+
+  @media (max-width: 768px) {
+    margin-top: 10px;
+    margin-bottom: 16px;
+
+    :deep(.el-button) {
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+  }
 }
 
 .content-area {
   min-height: 300px;
+
+  @media (max-width: 768px) {
+    min-height: 250px;
+  }
+}
+
+/* 帮助弹窗样式 */
+:deep(.help-dialog) {
+  .el-dialog__header {
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .el-dialog__title {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .el-dialog__headerbtn .el-dialog__close {
+    color: #fff;
+    font-size: 18px;
+  }
+
+  .el-dialog__body {
+    padding: 20px;
+  }
+
+  @media (max-width: 768px) {
+    width: 90% !important;
+    margin: 5vh auto !important;
+
+    .el-dialog__header {
+      padding: 14px 16px;
+    }
+
+    .el-dialog__title {
+      font-size: 16px;
+    }
+
+    .el-dialog__body {
+      padding: 16px;
+    }
+  }
 }
 </style>

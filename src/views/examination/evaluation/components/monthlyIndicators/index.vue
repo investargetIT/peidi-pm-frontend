@@ -92,6 +92,65 @@ interface DingDepartmentUsersResponse {
 const loading = ref(false);
 const tableData = ref<RecordItem[]>([]);
 const allRecords = ref<ApiRecordItem[]>([]);
+
+// 检测是否为移动端
+const isMobile = ref(window.innerWidth <= 768);
+
+// 触摸时间记录，用于检测双击
+let lastTouchTime = 0;
+let lastTouchTarget = '';
+
+// 监听窗口大小变化
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', () => {
+    isMobile.value = window.innerWidth <= 768;
+  });
+}
+
+// 处理触摸/点击事件 - 手机端单击，桌面端双击
+const handleEditTouch = (row: RecordItem, field: "target" | "achieved", event: Event) => {
+  if (isMobile.value) {
+    // 手机端直接单击编辑
+    startEdit(row, field);
+  } else {
+    // 桌面端需要双击
+    // 这里保持原来的 @dblclick 处理
+  }
+};
+
+// 处理单元格点击，兼容触摸和鼠标
+const handleCellClick = (row: RecordItem, field: "target" | "achieved") => {
+  if (isMobile.value) {
+    // 手机端需要二次确认
+    const fieldName = field === 'target' ? '目标值' : '完成值';
+    const currentValue = row[field] ?? '-';
+
+    ElMessageBox.confirm(
+      `<div style="text-align: center;">
+        <p style="margin-bottom: 8px; font-size: 14px;">即将编辑：</p>
+        <p style="font-weight: 600; color: #409eff; font-size: 15px;">
+          ${row.username} - ${fieldName}
+        </p>
+        <p style="margin-top: 8px; color: #909399; font-size: 13px;">
+          当前值：${formatNumber(currentValue)}
+        </p>
+      </div>`,
+      '确认编辑',
+      {
+        confirmButtonText: '进入编辑',
+        cancelButtonText: '取消',
+        type: 'info',
+        dangerouslyUseHTMLString: true,
+        center: true,
+        customClass: 'edit-confirm-dialog',
+      }
+    ).then(() => {
+      startEdit(row, field);
+    }).catch(() => {
+      // 用户取消，不做任何操作
+    });
+  }
+};
 // 注意：visibleRecords 是所有筛选后的数据（不受分页影响），导出和通知都用的是这个
 const visibleRecords = ref<ApiRecordItem[]>([]);
 const visibleUsernameSet = ref<Set<string> | null>(new Set());
@@ -676,11 +735,25 @@ const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
   // 确保编辑时使用正确的字符串格式
   editingValue.value = row[field] != null ? String(row[field]) : "";
   await nextTick();
-  const input = document.querySelector(
-    `.editable-cell-input-${row.id}-${field} input`
-  ) as HTMLInputElement | null;
-  input?.focus();
-  input?.select();
+
+  // 使用更可靠的选择器
+  const inputWrapper = document.querySelector(
+    `.editable-cell-input-${row.id}-${field}`
+  );
+  const input = inputWrapper?.querySelector('input') as HTMLInputElement | null;
+
+  // 确保 input 存在后再聚焦
+  if (input) {
+    // 延迟一点时间确保 DOM 完全渲染
+    setTimeout(() => {
+      input.focus();
+      input.select();
+      // 手机端滚动到可见区域
+      if (isMobile.value) {
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 50);
+  }
 };
 
 // 验证输入是否为有效数字，最多4位小数
@@ -1472,15 +1545,16 @@ onMounted(() => {
           /></el-icon>
           <span class="lock-tip-text">当前月份数据已锁定，不可修改</span>
         </div>
-        <el-table
-          v-loading="loading"
-          :data="tableData"
-          border
-          stripe
-          style="width: 100%"
-          :span-method="objectSpanMethod"
-          :cell-style="tableCellStyle"
-        >
+        <div class="table-wrapper">
+          <el-table
+            v-loading="loading"
+            :data="tableData"
+            border
+            stripe
+            class="monthly-table"
+            :span-method="objectSpanMethod"
+            :cell-style="tableCellStyle"
+          >
           <el-table-column label="序号" width="60" align="center">
             <template #default="{ $index }">
               {{ getGroupIndex($index) }}
@@ -1517,7 +1591,7 @@ onMounted(() => {
               <el-input
                 v-if="isEditing(row, 'target')"
                 v-model="editingValue"
-                :class="`editable-cell-input-${row.id}-target`"
+                :class="`editable-cell-input editable-cell-input-${row.id}-target`"
                 style="width: 120px"
                 @blur="confirmEdit(row, 'target')"
                 @keydown="handleEditKeydown($event, row, 'target')"
@@ -1527,9 +1601,12 @@ onMounted(() => {
                 v-loading="isSaving(row, 'target')"
                 class="editable-cell"
                 :class="{ 'editable-cell-disabled': !canEditRow(row) }"
-                :title="canEditRow(row) ? '双击修改' : '已锁定，不可编辑'"
+                :title="canEditRow(row) ? (isMobile ? '点击进入编辑（需确认）' : '双击修改') : '已锁定，不可编辑'"
                 @dblclick="
-                  canEditRow(row) ? startEdit(row, 'target') : undefined
+                  !isMobile && canEditRow(row) ? startEdit(row, 'target') : undefined
+                "
+                @click="
+                  isMobile && canEditRow(row) ? handleCellClick(row, 'target') : undefined
                 "
               >
                 {{ formatNumber(row.target) }}
@@ -1546,7 +1623,7 @@ onMounted(() => {
               <el-input
                 v-if="isEditing(row, 'achieved')"
                 v-model="editingValue"
-                :class="`editable-cell-input-${row.id}-achieved`"
+                :class="`editable-cell-input editable-cell-input-${row.id}-achieved`"
                 style="width: 120px"
                 @blur="confirmEdit(row, 'achieved')"
                 @keydown="handleEditKeydown($event, row, 'achieved')"
@@ -1563,12 +1640,17 @@ onMounted(() => {
                   !canEditRow(row)
                     ? '已锁定，不可编辑'
                     : isManualRow(row)
-                      ? '双击修改'
+                      ? (isMobile ? '点击进入编辑（需确认）' : '双击修改')
                       : '不可编辑'
                 "
                 @dblclick="
-                  canEditRow(row) && isManualRow(row)
+                  !isMobile && canEditRow(row) && isManualRow(row)
                     ? startEdit(row, 'achieved')
+                    : undefined
+                "
+                @click="
+                  isMobile && canEditRow(row) && isManualRow(row)
+                    ? handleCellClick(row, 'achieved')
                     : undefined
                 "
               >
@@ -1584,9 +1666,9 @@ onMounted(() => {
             </template>
           </el-table-column>
           <el-table-column
-            fixed="right"
+            :fixed="isMobile ? false : 'right'"
             label="操作"
-            width="280"
+            :width="isMobile ? 180 : 280"
             align="center"
           >
             <template #default="{ row }">
@@ -1598,7 +1680,8 @@ onMounted(() => {
                     :loading="isUpdating(row.userId || '')"
                     @click="handleUpdateMetricData(row)"
                   >
-                    更新指标数据
+                    <template v-if="isMobile">更新</template>
+                    <template v-else>更新指标数据</template>
                   </el-button>
                   <el-tooltip
                     content="提醒该负责人的填写人填写指标信息"
@@ -1609,7 +1692,8 @@ onMounted(() => {
                       size="small"
                       @click="handleNotifyUser(row)"
                     >
-                      提醒填写
+                      <template v-if="isMobile">提醒</template>
+                      <template v-else>提醒填写</template>
                     </el-button>
                   </el-tooltip>
                 </div>
@@ -1617,6 +1701,7 @@ onMounted(() => {
             </template>
           </el-table-column>
         </el-table>
+        </div>
 
         <!-- 分页 -->
         <div class="pagination-section">
@@ -1921,6 +2006,7 @@ onMounted(() => {
   gap: 16px;
 }
 
+/* 对话框样式 */
 :deep(.notify-confirm-dialog .el-dialog__header),
 :deep(.todo-notify-dialog .el-dialog__header) {
   text-align: center;
@@ -2099,6 +2185,15 @@ onMounted(() => {
   gap: 12px;
   width: 100%;
   justify-content: flex-end;
+
+  /* 确保所有按钮没有额外的左边距 */
+  :deep(.el-button) {
+    margin-left: 0 !important;
+  }
+
+  @media (max-width: 768px) {
+    justify-content: flex-start;
+  }
 }
 
 .table-section {
@@ -2192,10 +2287,26 @@ onMounted(() => {
 
 .search-section :deep(.el-form-item) {
   margin-bottom: 0;
+
+  /* 清除所有按钮的左边距 */
+  :deep(.el-button) {
+    margin-left: 0 !important;
+  }
 }
 
 .search-section :deep(.el-form-item:last-child) {
   margin-left: auto;
+
+  @media (max-width: 768px) {
+    margin-left: 0;
+    width: 100%;
+    display: flex;
+    gap: 8px;
+
+    .el-button {
+      flex: 1;
+    }
+  }
 }
 
 .pagination-section {
@@ -2211,11 +2322,40 @@ onMounted(() => {
   padding: 2px 6px;
   border-radius: 4px;
   cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+
+  /* 手机端优化 */
+  @media (max-width: 768px) {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 70px;
+    touch-action: manipulation;
+  }
 }
 
 .editable-cell:hover {
   background: var(--el-fill-color-light);
   color: var(--el-color-primary);
+
+  /* 手机端移除 hover 效果，增强点击效果 */
+  @media (max-width: 768px) {
+    background: transparent;
+    color: inherit;
+  }
+}
+
+.editable-cell:active {
+  /* 手机端点击效果 */
+  @media (max-width: 768px) {
+    background: var(--el-fill-color-light);
+    color: var(--el-color-primary);
+    transform: scale(0.98);
+  }
 }
 
 .editable-cell-disabled {
@@ -2226,6 +2366,24 @@ onMounted(() => {
 .editable-cell-disabled:hover {
   background: transparent;
   color: inherit;
+}
+
+/* 手机端输入框优化 */
+@media (max-width: 768px) {
+  :deep(.editable-cell-input) {
+    .el-input {
+      width: 100% !important;
+    }
+
+    .el-input__wrapper {
+      padding: 6px 10px;
+    }
+
+    .el-input__inner {
+      font-size: 16px !important; /* 防止 iOS 缩放 */
+      text-align: right;
+    }
+  }
 }
 
 .rate-excellent {
@@ -2249,5 +2407,216 @@ onMounted(() => {
   justify-content: center;
   gap: 8px;
   width: 100%;
+}
+
+/* 编辑确认对话框样式优化 */
+:deep(.edit-confirm-dialog) {
+  .el-dialog__header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 16px 20px;
+    margin: 0;
+
+    .el-dialog__title {
+      color: white;
+      font-weight: 600;
+    }
+
+    .el-dialog__headerbtn {
+      top: 16px;
+      right: 16px;
+
+      .el-dialog__close {
+        color: white;
+        font-size: 20px;
+
+        &:hover {
+          color: #f0f0f0;
+        }
+      }
+    }
+  }
+
+  .el-dialog__body {
+    padding: 24px 20px;
+  }
+
+  .el-dialog__footer {
+    padding: 16px 20px 20px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+
+    .el-button {
+      padding: 10px 24px;
+      font-size: 14px;
+    }
+  }
+
+  /* 手机端对话框优化 */
+  @media (max-width: 768px) {
+    width: 85% !important;
+    margin: 10vh auto !important;
+
+    .el-dialog__body {
+      padding: 20px 16px;
+    }
+
+    .el-dialog__footer {
+      flex-direction: column;
+
+      .el-button {
+        width: 100%;
+        margin-left: 0 !important;
+      }
+    }
+  }
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .monthly-indicators-container {
+    gap: 12px;
+  }
+
+  .section-title {
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+
+  .search-card,
+  .action-card,
+  .table-card {
+    :deep(.el-card__body) {
+      padding: 12px;
+    }
+  }
+
+  .search-section :deep(.el-form) {
+    gap: 10px;
+
+    :deep(.el-form-item) {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    :deep(.el-form-item:last-child) {
+      margin-left: 0;
+      margin-top: 4px;
+
+      .el-button {
+        flex: 1;
+      }
+    }
+  }
+
+  .search-section :deep(.el-autocomplete),
+  .search-section :deep(.el-input),
+  .search-section :deep(.el-date-picker),
+  .search-section :deep(.el-select) {
+    width: 100% !important;
+  }
+
+  .action-bar {
+    justify-content: stretch;
+
+    .el-button {
+      flex: 1;
+      font-size: 13px;
+    }
+  }
+
+  .table-tip,
+  .table-lock-tip {
+    flex-wrap: wrap;
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  .tip-text,
+  .lock-tip-text {
+    font-size: 12px;
+  }
+
+  /* 表格响应式 */
+  .table-card {
+    :deep(.el-card__body) {
+      padding: 8px;
+    }
+  }
+
+  .table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 表格列在移动端不固定操作列 */
+  :deep(.el-table) {
+    .el-table__fixed-right {
+      display: none;
+    }
+  }
+
+  /* 对话框响应式 */
+  :deep(.el-dialog) {
+    width: 90% !important;
+    margin: 5vh auto !important;
+  }
+
+  .notify-confirm-content {
+    flex-direction: column;
+    text-align: center;
+    padding: 16px;
+  }
+
+  .notify-icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .notify-features {
+    padding: 0 12px;
+  }
+
+  .notify-checkbox {
+    padding: 0 12px;
+  }
+
+  .dialog-footer {
+    flex-direction: column;
+    padding: 0 12px 12px;
+
+    .el-button {
+      width: 100%;
+    }
+  }
+
+  .pagination-section {
+    justify-content: center;
+    overflow-x: auto;
+
+    :deep(.el-pagination) {
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+
+      .el-pager,
+      .btn-prev,
+      .btn-next {
+        flex-shrink: 0;
+      }
+    }
+  }
+
+  /* 表格操作按钮 */
+  .action-buttons {
+    flex-direction: column;
+    width: 100%;
+
+    .el-button {
+      width: 100%;
+      margin: 2px 0;
+    }
+  }
 }
 </style>

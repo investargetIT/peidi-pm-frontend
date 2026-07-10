@@ -256,4 +256,62 @@ const getNodeTypeTagType = (type: string): any => {
 .metric-actions :deep(.el-button .el-icon) {
   font-size: 16px;
 }
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .detail-section {
+    width: 100%;
+    padding: 12px;
+    min-height: 300px;
+  }
+
+  .detail-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .detail-header h3 {
+    font-size: 14px;
+  }
+
+  .detail-actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 4px;
+    border-top: 1px solid var(--el-border-color-lighter);
+  }
+
+  .detail-info p {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detail-info .label {
+    width: auto;
+    font-weight: 500;
+  }
+
+  .metric-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .metric-header .el-button {
+    width: 100%;
+  }
+
+  .metric-item {
+    flex-direction: column;
+    padding: 10px;
+  }
+
+  .metric-actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 8px;
+    border-top: 1px solid var(--el-border-color-lighter);
+  }
+}
 </style>
