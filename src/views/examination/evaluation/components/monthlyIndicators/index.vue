@@ -1416,7 +1416,8 @@ onMounted(() => {
               v-model="searchParams.dataType"
               placeholder="请选择数据类型"
               clearable
-              style="width: 220px"
+              class="data-type-select"
+              style="width: 280px !important"
             >
               <el-option label="手填类型" value="manual" />
               <el-option
@@ -2299,6 +2300,18 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+/* 数据类型选择框样式优化 */
+.search-section :deep(.data-type-select) {
+  width: 280px !important;
+
+  /* 增大字体以便看清 */
+  :deep(.el-input__wrapper),
+  :deep(.el-select__selected-item),
+  :deep(.el-select__placeholder) {
+    font-size: 15px !important;
+  }
+}
+
 .search-card,
 .action-card,
 .table-card {
@@ -2540,15 +2553,37 @@ onMounted(() => {
   .search-section :deep(.el-autocomplete),
   .search-section :deep(.el-input),
   .search-section :deep(.el-date-picker),
-  .search-section :deep(.el-select) {
+  .search-section :deep(.el-select:not(.data-type-select)) {
     width: 100% !important;
   }
 
+  /* 移动端数据类型选择框专门优化 */
+  .search-section :deep(.data-type-select) {
+    width: 100% !important;
+
+    /* 更大的高度 */
+    :deep(.el-input__wrapper) {
+      min-height: 48px !important;
+      padding: 8px 15px !important;
+    }
+
+    /* 更大的字体 */
+    :deep(.el-input__wrapper),
+    :deep(.el-select__selected-item),
+    :deep(.el-select__placeholder),
+    :deep(.el-select__input) {
+      font-size: 16px !important;
+      line-height: 1.6 !important;
+    }
+  }
+
   .action-bar {
-    justify-content: stretch;
+    justify-content: flex-start;
 
     .el-button {
-      flex: 1;
+      margin-left: 0 !important;
+      flex: 1 1 calc(50% - 6px);
+      min-width: calc(50% - 6px);
       font-size: 13px;
     }
   }
@@ -2613,9 +2648,11 @@ onMounted(() => {
   .dialog-footer {
     flex-direction: column;
     padding: 0 12px 12px;
+    gap: 10px;
 
     .el-button {
       width: 100%;
+      margin-left: 0 !important;
     }
   }
 

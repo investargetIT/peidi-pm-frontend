@@ -855,25 +855,22 @@ onMounted(() => {
 
 .search-section :deep(.el-form-item) {
   margin-bottom: 0;
-
-  /* 清除所有按钮的左边距 */
-  :deep(.el-button) {
-    margin-left: 0 !important;
-  }
 }
+
 
 /* 移动端搜索表单优化 */
 @media (max-width: 768px) {
   .search-section :deep(.el-form) {
+    width: 100%;
     flex-direction: column;
     align-items: stretch;
 
-    .el-form-item {
+    :deep(.el-form-item) {
       width: 100%;
       margin-bottom: 8px;
     }
 
-    .el-form-item:last-child {
+    :deep(.el-form-item:last-child) {
       display: flex;
       gap: 8px;
 
@@ -881,11 +878,21 @@ onMounted(() => {
         flex: 1;
       }
     }
+
+    :deep(.el-autocomplete),
+    :deep(.el-input) {
+      width: 100% !important;
+    }
   }
 
   .search-section {
-    :deep(.el-button) {
-      margin-left: 0 !important;
+    padding: 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+
+    > .el-button {
+      width: 100%;
     }
   }
 }

@@ -112,7 +112,7 @@ const handleAddRootNode = () => {
         :data="dataSource"
         :show-checkbox="false"
         node-key="id"
-        :default-expand-all="true"
+        :default-expand-all="false"
         :expand-on-click-node="false"
         :props="{ label: 'nodeName' }"
         :filter-node-method="filterNode"

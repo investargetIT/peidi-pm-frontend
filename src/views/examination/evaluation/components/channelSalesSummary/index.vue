@@ -294,12 +294,8 @@ onMounted(() => {
 
 .search-section :deep(.el-form-item) {
   margin-bottom: 0;
-
-  /* 清除所有按钮的左边距 */
-  :deep(.el-button) {
-    margin-left: 0 !important;
-  }
 }
+
 
 .search-section :deep(.el-form-item:last-child) {
   margin-left: auto;
@@ -312,15 +308,6 @@ onMounted(() => {
 
     .el-button {
       flex: 1;
-    }
-  }
-}
-
-/* 确保所有按钮在移动端都没有左边距 */
-@media (max-width: 768px) {
-  .search-section {
-    :deep(.el-button) {
-      margin-left: 0 !important;
     }
   }
 }
@@ -347,25 +334,36 @@ onMounted(() => {
   .search-section :deep(.el-form) {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+    gap: 8px;
 
     :deep(.el-form-item) {
       width: 100%;
-      margin-bottom: 8px;
+      margin-bottom: 0;
     }
 
-    :deep(.el-form-item:last-child) {
-      margin-left: 0;
-      margin-top: 4px;
+    /* 查询和重置按钮并排显示 */
+    :deep(.el-form-item:nth-child(2)) {
+      display: flex;
+      gap: 8px;
 
       .el-button {
         flex: 1;
       }
     }
+
+    /* 导出Excel按钮单独一行 */
+    :deep(.el-form-item:last-child) {
+      margin-left: 0;
+      width: 100%;
+
+      .el-button {
+        width: 100% !important;
+      }
+    }
   }
 
   .search-section :deep(.el-date-picker),
-  .search-section :deep(.el-button) {
+  .search-section :deep(.el-input) {
     width: 100% !important;
   }
 

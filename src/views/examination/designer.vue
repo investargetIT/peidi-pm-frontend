@@ -272,16 +272,17 @@ watch(
          <p>2. 设计师系统以“确认完成日期”而非“需求截止日期”计入当月绩效。任务在哪个月确认完成，就算作哪个月的绩效（例如：截止日期为6月的任务，若在5月确认完成，则计入5月绩效）。</p>
       </div>
     </div>
-    <div class="mt-[12px] mb-[12px] flex justify-between items-center">
+    <div class="controls-bar">
       <!-- 月份选择器 -->
       <el-date-picker
+        class="month-picker"
         v-model="selectedMonth"
         type="month"
         placeholder="选择月份"
         :clearable="false"
         :disabled-date="disabledDate"
       />
-      <el-button type="primary" @click="handleExport" :icon="Upload">
+      <el-button class="export-btn" type="primary" @click="handleExport" :icon="Upload">
         <i class="el-icon-download"></i>
         导出数据
       </el-button>
