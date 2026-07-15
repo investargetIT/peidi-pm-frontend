@@ -518,7 +518,7 @@ export const calculateMonthlyMetricData = async (
         previousMonthTarget: valueI,
         previousMonthActual: valueK,
         currentMonthTarget: valueO,
-        completionRate: Number(Math.max(0, completionRate).toFixed(4))
+        completionRate: Number(Math.max(0, completionRate).toFixed(2))
       });
     });
 
