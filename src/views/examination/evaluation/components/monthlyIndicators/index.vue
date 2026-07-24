@@ -12,6 +12,7 @@ import {
   updateEditStatusApi
 } from "@/api/evaluation";
 import { processAndExportMonthlyMetricForHR, calculateMonthlyMetricData } from "@/views/examination/utils/exportMonthlyMetricForHR";
+import { exportTargetPerformance } from "@/views/examination/utils/exportTargetPerformance";
 import { ElMessage, ElMessageBox, ElCheckbox } from "element-plus";
 import { Download, Bell, CircleCheck, Warning, InfoFilled } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
@@ -1159,6 +1160,7 @@ const handleExport = async () => {
 
 const hrExportLoading = ref(false);
 const exportLoading = ref(false);
+const targetPerformanceExportLoading = ref(false);
 
 const handleExportForHR = async () => {
   if (!isDeveloper()) {
@@ -1193,6 +1195,31 @@ const handleExportForHR = async () => {
     }
   } finally {
     hrExportLoading.value = false;
+  }
+};
+
+const handleExportTargetPerformance = async () => {
+  if (!isDeveloper()) {
+    ElMessage.warning("只有开发者可以导出");
+    return;
+  }
+
+  try {
+    targetPerformanceExportLoading.value = true;
+    const result = await exportTargetPerformance();
+    ElMessage.success(
+      `导出目标绩效结果表成功，共填充 ${result.filledCount} 行` +
+      (result.unmatchedCount > 0
+        ? `，${result.unmatchedCount} 行未匹配（详见控制台）`
+        : "")
+    );
+  } catch (error) {
+    console.error("导出目标绩效结果表失败:", error);
+    const errorMsg =
+      error instanceof Error ? error.message : "导出失败，请重试";
+    ElMessage.error(errorMsg);
+  } finally {
+    targetPerformanceExportLoading.value = false;
   }
 };
 
@@ -1532,6 +1559,19 @@ onMounted(() => {
               >
                 <el-icon><Download /></el-icon>
                 导出目标业绩表
+              </el-button>
+            </el-tooltip>
+            <el-tooltip
+              content="读取季度GMV目标模板，按姓名和指标名称匹配填充目标值后导出"
+              placement="top"
+            >
+              <el-button
+                class="excel-export-btn"
+                :loading="targetPerformanceExportLoading"
+                @click="handleExportTargetPerformance"
+              >
+                <el-icon><Download /></el-icon>
+                导出目标绩效结果表
               </el-button>
             </el-tooltip>
           </template>
