@@ -23,6 +23,7 @@ import Axios from "axios";
 import { message } from "@/utils/message";
 import { ElLoading, ElMessageBox } from "element-plus";
 import WorkerDetailModal from "./workerDetailModal.vue";
+import { CircleCheckFilled } from "@element-plus/icons-vue";
 
 const isDesignWorkType = computed(() => {
   const designWorkTypes = ["包装设计", "品牌设计", "集团设计"];
@@ -110,6 +111,37 @@ getTaskTypeApi({})
       }
       console.log('newTaskData.value', newTaskData.value);
     }
+
+    // 新增模式：尝试恢复无感暂存
+    if (isNew && autoSaveKey) {
+      try {
+        const raw = localStorage.getItem(autoSaveKey);
+        if (raw) {
+          const draft = JSON.parse(raw);
+          newTaskData.value = {
+            ...newTaskDataDefault,
+            ...draft,
+            contacters: draft.contacters?.length
+              ? draft.contacters
+              : newTaskData.value.contacters
+          };
+          const isLevel1 = workTypeMap.value.find(i => i.id == draft.workTypeId);
+          const isLevel2 = workContentMap.value.find(i => i.id == draft.workTypeId);
+          if (isLevel1) {
+            newTaskData.value.workTypeId = Number(draft.workTypeId);
+            workTypeChange(true);
+          }
+          if (isLevel2) {
+            newTaskData.value.workContentId = Number(draft.workTypeId);
+            newTaskData.value.workTypeId = workTypeMap.value.find(i => i.level1 == isLevel2.level1).id;
+            workTypeChange(true);
+          }
+          message("已恢复上次未提交的内容", { type: "success" });
+        }
+      } catch (e) {
+        console.error("恢复草稿失败", e);
+      }
+    }
   }
 })
 
@@ -120,7 +152,7 @@ defineOptions({
   name: "addTask"
 });
 const emit = defineEmits(["close", "finish"]);
-const { actionType, taskData, examine } = defineProps(["actionType", "taskData", "examine"]);
+const { actionType, taskData, examine, autoSaveKey } = defineProps(["actionType", "taskData", "examine", "autoSaveKey"]);
 let ddUserInfo = localStorage.getItem("ddUserInfo");
 if (ddUserInfo) {
   ddUserInfo = JSON.parse(ddUserInfo);
@@ -466,6 +498,9 @@ const addNewTask = async () => {
         if (code == 200) {
           message("新建任务成功", { type: "success" });
           newTaskData.value = newTaskDataDefault;
+          if (autoSaveKey) {
+            localStorage.removeItem(autoSaveKey);
+          }
           emit("finish");
           emit("close");
         }
@@ -712,15 +747,57 @@ const workerDetailModalRefresh = (data) => {
   newTaskData.value.workers = data;
 }
 
+// 暴露给父组件读写表单（用于草稿功能）
+const getFormData = () => JSON.parse(JSON.stringify(newTaskData.value));
+
+const setFormData = (data) => {
+  newTaskData.value = JSON.parse(JSON.stringify(data));
+  workContentList.value = [];
+  downloadFileName.value = [];
+};
+
+defineExpose({ getFormData, setFormData });
+
+// 无感自动暂存：仅在新增模式 + 传了 autoSaveKey 时启用
+const lastSavedAt = ref(null);
+const lastSavedAtText = computed(() => {
+  if (!lastSavedAt.value) return "尚未保存";
+  const d = new Date(lastSavedAt.value);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+});
+let saveTimer: any = null;
+watch(
+  () => newTaskData.value,
+  (val) => {
+    if (!isNew || !autoSaveKey) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(autoSaveKey, JSON.stringify(val));
+        lastSavedAt.value = Date.now();
+      } catch (e) {
+        console.error("自动暂存失败", e);
+      }
+    }, 500);
+  },
+  { deep: true }
+);
 </script>
 
 <template>
   <div class="container1">
     <el-form label-position="top" label-width="auto" v-loading="loading" element-loading-text="上传中。。。" ref="formRef"
       :rules="taskRules" :model="newTaskData">
-      <p style="margin-bottom: 10px; font-size: 28px; font-weight: 800">
-        {{ isNew ? "新建" : "修改" }}任务
-      </p>
+      <div class="title-bar">
+        <p style="margin: 0; font-size: 28px; font-weight: 800">
+          {{ isNew ? "新建" : "修改" }}任务
+        </p>
+        <div v-if="autoSaveKey" class="auto-save-tip">
+          <el-icon class="save-icon"><CircleCheckFilled /></el-icon>
+          <span>已自动保存于 {{ lastSavedAtText }}</span>
+        </div>
+      </div>
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="任务主题" prop="taskTheme">
@@ -909,6 +986,26 @@ const workerDetailModalRefresh = (data) => {
   cursor: pointer;
   border: 1px solid #aaa;
   border-radius: 8px;
+}
+.title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.auto-save-tip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #f0f9ff;
+  border: 1px solid #d1e9ff;
+  border-radius: 4px;
+  color: #409eff;
+  font-size: 13px;
+  .save-icon {
+    font-size: 14px;
+  }
 }
 </style>
 <style>
