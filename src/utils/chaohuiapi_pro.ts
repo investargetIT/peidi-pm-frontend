@@ -9,18 +9,18 @@ const PASSWORD = import.meta.env.VITE_CHAOHUI_PASSWORD;
 // const ips = ["192.168.110.252:6001", "12.18.1.16:6001", "192.168.1.252:6001"];
 const ips = ["12.18.1.16:6001"];
 const ipsName = [
-  {
-    url: "http://192.168.110.252:6001",
-    name: "CD区"
-  },
+  // {
+  //   url: "http://192.168.110.252:6001",
+  //   name: "CD区"
+  // },
   {
     url: "http://12.18.1.16:6001",
     name: "B区"
-  },
-  {
-    url: "http://192.168.1.252:6001",
-    name: "A区"
   }
+  // {
+  //   url: "http://192.168.1.252:6001",
+  //   name: "A区"
+  // }
 ];
 
 let uploadUrl = "http://pm.peidigroup.cn/nas";
