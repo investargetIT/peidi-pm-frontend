@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import dayjs from "dayjs";
 import {
@@ -57,6 +57,15 @@ const currentMonth = ref(
     .startOf("month")
     .format("YYYY-MM-DD")
 );
+// 展示用的月份文案，例如 "2026年7月"
+const currentMonthLabel = computed(() => {
+  const d = dayjs(currentMonth.value);
+  return d.isValid() ? `${d.format("YYYY")}年${Number(d.format("M"))}月` : "";
+});
+// 禁用当月之后的月份
+const disabledMonth = (time: Date) => {
+  return dayjs(time).isAfter(dayjs().startOf("month"), "month");
+};
 const monthMetricIndex = ref<Map<string, MonthUserInfo[]>>(new Map());
 
 // 节点编辑对话框
@@ -265,6 +274,9 @@ const handleDeleteMetric = async (metric: MetricConfig) => {
 const handleMetricDialogSuccess = async () => {
   const currentNodeId = selectedNode.value?.id;
   await fetchPmKpiGroupNodePage();
+  // 指标配置有变更（增/删/改 targetName），
+  // 都要重拉月度数据以让"指标↔人"匹配关系同步
+  await fetchMonthMetrics(currentMonth.value);
   if (currentNodeId) {
     const restoredNode = findNodeById(dataSource.value, currentNodeId);
     if (restoredNode) {
@@ -272,6 +284,13 @@ const handleMetricDialogSuccess = async () => {
     }
   }
 };
+
+// 监听月份变化，重新拉取月度指标
+watch(currentMonth, val => {
+  if (val) {
+    fetchMonthMetrics(val);
+  }
+});
 
 onMounted(() => {
   fetchPmKpiGroupNodePage();
@@ -281,25 +300,42 @@ onMounted(() => {
 
 <template>
   <div class="evaluation-tree-container">
-    <TreeSection
-      :data-source="dataSource"
-      :loading="loading"
-      :month-metric-index="monthMetricIndex"
-      @node-click="handleNodeClick"
-      @add-node="handleAddNode"
-      @edit-node="handleEditNode"
-      @delete-node="handleDeleteNode"
-    />
-    <DetailSection
-      :selected-node="selectedNode"
-      :month-metric-index="monthMetricIndex"
-      :current-month="currentMonth"
-      @edit-node="handleEditNode"
-      @delete-node="handleDeleteNode"
-      @add-metric="handleAddMetric"
-      @edit-metric="handleEditMetric"
-      @delete-metric="handleDeleteMetric"
-    />
+    <div class="month-toolbar">
+      <span class="month-label">查看月份：</span>
+      <el-date-picker
+        v-model="currentMonth"
+        type="month"
+        placeholder="选择月份"
+        :clearable="false"
+        :disabled-date="disabledMonth"
+        value-format="YYYY-MM-DD"
+        style="width: 160px"
+      />
+      <span class="month-hint">展示「{{ currentMonthLabel }}」的使用人数据</span>
+    </div>
+    <div class="evaluation-main">
+      <TreeSection
+        :data-source="dataSource"
+        :loading="loading"
+        :month-metric-index="monthMetricIndex"
+        :current-month-label="currentMonthLabel"
+        @node-click="handleNodeClick"
+        @add-node="handleAddNode"
+        @edit-node="handleEditNode"
+        @delete-node="handleDeleteNode"
+      />
+      <DetailSection
+        :selected-node="selectedNode"
+        :month-metric-index="monthMetricIndex"
+        :current-month="currentMonth"
+        :current-month-label="currentMonthLabel"
+        @edit-node="handleEditNode"
+        @delete-node="handleDeleteNode"
+        @add-metric="handleAddMetric"
+        @edit-metric="handleEditMetric"
+        @delete-metric="handleDeleteMetric"
+      />
+    </div>
     <NodeEditDialog
       v-model:visible="nodeDialogVisible"
       :node="editingNode"
@@ -318,16 +354,47 @@ onMounted(() => {
 <style scoped>
 .evaluation-tree-container {
   display: flex;
-  gap: 24px;
+  flex-direction: column;
+  gap: 16px;
   height: calc(100vh - 200px);
   min-height: 600px;
   overflow: hidden;
 
   @media (max-width: 768px) {
-    flex-direction: column;
     height: auto;
     min-height: auto;
+  }
+}
+
+.evaluation-main {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
     gap: 16px;
+  }
+}
+
+.month-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+
+  .month-label {
+    font-size: 14px;
+    color: #303133;
+  }
+
+  .month-hint {
+    font-size: 12px;
+    color: #909399;
+    margin-left: 4px;
   }
 }
 </style>

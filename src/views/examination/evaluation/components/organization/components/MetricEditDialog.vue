@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, watch, computed } from "vue";
-import { ElForm, ElMessage } from "element-plus";
+import { ElForm, ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import type { MetricConfig } from "./types";
 
@@ -78,6 +78,31 @@ const handleSubmit = async () => {
   await formRef.value?.validate();
   try {
     if (props.metric) {
+      // 检测 targetName 是否变化——变化会导致历史月度数据匹配不上
+      const oldName = props.metric.targetName;
+      const newName = formData.value.targetName;
+      const isTargetNameChanged = oldName !== newName;
+
+      if (isTargetNameChanged) {
+        try {
+          await ElMessageBox.confirm(
+            `指标名称已由「${oldName}」改为「${newName}」。\n` +
+              `此操作会导致历史月度数据中按原名称匹配的使用人「暂时无法关联」，` +
+              `需要联系后端同步更新历史记录中的指标名称才能恢复。\n\n` +
+              `确认要继续修改吗？`,
+            "指标名称变更提示",
+            {
+              confirmButtonText: "确认修改",
+              cancelButtonText: "取消",
+              type: "warning"
+            }
+          );
+        } catch (e) {
+          // 用户取消
+          return;
+        }
+      }
+
       // 更新
       const { updatePmKpiGroupNodeNodeConfigApi } = await import(
         "@/api/evaluation"

@@ -15,11 +15,13 @@ interface Props {
   selectedNode: TreeNode | null;
   monthMetricIndex?: Map<string, MonthUserInfo[]>;
   currentMonth?: string;
+  currentMonthLabel?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   monthMetricIndex: () => new Map(),
-  currentMonth: ""
+  currentMonth: "",
+  currentMonthLabel: ""
 });
 const tooltipShowAfter = 800;
 
@@ -30,8 +32,6 @@ const emit = defineEmits<{
   "edit-metric": [metric: MetricConfig];
   "delete-metric": [metric: MetricConfig];
 }>();
-
-// ... existing code ...
 
 const getNodeTypeLabel = (type: string) => {
   const map: Record<string, string> = {
@@ -84,6 +84,46 @@ const getUserStatusType = (status: "done" | "doing" | "pending") => {
     pending: "info"
   };
   return map[status];
+};
+
+// 统计指标各状态人数
+const getMetricStats = (metric: MetricConfig) => {
+  const users = getMetricUsers(metric);
+  const count = { done: 0, doing: 0, pending: 0 };
+  users.forEach(u => {
+    count[getUserStatus(u)]++;
+  });
+  return [
+    { key: "done", count: count.done, label: "已完成" },
+    { key: "doing", count: count.doing, label: "进行中" },
+    { key: "pending", count: count.pending, label: "未填写" }
+  ];
+};
+
+// 获取用户姓名首字符（用于头像）
+const getUserInitial = (name: string): string => {
+  if (!name) return "?";
+  return name.trim().charAt(0).toUpperCase();
+};
+
+// 头像配色板（按 userId 散列取色，固定展示）
+const AVATAR_COLORS = [
+  "#5B8FF9",
+  "#5AD8A6",
+  "#F6BD16",
+  "#E86452",
+  "#6DC8EC",
+  "#945FB9",
+  "#FF99C3",
+  "#269A99",
+  "#FF9845"
+];
+const getAvatarColor = (userId: string): string => {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = (hash * 31 + userId.charCodeAt(i)) & 0xffffffff;
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 };
 </script>
 
@@ -160,52 +200,76 @@ const getUserStatusType = (status: "done" | "doing" | "pending") => {
               {{ metric.kpiDepict }}
             </p>
 
-            <!-- 本月使用人 -->
+            <!-- {{ currentMonthLabel || '本月' }}使用人 -->
             <div class="metric-users">
               <div class="users-header">
-                <el-icon><User /></el-icon>
-                <span class="users-title">本月使用人</span>
-                <el-tag
-                  size="small"
-                  :type="getMetricUsers(metric).length ? 'primary' : 'info'"
-                  effect="light"
-                >
-                  {{ getMetricUsers(metric).length }} 人
-                </el-tag>
-                <span class="users-legend">
-                  <el-tag size="small" type="success" effect="plain">已完成</el-tag>
-                  <el-tag size="small" type="warning" effect="plain">进行中</el-tag>
-                  <el-tag size="small" type="info" effect="plain">未填写</el-tag>
+                <span class="users-title">
+                  <el-icon class="users-title-icon"><User /></el-icon>
+                  {{ currentMonthLabel || "本月" }}使用人
                 </span>
+                <div class="users-summary">
+                  <span
+                    v-for="item in getMetricStats(metric)"
+                    :key="item.key"
+                    class="stat-pill"
+                    :class="`stat-pill--${item.key}`"
+                  >
+                    <span class="stat-dot" />
+                    <span class="stat-num">{{ item.count }}</span>
+                    <span class="stat-label">{{ item.label }}</span>
+                  </span>
+                </div>
               </div>
               <div
                 v-if="getMetricUsers(metric).length"
-                class="user-chips"
+                class="user-cards"
               >
                 <el-tooltip
                   v-for="u in getMetricUsers(metric)"
                   :key="u.userId + '_' + u.recordId"
                   placement="top"
+                  :show-after="tooltipShowAfter"
                 >
                   <template #content>
-                    <div>工号：{{ u.jobNum || "-" }}</div>
-                    <div>目标值：{{ u.target ?? "-" }}</div>
-                    <div>完成值：{{ u.achieved ?? "-" }}</div>
+                    <div class="user-tooltip">
+                      <div class="user-tooltip__name">{{ u.username }}</div>
+                      <div class="user-tooltip__row">
+                        <span>工号</span><span>{{ u.jobNum || "-" }}</span>
+                      </div>
+                      <div class="user-tooltip__row">
+                        <span>目标值</span><span>{{ u.target ?? "-" }}</span>
+                      </div>
+                      <div class="user-tooltip__row">
+                        <span>完成值</span><span>{{ u.achieved ?? "-" }}</span>
+                      </div>
+                      <div class="user-tooltip__status" :class="`is-${getUserStatus(u)}`">
+                        {{ getUserStatusLabel(getUserStatus(u)) }}
+                      </div>
+                    </div>
                   </template>
-                  <el-tag
-                    size="small"
-                    :type="getUserStatusType(getUserStatus(u)) as any"
-                    effect="light"
-                    class="user-chip"
+                  <div
+                    class="user-card"
+                    :class="`user-card--${getUserStatus(u)}`"
                   >
-                    {{ u.username }}
-                  </el-tag>
+                    <div
+                      class="user-avatar"
+                      :style="{ background: getAvatarColor(u.userId) }"
+                    >
+                      {{ getUserInitial(u.username) }}
+                    </div>
+                    <div class="user-info">
+                      <span class="user-name" :title="u.username">{{ u.username }}</span>
+                      <span class="user-status">
+                        <span class="status-dot" />
+                        {{ getUserStatusLabel(getUserStatus(u)) }}
+                      </span>
+                    </div>
+                  </div>
                 </el-tooltip>
               </div>
               <div v-else class="no-users">
-                <el-text type="info" size="small"
-                  >本月无人使用此指标</el-text
-                >
+                <el-icon class="no-users-icon"><User /></el-icon>
+                <span>{{ currentMonthLabel || "本月" }}暂无人员使用此指标</span>
               </div>
             </div>
           </div>
@@ -348,56 +412,272 @@ const getUserStatusType = (status: "done" | "doing" | "pending") => {
 
 .metric-users {
   margin-top: 10px;
-  padding: 8px 10px;
-  background: var(--el-fill-color-blank);
-  border: 1px dashed var(--el-border-color-lighter);
-  border-radius: 4px;
+  padding: 10px 12px;
+  background: linear-gradient(
+    135deg,
+    #f8fafc 0%,
+    #f1f5f9 100%
+  );
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
 }
 
 .users-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .users-title {
-  font-weight: 500;
-  color: var(--el-text-color-regular);
-}
-
-.users-legend {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.users-title-icon {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.users-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   flex-wrap: wrap;
 }
 
-.users-legend :deep(.el-tag) {
-  margin: 0 !important;
-  height: 18px;
-  line-height: 16px;
-  padding: 0 5px;
+.stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
   font-size: 11px;
+  font-weight: 500;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  line-height: 1.4;
+  transition: all 0.2s ease;
 }
 
-.user-chips {
+.stat-pill .stat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stat-pill--done .stat-dot {
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+}
+
+.stat-pill--doing .stat-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+}
+
+.stat-pill--pending .stat-dot {
+  background: #94a3b8;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.15);
+}
+
+.stat-pill--done {
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.stat-pill--doing {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.stat-pill--pending {
+  color: #475569;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.stat-pill .stat-num {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.stat-pill .stat-label {
+  opacity: 0.85;
+}
+
+.user-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.user-card {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: default;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.user-chip {
-  margin: 0 !important;
-  cursor: default;
+.user-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #cbd5e1;
+  transition: all 0.2s ease;
+}
+
+.user-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  border-color: #cbd5e1;
+}
+
+.user-card--done::before {
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+}
+
+.user-card--doing::before {
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+}
+
+.user-card--pending::before {
+  background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.user-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.3;
+  margin-top: 1px;
+}
+
+.user-status .status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.user-card--done .user-status .status-dot {
+  background: #10b981;
+}
+
+.user-card--doing .user-status .status-dot {
+  background: #f59e0b;
+}
+
+.user-card--pending .user-status .status-dot {
+  background: #94a3b8;
+}
+
+.user-tooltip {
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 2px;
+  min-width: 140px;
+}
+
+.user-tooltip__name {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: #fff;
+}
+
+.user-tooltip__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.user-tooltip__status {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  font-weight: 500;
+}
+
+.user-tooltip__status.is-done {
+  color: #6ee7b7;
+}
+
+.user-tooltip__status.is-doing {
+  color: #fcd34d;
+}
+
+.user-tooltip__status.is-pending {
+  color: #cbd5e1;
 }
 
 .no-users {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 0;
   font-size: 12px;
-  color: var(--el-text-color-placeholder);
+  color: #94a3b8;
+}
+
+.no-users-icon {
+  font-size: 14px;
+  opacity: 0.6;
 }
 
 .metric-actions :deep(.el-button) {
@@ -464,6 +744,15 @@ const getUserStatusType = (status: "done" | "doing" | "pending") => {
     justify-content: flex-end;
     padding-top: 8px;
     border-top: 1px solid var(--el-border-color-lighter);
+  }
+
+  .users-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .user-cards {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
 }
 </style>

@@ -18,10 +18,12 @@ interface Props {
   dataSource: TreeNode[];
   loading: boolean;
   monthMetricIndex?: Map<string, MonthUserInfo[]>;
+  currentMonthLabel?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  monthMetricIndex: () => new Map()
+  monthMetricIndex: () => new Map(),
+  currentMonthLabel: ""
 });
 
 const emit = defineEmits<{
@@ -175,7 +177,7 @@ const getNodeUsedUserCount = (node: TreeNode): number => {
               </el-tag>
               <el-tooltip
                 v-if="getNodeUsedUserCount(data) > 0"
-                :content="`本月有 ${getNodeUsedUserCount(data)} 人在使用该节点下的指标`"
+                :content="`${currentMonthLabel}有 ${getNodeUsedUserCount(data)} 人在使用该节点下的指标`"
                 placement="top"
                 :show-after="tooltipShowAfter"
               >
@@ -187,7 +189,7 @@ const getNodeUsedUserCount = (node: TreeNode): number => {
                 >
                   <span class="used-user-inner">
                     <el-icon class="used-user-icon"><User /></el-icon>
-                    <span>本月 {{ getNodeUsedUserCount(data) }} 人使用</span>
+                    <span>{{ currentMonthLabel }} {{ getNodeUsedUserCount(data) }} 人使用</span>
                   </span>
                 </el-tag>
               </el-tooltip>
