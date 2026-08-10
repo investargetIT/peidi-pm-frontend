@@ -1,12 +1,26 @@
 <script lang="ts" setup>
-import { Edit, Delete } from "@element-plus/icons-vue";
+import { Edit, Delete, User } from "@element-plus/icons-vue";
 import type { TreeNode, MetricConfig } from "./types";
+
+interface MonthUserInfo {
+  userId: string;
+  username: string;
+  jobNum?: string;
+  target: number | null;
+  achieved: number | null;
+  recordId: string;
+}
 
 interface Props {
   selectedNode: TreeNode | null;
+  monthMetricIndex?: Map<string, MonthUserInfo[]>;
+  currentMonth?: string;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  monthMetricIndex: () => new Map(),
+  currentMonth: ""
+});
 const tooltipShowAfter = 800;
 
 const emit = defineEmits<{
@@ -35,6 +49,41 @@ const getNodeTypeTagType = (type: string): any => {
     examination_group: "success"
   };
   return map[type] || "info";
+};
+
+// 获取指标的本月使用人
+const getMetricUsers = (metric: MetricConfig): MonthUserInfo[] => {
+  const key = `${metric.nodeId}__${metric.targetName}`;
+  return props.monthMetricIndex.get(key) || [];
+};
+
+// 判断用户完成状态：done=已完成, doing=进行中, pending=未填
+const getUserStatus = (
+  u: MonthUserInfo
+): "done" | "doing" | "pending" => {
+  if (u.achieved == null || u.achieved === "") return "pending";
+  const targetNum = Number(u.target);
+  const achievedNum = Number(u.achieved);
+  if (targetNum > 0 && achievedNum >= targetNum) return "done";
+  return "doing";
+};
+
+const getUserStatusLabel = (status: "done" | "doing" | "pending") => {
+  const map: Record<string, string> = {
+    done: "已完成",
+    doing: "进行中",
+    pending: "未填写"
+  };
+  return map[status];
+};
+
+const getUserStatusType = (status: "done" | "doing" | "pending") => {
+  const map: Record<string, string> = {
+    done: "success",
+    doing: "warning",
+    pending: "info"
+  };
+  return map[status];
 };
 </script>
 
@@ -110,6 +159,55 @@ const getNodeTypeTagType = (type: string): any => {
             <p v-if="metric.kpiDepict" class="metric-desc">
               {{ metric.kpiDepict }}
             </p>
+
+            <!-- 本月使用人 -->
+            <div class="metric-users">
+              <div class="users-header">
+                <el-icon><User /></el-icon>
+                <span class="users-title">本月使用人</span>
+                <el-tag
+                  size="small"
+                  :type="getMetricUsers(metric).length ? 'primary' : 'info'"
+                  effect="light"
+                >
+                  {{ getMetricUsers(metric).length }} 人
+                </el-tag>
+                <span class="users-legend">
+                  <el-tag size="small" type="success" effect="plain">已完成</el-tag>
+                  <el-tag size="small" type="warning" effect="plain">进行中</el-tag>
+                  <el-tag size="small" type="info" effect="plain">未填写</el-tag>
+                </span>
+              </div>
+              <div
+                v-if="getMetricUsers(metric).length"
+                class="user-chips"
+              >
+                <el-tooltip
+                  v-for="u in getMetricUsers(metric)"
+                  :key="u.userId + '_' + u.recordId"
+                  placement="top"
+                >
+                  <template #content>
+                    <div>工号：{{ u.jobNum || "-" }}</div>
+                    <div>目标值：{{ u.target ?? "-" }}</div>
+                    <div>完成值：{{ u.achieved ?? "-" }}</div>
+                  </template>
+                  <el-tag
+                    size="small"
+                    :type="getUserStatusType(getUserStatus(u)) as any"
+                    effect="light"
+                    class="user-chip"
+                  >
+                    {{ u.username }}
+                  </el-tag>
+                </el-tooltip>
+              </div>
+              <div v-else class="no-users">
+                <el-text type="info" size="small"
+                  >本月无人使用此指标</el-text
+                >
+              </div>
+            </div>
           </div>
           <div class="metric-actions">
             <el-tooltip content="编辑指标" placement="top" :show-after="tooltipShowAfter">
@@ -246,6 +344,60 @@ const getNodeTypeTagType = (type: string): any => {
   gap: 8px;
   flex-shrink: 0;
   min-height: 32px;
+}
+
+.metric-users {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--el-fill-color-blank);
+  border: 1px dashed var(--el-border-color-lighter);
+  border-radius: 4px;
+}
+
+.users-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.users-title {
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+}
+
+.users-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.users-legend :deep(.el-tag) {
+  margin: 0 !important;
+  height: 18px;
+  line-height: 16px;
+  padding: 0 5px;
+  font-size: 11px;
+}
+
+.user-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.user-chip {
+  margin: 0 !important;
+  cursor: default;
+}
+
+.no-users {
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
 }
 
 .metric-actions :deep(.el-button) {

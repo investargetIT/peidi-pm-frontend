@@ -1,10 +1,12 @@
 <script lang="ts" setup>
 import { ref, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
+import dayjs from "dayjs";
 import {
   getPmKpiGroupNodePage,
   deletePmKpiGroupNodeApi,
-  deletePmKpiGroupNodeNodeConfigApi
+  deletePmKpiGroupNodeNodeConfigApi,
+  getPmKpiMonthMetricTargetPage
 } from "@/api/evaluation";
 import TreeSection from "./components/TreeSection.vue";
 import DetailSection from "./components/DetailSection.vue";
@@ -12,9 +14,50 @@ import NodeEditDialog from "./components/NodeEditDialog.vue";
 import MetricEditDialog from "./components/MetricEditDialog.vue";
 import type { TreeNode, MetricConfig, ApiResponse } from "./components/types";
 
+interface MonthUserInfo {
+  userId: string;
+  username: string;
+  jobNum?: string;
+  target: number | null;
+  achieved: number | null;
+  recordId: string;
+}
+
+interface MonthApiResponse {
+  code: number;
+  msg: string;
+  success: boolean;
+  data: {
+    records: Array<{
+      userId: string | number;
+      jobNum?: string;
+      username: string;
+      month: string;
+      metricTargetList?: Array<{
+        id: string | number;
+        nodeId: string | number;
+        targetName: string;
+        target: number | null;
+        achieved: number | null;
+        status?: number;
+      }>;
+    }>;
+    total: number;
+  };
+}
+
 const dataSource = ref<TreeNode[]>([]);
 const loading = ref(false);
 const selectedNode = ref<TreeNode | null>(null);
+
+// 月度数据
+const currentMonth = ref(
+  dayjs()
+    .subtract(1, "month")
+    .startOf("month")
+    .format("YYYY-MM-DD")
+);
+const monthMetricIndex = ref<Map<string, MonthUserInfo[]>>(new Map());
 
 // 节点编辑对话框
 const nodeDialogVisible = ref(false);
@@ -39,6 +82,40 @@ const fetchPmKpiGroupNodePage = async () => {
     console.error("获取节点列表失败", error);
   } finally {
     loading.value = false;
+  }
+};
+
+const fetchMonthMetrics = async (month?: string) => {
+  const targetMonth = month || currentMonth.value;
+  try {
+    const res = (await getPmKpiMonthMetricTargetPage({
+      startDate: targetMonth,
+      endDate: targetMonth,
+      pageNo: 1,
+      pageSize: 99999
+    })) as MonthApiResponse;
+
+    const map = new Map<string, MonthUserInfo[]>();
+    if (res?.success && res.data?.records) {
+      res.data.records.forEach(user => {
+        (user.metricTargetList || []).forEach(m => {
+          if (m.status === 0) return;
+          const key = `${m.nodeId}__${m.targetName}`;
+          if (!map.has(key)) map.set(key, []);
+          map.get(key)!.push({
+            userId: String(user.userId),
+            username: user.username,
+            jobNum: user.jobNum,
+            target: m.target,
+            achieved: m.achieved,
+            recordId: String(m.id)
+          });
+        });
+      });
+    }
+    monthMetricIndex.value = map;
+  } catch (error) {
+    console.error("获取月度指标失败", error);
   }
 };
 
@@ -198,6 +275,7 @@ const handleMetricDialogSuccess = async () => {
 
 onMounted(() => {
   fetchPmKpiGroupNodePage();
+  fetchMonthMetrics();
 });
 </script>
 
@@ -206,6 +284,7 @@ onMounted(() => {
     <TreeSection
       :data-source="dataSource"
       :loading="loading"
+      :month-metric-index="monthMetricIndex"
       @node-click="handleNodeClick"
       @add-node="handleAddNode"
       @edit-node="handleEditNode"
@@ -213,6 +292,8 @@ onMounted(() => {
     />
     <DetailSection
       :selected-node="selectedNode"
+      :month-metric-index="monthMetricIndex"
+      :current-month="currentMonth"
       @edit-node="handleEditNode"
       @delete-node="handleDeleteNode"
       @add-metric="handleAddMetric"

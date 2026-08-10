@@ -1,16 +1,28 @@
 <script lang="ts" setup>
-import { Search, Plus, Edit, Delete } from "@element-plus/icons-vue";
+import { Search, Plus, Edit, Delete, User } from "@element-plus/icons-vue";
 import type { TreeInstance } from "element-plus";
 import type { TreeNode } from "./types";
 import { ref, computed } from "vue";
 import RiAddLine from "@iconify-icons/ri/add-line";
 
+interface MonthUserInfo {
+  userId: string;
+  username: string;
+  jobNum?: string;
+  target: number | null;
+  achieved: number | null;
+  recordId: string;
+}
+
 interface Props {
   dataSource: TreeNode[];
   loading: boolean;
+  monthMetricIndex?: Map<string, MonthUserInfo[]>;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  monthMetricIndex: () => new Map()
+});
 
 const emit = defineEmits<{
   "node-click": [node: TreeNode];
@@ -78,6 +90,25 @@ const handleSearch = () => {
 const handleAddRootNode = () => {
   emit("add-node", null);
 };
+
+// 收集节点（含子节点）下所有被本月使用的指标对应的去重用户数
+// 按 userId 去重：同一用户用同节点下多条指标只算 1 人
+const getNodeUsedUserCount = (node: TreeNode): number => {
+  if (!props.monthMetricIndex || props.monthMetricIndex.size === 0) return 0;
+  const userSet = new Set<string>();
+  const walk = (n: TreeNode) => {
+    (n.metricConfigs || []).forEach(m => {
+      const key = `${m.nodeId}__${m.targetName}`;
+      const users = props.monthMetricIndex.get(key);
+      if (users && users.length) {
+        users.forEach(u => userSet.add(u.userId));
+      }
+    });
+    (n.children || []).forEach(walk);
+  };
+  walk(node);
+  return userSet.size;
+};
 </script>
 
 <template>
@@ -142,6 +173,24 @@ const handleAddRootNode = () => {
               >
                 {{ data.metricConfigs.length }}个指标
               </el-tag>
+              <el-tooltip
+                v-if="getNodeUsedUserCount(data) > 0"
+                :content="`本月有 ${getNodeUsedUserCount(data)} 人在使用该节点下的指标`"
+                placement="top"
+                :show-after="tooltipShowAfter"
+              >
+                <el-tag
+                  type="success"
+                  size="small"
+                  effect="dark"
+                  class="used-user-tag"
+                >
+                  <span class="used-user-inner">
+                    <el-icon class="used-user-icon"><User /></el-icon>
+                    <span>本月 {{ getNodeUsedUserCount(data) }} 人使用</span>
+                  </span>
+                </el-tag>
+              </el-tooltip>
             </span>
             <span class="node-actions">
               <el-tooltip
@@ -294,6 +343,24 @@ const handleAddRootNode = () => {
 
 .metric-count-tag {
   flex-shrink: 0;
+}
+
+.used-user-tag {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.used-user-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.used-user-icon {
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .node-actions {
