@@ -321,13 +321,11 @@ const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
       // 检查条件：目标值不等于0，且完成值为0或null
       if (targetValue !== null && targetValue !== 0) {
         if (achievedValue === null || achievedValue === 0) {
-          // 忽略侯子洋的"好适嘉项目累计净毛利"和王琳的"自有产品净毛利"这条数据
+          // 忽略侯子洋的"好适嘉项目累计净毛利"和"好适嘉项目净毛利20%"
           const isIgnoredRecord =
-            (record.username === "侯子洋" &&
-              (record.targetName === "好适嘉项目累计净毛利" ||
-                record.targetName === "好适嘉项目净毛利20%")) ||
-            (record.username === "王琳" &&
-              record.targetName === "自有产品净毛利");
+            record.username === "侯子洋" &&
+            (record.targetName === "好适嘉项目累计净毛利" ||
+              record.targetName === "好适嘉项目净毛利20%");
 
           if (!isIgnoredRecord) {
             console.log(
@@ -451,13 +449,11 @@ export const calculateMonthlyMetricData = async (
       } else if (calculationType === 4) {
         // 自定义模式：需要在这里单独写逻辑的指标
         if (
-          (dataItem.userName === "侯子洋" &&
-            (dataItem.examinationType === "好适嘉项目累计净毛利" ||
-              dataItem.examinationType === "好适嘉项目净毛利20%")) ||
-          (dataItem.userName === "王琳" &&
-            dataItem.examinationType === "自有产品净毛利")
+          dataItem.userName === "侯子洋" &&
+          (dataItem.examinationType === "好适嘉项目累计净毛利" ||
+            dataItem.examinationType === "好适嘉项目净毛利20%")
         ) {
-          // 侯子洋 好适嘉项目累计净毛利 或 王琳 自有产品净毛利：取上上个月
+          // 侯子洋 好适嘉项目累计净毛利 / 好适嘉项目净毛利20%：取上上个月
           valueI = targetData
             .slice(
               0,
