@@ -216,10 +216,11 @@ export const processAndExportOBMData = async (
           .reduce(sumDataValue, 0);
       } else if ((rowNumber >= 4 && rowNumber <= 32) || rowNumber === 61) {
         // 第 4-32 行：累计值计算（行号不变）
-        //#region 侯子洋 好适嘉项目净毛利20% 单独处理 取上上个月
+        //#region 侯子洋 好适嘉项目累计净毛利 单独处理 取上上个月
         if (
           userName === "侯子洋" &&
-          examinationType === "好适嘉项目净毛利20%"
+          (examinationType === "好适嘉项目累计净毛利" ||
+            examinationType === "好适嘉项目净毛利20%")
         ) {
           valueI = targetData
             .slice(0, findObjectByMonthIndex(targetData, previousMonth - 1) + 1)
