@@ -11,10 +11,19 @@ import {
   notifyUserConfirmApi,
   updateEditStatusApi
 } from "@/api/evaluation";
-import { processAndExportMonthlyMetricForHR, calculateMonthlyMetricData } from "@/views/examination/utils/exportMonthlyMetricForHR";
+import {
+  processAndExportMonthlyMetricForHR,
+  calculateMonthlyMetricData
+} from "@/views/examination/utils/exportMonthlyMetricForHR";
 import { exportTargetPerformance } from "@/views/examination/utils/exportTargetPerformance";
 import { ElMessage, ElMessageBox, ElCheckbox } from "element-plus";
-import { Download, Bell, CircleCheck, Warning, InfoFilled } from "@element-plus/icons-vue";
+import {
+  Download,
+  Bell,
+  CircleCheck,
+  Warning,
+  InfoFilled
+} from "@element-plus/icons-vue";
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -99,17 +108,21 @@ const isMobile = ref(window.innerWidth <= 768);
 
 // 触摸时间记录，用于检测双击
 let lastTouchTime = 0;
-let lastTouchTarget = '';
+let lastTouchTarget = "";
 
 // 监听窗口大小变化
-if (typeof window !== 'undefined') {
-  window.addEventListener('resize', () => {
+if (typeof window !== "undefined") {
+  window.addEventListener("resize", () => {
     isMobile.value = window.innerWidth <= 768;
   });
 }
 
 // 处理触摸/点击事件 - 手机端单击，桌面端双击
-const handleEditTouch = (row: RecordItem, field: "target" | "achieved", event: Event) => {
+const handleEditTouch = (
+  row: RecordItem,
+  field: "target" | "achieved",
+  event: Event
+) => {
   if (isMobile.value) {
     // 手机端直接单击编辑
     startEdit(row, field);
@@ -123,8 +136,8 @@ const handleEditTouch = (row: RecordItem, field: "target" | "achieved", event: E
 const handleCellClick = (row: RecordItem, field: "target" | "achieved") => {
   if (isMobile.value) {
     // 手机端需要二次确认
-    const fieldName = field === 'target' ? '目标值' : '完成值';
-    const currentValue = row[field] ?? '-';
+    const fieldName = field === "target" ? "目标值" : "完成值";
+    const currentValue = row[field] ?? "-";
 
     ElMessageBox.confirm(
       `<div style="text-align: center;">
@@ -136,20 +149,22 @@ const handleCellClick = (row: RecordItem, field: "target" | "achieved") => {
           当前值：${formatNumber(currentValue)}
         </p>
       </div>`,
-      '确认编辑',
+      "确认编辑",
       {
-        confirmButtonText: '进入编辑',
-        cancelButtonText: '取消',
-        type: 'info',
+        confirmButtonText: "进入编辑",
+        cancelButtonText: "取消",
+        type: "info",
         dangerouslyUseHTMLString: true,
         center: true,
-        customClass: 'edit-confirm-dialog',
+        customClass: "edit-confirm-dialog"
       }
-    ).then(() => {
-      startEdit(row, field);
-    }).catch(() => {
-      // 用户取消，不做任何操作
-    });
+    )
+      .then(() => {
+        startEdit(row, field);
+      })
+      .catch(() => {
+        // 用户取消，不做任何操作
+      });
   }
 };
 // 注意：visibleRecords 是所有筛选后的数据（不受分页影响），导出和通知都用的是这个
@@ -185,10 +200,10 @@ const DEVELOPER_USER_IDS = [
 const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
   邓苏: ["邓苏", "王永蝶", "夏立明", "潘明旺", "缪欣瑶"],
   孙舒欣: ["孙舒欣"],
-  方云: ["侯子洋", "王琳"],
+  方云: ["侯子洋", "王琳", "张洪亮", "黄向前"],
   付阳: ["黄文豪"],
   范振吉: ["邓苏", "孙舒欣", "潘明旺"],
-  黄向前: ["李源泰"],
+  黄向前: ["李源泰"]
 };
 const DEPARTMENT_LIST = [
   { name: "零食", deptId: 992836831 },
@@ -354,7 +369,8 @@ const isCoreDeveloper = () =>
 const showHuangNotice = computed(() => {
   const isHuang = getCurrentUsername() === "黄向前";
   const selectedMonth = searchParams.value.startDate;
-  const isTargetMonth = selectedMonth === "2026-09-01" || selectedMonth === "2026-10-01";
+  const isTargetMonth =
+    selectedMonth === "2026-09-01" || selectedMonth === "2026-10-01";
   return isHuang && isTargetMonth;
 });
 
@@ -750,7 +766,7 @@ const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
   const inputWrapper = document.querySelector(
     `.editable-cell-input-${row.id}-${field}`
   );
-  const input = inputWrapper?.querySelector('input') as HTMLInputElement | null;
+  const input = inputWrapper?.querySelector("input") as HTMLInputElement | null;
 
   // 确保 input 存在后再聚焦
   if (input) {
@@ -760,7 +776,7 @@ const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
       input.select();
       // 手机端滚动到可见区域
       if (isMobile.value) {
-        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        input.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }, 50);
   }
@@ -1209,9 +1225,9 @@ const handleExportTargetPerformance = async () => {
     const result = await exportTargetPerformance();
     ElMessage.success(
       `导出目标绩效结果表成功，共填充 ${result.filledCount} 行` +
-      (result.unmatchedCount > 0
-        ? `，${result.unmatchedCount} 行未匹配（详见控制台）`
-        : "")
+        (result.unmatchedCount > 0
+          ? `，${result.unmatchedCount} 行未匹配（详见控制台）`
+          : "")
     );
   } catch (error) {
     console.error("导出目标绩效结果表失败:", error);
@@ -1236,7 +1252,7 @@ const tableStatusDialogVisible = ref(false);
 const tableStatusChecked = ref(false);
 const tableStatusLoading = ref(false);
 const tableStatusMonth = ref(getDefaultMonth());
-const tableStatusAction = ref<'lock' | 'unlock'>('unlock');
+const tableStatusAction = ref<"lock" | "unlock">("unlock");
 
 // 批量通知相关
 const batchTodoNotifyDialogVisible = ref(false);
@@ -1271,7 +1287,10 @@ const confirmNotify = async () => {
 
     // 构建新的数组，确保有 month 字段
     // 传上个月，比如当前是2026-07，就传2026-06-01
-    const lastMonth = dayjs().subtract(1, 'month').startOf('month').format("YYYY-MM-DD");
+    const lastMonth = dayjs()
+      .subtract(1, "month")
+      .startOf("month")
+      .format("YYYY-MM-DD");
     console.log("📅 使用的月份（上个月）：", lastMonth);
 
     const args = metricDataArray.map(item => {
@@ -1300,7 +1319,7 @@ const confirmNotify = async () => {
 };
 
 // 打开表格状态设置对话框
-const handleTableStatus = (action: 'lock' | 'unlock') => {
+const handleTableStatus = (action: "lock" | "unlock") => {
   tableStatusAction.value = action;
   tableStatusChecked.value = false;
   tableStatusMonth.value = getDefaultMonth();
@@ -1318,21 +1337,28 @@ const confirmTableStatus = async () => {
     tableStatusLoading.value = true;
     tableStatusDialogVisible.value = false;
 
-    const isEdit = tableStatusAction.value === 'unlock' ? 1 : 0;
+    const isEdit = tableStatusAction.value === "unlock" ? 1 : 0;
     const res = (await updateEditStatusApi({
       isEdit,
       month: tableStatusMonth.value
     })) as any;
 
     if (res?.code === 200 || res?.success) {
-      ElMessage.success(tableStatusAction.value === 'unlock' ? "解锁成功" : "加锁成功");
+      ElMessage.success(
+        tableStatusAction.value === "unlock" ? "解锁成功" : "加锁成功"
+      );
       fetchData(); // 重新获取数据以更新锁定状态
     } else {
-      ElMessage.error(res?.msg || (tableStatusAction.value === 'unlock' ? "解锁失败" : "加锁失败"));
+      ElMessage.error(
+        res?.msg ||
+          (tableStatusAction.value === "unlock" ? "解锁失败" : "加锁失败")
+      );
     }
   } catch (error) {
     console.error("设置表格状态失败:", error);
-    ElMessage.error(tableStatusAction.value === 'unlock' ? "解锁失败" : "加锁失败");
+    ElMessage.error(
+      tableStatusAction.value === "unlock" ? "解锁失败" : "加锁失败"
+    );
   } finally {
     tableStatusLoading.value = false;
   }
@@ -1512,10 +1538,7 @@ onMounted(() => {
                 通知用户确认绩效信息
               </el-button>
             </el-tooltip>
-            <el-tooltip
-              content="锁定指定月份的表格填写权限"
-              placement="top"
-            >
+            <el-tooltip content="锁定指定月份的表格填写权限" placement="top">
               <el-button
                 type="danger"
                 :loading="tableStatusLoading && tableStatusAction === 'lock'"
@@ -1525,10 +1548,7 @@ onMounted(() => {
                 表格填写加锁
               </el-button>
             </el-tooltip>
-            <el-tooltip
-              content="解锁指定月份的表格填写权限"
-              placement="top"
-            >
+            <el-tooltip content="解锁指定月份的表格填写权限" placement="top">
               <el-button
                 type="warning"
                 :loading="tableStatusLoading && tableStatusAction === 'unlock'"
@@ -1591,8 +1611,12 @@ onMounted(() => {
         </div>
         <!-- 黄向前的特殊通知 -->
         <div v-if="showHuangNotice" class="huang-notice">
-          <el-icon color="#409eff" style="margin-right: 8px; font-size: 18px;"><InfoFilled /></el-icon>
-          <span class="huang-notice-text">请注意修改双十一期间李源泰的短视频出单量达成率指标目标值</span>
+          <el-icon color="#409eff" style="margin-right: 8px; font-size: 18px"
+            ><InfoFilled
+          /></el-icon>
+          <span class="huang-notice-text"
+            >请注意修改双十一期间李源泰的短视频出单量达成率指标目标值</span
+          >
         </div>
         <div v-if="isMonthLocked" class="table-lock-tip">
           <el-icon color="#f56c6c" style="margin-right: 5px"
@@ -1610,152 +1634,169 @@ onMounted(() => {
             :span-method="objectSpanMethod"
             :cell-style="tableCellStyle"
           >
-          <el-table-column label="序号" width="60" align="center">
-            <template #default="{ $index }">
-              {{ getGroupIndex($index) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="month" label="月份" width="120" align="center">
-            <template #default="{ row }">
-              {{ row.groupIndex === 0 ? formatMonth(row.month) : "" }}
-            </template>
-          </el-table-column>
-          <el-table-column
-            prop="username"
-            label="负责人"
-            width="100"
-            align="center"
-          >
-            <template #default="{ row }">
-              {{ row.groupIndex === 0 ? row.username : "" }}
-            </template>
-          </el-table-column>
-          <el-table-column
-            prop="targetName"
-            label="指标名称"
-            min-width="200"
-            show-overflow-tooltip
-          />
-          <el-table-column
-            prop="target"
-            label="目标值（元）"
-            width="160"
-            align="right"
-          >
-            <template #default="{ row }">
-              <el-input
-                v-if="isEditing(row, 'target')"
-                v-model="editingValue"
-                :class="`editable-cell-input editable-cell-input-${row.id}-target`"
-                style="width: 120px"
-                @blur="confirmEdit(row, 'target')"
-                @keydown="handleEditKeydown($event, row, 'target')"
-              />
-              <span
-                v-else
-                v-loading="isSaving(row, 'target')"
-                class="editable-cell"
-                :class="{ 'editable-cell-disabled': !canEditRow(row) }"
-                :title="canEditRow(row) ? (isMobile ? '点击进入编辑（需确认）' : '双击修改') : '已锁定，不可编辑'"
-                @dblclick="
-                  !isMobile && canEditRow(row) ? startEdit(row, 'target') : undefined
-                "
-                @click="
-                  isMobile && canEditRow(row) ? handleCellClick(row, 'target') : undefined
-                "
-              >
-                {{ formatNumber(row.target) }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column
-            prop="achieved"
-            label="完成值（元）"
-            width="160"
-            align="right"
-          >
-            <template #default="{ row }">
-              <el-input
-                v-if="isEditing(row, 'achieved')"
-                v-model="editingValue"
-                :class="`editable-cell-input editable-cell-input-${row.id}-achieved`"
-                style="width: 120px"
-                @blur="confirmEdit(row, 'achieved')"
-                @keydown="handleEditKeydown($event, row, 'achieved')"
-              />
-              <span
-                v-else
-                v-loading="isSaving(row, 'achieved')"
-                class="editable-cell"
-                :class="{
-                  'editable-cell-disabled':
-                    !canEditRow(row) || !isManualRow(row)
-                }"
-                :title="
-                  !canEditRow(row)
-                    ? '已锁定，不可编辑'
-                    : isManualRow(row)
-                      ? (isMobile ? '点击进入编辑（需确认）' : '双击修改')
-                      : '不可编辑'
-                "
-                @dblclick="
-                  !isMobile && canEditRow(row) && isManualRow(row)
-                    ? startEdit(row, 'achieved')
-                    : undefined
-                "
-                @click="
-                  isMobile && canEditRow(row) && isManualRow(row)
-                    ? handleCellClick(row, 'achieved')
-                    : undefined
-                "
-              >
-                {{ formatNumber(row.achieved) }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="完成率" width="140" align="center">
-            <template #default="{ row }">
-              <span :class="getRateClass(row.target, row.achieved)">
-                {{ getCompletionRate(row.target, row.achieved) }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column
-            :fixed="isMobile ? false : 'right'"
-            label="操作"
-            :width="isMobile ? 180 : 280"
-            align="center"
-          >
-            <template #default="{ row }">
-              <template v-if="row.groupIndex === 0">
-                <div class="action-buttons">
-                  <el-button
-                    type="success"
-                    size="small"
-                    :loading="isUpdating(row.userId || '')"
-                    @click="handleUpdateMetricData(row)"
-                  >
-                    <template v-if="isMobile">更新</template>
-                    <template v-else>更新指标数据</template>
-                  </el-button>
-                  <el-tooltip
-                    content="提醒该负责人的填写人填写指标信息"
-                    placement="top"
-                  >
-                    <el-button
-                      class="dingtalk-blue-btn"
-                      size="small"
-                      @click="handleNotifyUser(row)"
-                    >
-                      <template v-if="isMobile">提醒</template>
-                      <template v-else>提醒填写</template>
-                    </el-button>
-                  </el-tooltip>
-                </div>
+            <el-table-column label="序号" width="60" align="center">
+              <template #default="{ $index }">
+                {{ getGroupIndex($index) }}
               </template>
-            </template>
-          </el-table-column>
-        </el-table>
+            </el-table-column>
+            <el-table-column
+              prop="month"
+              label="月份"
+              width="120"
+              align="center"
+            >
+              <template #default="{ row }">
+                {{ row.groupIndex === 0 ? formatMonth(row.month) : "" }}
+              </template>
+            </el-table-column>
+            <el-table-column
+              prop="username"
+              label="负责人"
+              width="100"
+              align="center"
+            >
+              <template #default="{ row }">
+                {{ row.groupIndex === 0 ? row.username : "" }}
+              </template>
+            </el-table-column>
+            <el-table-column
+              prop="targetName"
+              label="指标名称"
+              min-width="200"
+              show-overflow-tooltip
+            />
+            <el-table-column
+              prop="target"
+              label="目标值（元）"
+              width="160"
+              align="right"
+            >
+              <template #default="{ row }">
+                <el-input
+                  v-if="isEditing(row, 'target')"
+                  v-model="editingValue"
+                  :class="`editable-cell-input editable-cell-input-${row.id}-target`"
+                  style="width: 120px"
+                  @blur="confirmEdit(row, 'target')"
+                  @keydown="handleEditKeydown($event, row, 'target')"
+                />
+                <span
+                  v-else
+                  v-loading="isSaving(row, 'target')"
+                  class="editable-cell"
+                  :class="{ 'editable-cell-disabled': !canEditRow(row) }"
+                  :title="
+                    canEditRow(row)
+                      ? isMobile
+                        ? '点击进入编辑（需确认）'
+                        : '双击修改'
+                      : '已锁定，不可编辑'
+                  "
+                  @dblclick="
+                    !isMobile && canEditRow(row)
+                      ? startEdit(row, 'target')
+                      : undefined
+                  "
+                  @click="
+                    isMobile && canEditRow(row)
+                      ? handleCellClick(row, 'target')
+                      : undefined
+                  "
+                >
+                  {{ formatNumber(row.target) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column
+              prop="achieved"
+              label="完成值（元）"
+              width="160"
+              align="right"
+            >
+              <template #default="{ row }">
+                <el-input
+                  v-if="isEditing(row, 'achieved')"
+                  v-model="editingValue"
+                  :class="`editable-cell-input editable-cell-input-${row.id}-achieved`"
+                  style="width: 120px"
+                  @blur="confirmEdit(row, 'achieved')"
+                  @keydown="handleEditKeydown($event, row, 'achieved')"
+                />
+                <span
+                  v-else
+                  v-loading="isSaving(row, 'achieved')"
+                  class="editable-cell"
+                  :class="{
+                    'editable-cell-disabled':
+                      !canEditRow(row) || !isManualRow(row)
+                  }"
+                  :title="
+                    !canEditRow(row)
+                      ? '已锁定，不可编辑'
+                      : isManualRow(row)
+                        ? isMobile
+                          ? '点击进入编辑（需确认）'
+                          : '双击修改'
+                        : '不可编辑'
+                  "
+                  @dblclick="
+                    !isMobile && canEditRow(row) && isManualRow(row)
+                      ? startEdit(row, 'achieved')
+                      : undefined
+                  "
+                  @click="
+                    isMobile && canEditRow(row) && isManualRow(row)
+                      ? handleCellClick(row, 'achieved')
+                      : undefined
+                  "
+                >
+                  {{ formatNumber(row.achieved) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="完成率" width="140" align="center">
+              <template #default="{ row }">
+                <span :class="getRateClass(row.target, row.achieved)">
+                  {{ getCompletionRate(row.target, row.achieved) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column
+              :fixed="isMobile ? false : 'right'"
+              label="操作"
+              :width="isMobile ? 180 : 280"
+              align="center"
+            >
+              <template #default="{ row }">
+                <template v-if="row.groupIndex === 0">
+                  <div class="action-buttons">
+                    <el-button
+                      type="success"
+                      size="small"
+                      :loading="isUpdating(row.userId || '')"
+                      @click="handleUpdateMetricData(row)"
+                    >
+                      <template v-if="isMobile">更新</template>
+                      <template v-else>更新指标数据</template>
+                    </el-button>
+                    <el-tooltip
+                      content="提醒该负责人的填写人填写指标信息"
+                      placement="top"
+                    >
+                      <el-button
+                        class="dingtalk-blue-btn"
+                        size="small"
+                        @click="handleNotifyUser(row)"
+                      >
+                        <template v-if="isMobile">提醒</template>
+                        <template v-else>提醒填写</template>
+                      </el-button>
+                    </el-tooltip>
+                  </div>
+                </template>
+              </template>
+            </el-table-column>
+          </el-table>
         </div>
 
         <!-- 分页 -->
@@ -1843,7 +1884,7 @@ onMounted(() => {
         <div class="notify-info">
           <div class="notify-title">发送钉钉通知</div>
           <div class="notify-desc">
-            向上个月所有考核用户发送钉钉消息<br>
+            向上个月所有考核用户发送钉钉消息<br />
             通知用户确认其上个月绩效
           </div>
         </div>
@@ -1994,28 +2035,50 @@ onMounted(() => {
       :close-on-click-modal="false"
       :class="tableStatusAction === 'unlock' ? 'unlock-dialog' : 'lock-dialog'"
     >
-      <div class="notify-confirm-content" :class="tableStatusAction === 'unlock' ? 'unlock-bg' : 'lock-bg'">
+      <div
+        class="notify-confirm-content"
+        :class="tableStatusAction === 'unlock' ? 'unlock-bg' : 'lock-bg'"
+      >
         <div class="notify-icon">
-          <el-icon :size="48" :color="tableStatusAction === 'unlock' ? '#E6A23C' : '#F56C6C'">
+          <el-icon
+            :size="48"
+            :color="tableStatusAction === 'unlock' ? '#E6A23C' : '#F56C6C'"
+          >
             <CircleCheck v-if="tableStatusAction === 'unlock'" />
             <Warning v-else />
           </el-icon>
         </div>
         <div class="notify-info">
-          <div class="notify-title">{{ tableStatusAction === 'unlock' ? '表格填写解锁' : '表格填写加锁' }}</div>
+          <div class="notify-title">
+            {{
+              tableStatusAction === "unlock" ? "表格填写解锁" : "表格填写加锁"
+            }}
+          </div>
           <div class="notify-desc">
-            {{ tableStatusAction === 'unlock' ? '即将解锁指定月份的表格填写权限' : '即将锁定指定月份的表格填写权限' }}
+            {{
+              tableStatusAction === "unlock"
+                ? "即将解锁指定月份的表格填写权限"
+                : "即将锁定指定月份的表格填写权限"
+            }}
           </div>
         </div>
       </div>
       <div class="notify-features">
         <div class="feature-item">
           <el-icon color="#67C23A"><CircleCheck /></el-icon>
-          <span>{{ tableStatusAction === 'unlock' ? '解锁后，用户可以编辑该月份的指标数据' : '加锁后，用户无法编辑该月份的指标数据' }}</span>
+          <span>{{
+            tableStatusAction === "unlock"
+              ? "解锁后，用户可以编辑该月份的指标数据"
+              : "加锁后，用户无法编辑该月份的指标数据"
+          }}</span>
         </div>
         <div class="feature-item">
           <el-icon color="#E6A23C"><Warning /></el-icon>
-          <span>{{ tableStatusAction === 'unlock' ? '请谨慎操作，解锁后数据可能被修改' : '加锁后可以保护数据不被意外修改' }}</span>
+          <span>{{
+            tableStatusAction === "unlock"
+              ? "请谨慎操作，解锁后数据可能被修改"
+              : "加锁后可以保护数据不被意外修改"
+          }}</span>
         </div>
       </div>
       <div class="unlock-month-select">
@@ -2031,7 +2094,9 @@ onMounted(() => {
       </div>
       <div class="notify-checkbox">
         <el-checkbox v-model="tableStatusChecked" size="large">
-          我确认{{ tableStatusAction === 'unlock' ? '解锁' : '锁定' }}该月份的表格填写权限
+          我确认{{
+            tableStatusAction === "unlock" ? "解锁" : "锁定"
+          }}该月份的表格填写权限
         </el-checkbox>
       </div>
       <template #footer>
@@ -2046,7 +2111,7 @@ onMounted(() => {
             :disabled="!tableStatusChecked"
             @click="confirmTableStatus"
           >
-            确定{{ tableStatusAction === 'unlock' ? '解锁' : '加锁' }}
+            确定{{ tableStatusAction === "unlock" ? "解锁" : "加锁" }}
           </el-button>
         </div>
       </template>
