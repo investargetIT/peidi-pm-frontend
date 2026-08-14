@@ -475,6 +475,7 @@ const updateTaskFun = data => {
   let newArr: any = [];
   if (data.attachments) {
     data.attachments.map(item => {
+      if (!item) return;
       if (!item.response) {
         newArr.push({
           raw: {
