@@ -1008,6 +1008,7 @@ const handleExport = async () => {
       targetName: string;
       username: string;
       monthlyTargets: TargetData;
+      monthlyAchieved: TargetData;
       total: number;
     }
 
@@ -1040,13 +1041,15 @@ const handleExport = async () => {
             targetName: metric.targetName || "",
             username: record.username || "",
             monthlyTargets: {},
+            monthlyAchieved: {},
             total: 0
           });
         }
 
         const rowData = rowDataMap.get(key)!;
-        // 存储目标值
+        // 存储目标值 / 完成值
         rowData.monthlyTargets[monthNum.toString()] = metric.target ?? "";
+        rowData.monthlyAchieved[monthNum.toString()] = metric.achieved ?? "";
       });
     });
 
@@ -1062,17 +1065,23 @@ const handleExport = async () => {
       { key: "username", header: "姓名", width: 12 }
     ];
 
-    // 添加1-12月列
+    // 添加1-12月列（每个月拆成"目标"和"完成"两列）
     for (let i = 1; i <= 12; i++) {
       columns.push({
-        key: `month${i}`,
-        header: `${i}月`,
+        key: `month${i}Target`,
+        header: `${i}月目标`,
+        width: 12
+      });
+      columns.push({
+        key: `month${i}Achieved`,
+        header: `${i}月完成`,
         width: 12
       });
     }
 
-    // 添加合计和备注列
-    columns.push({ key: "total", header: "合计", width: 15 });
+    // 添加合计和备注列（合计拆成目标合计 / 完成合计）
+    columns.push({ key: "totalTarget", header: "合计目标", width: 15 });
+    columns.push({ key: "totalAchieved", header: "合计完成", width: 15 });
     columns.push({ key: "remark", header: "单位：万", width: 12 });
 
     worksheet.columns = columns;
@@ -1099,16 +1108,9 @@ const handleExport = async () => {
     // 添加数据行
     let currentRow = 2;
     rowDataMap.forEach(rowData => {
-      // 计算合计
-      let total = 0;
-      const monthlyValues: (number | string)[] = [];
-      for (let i = 1; i <= 12; i++) {
-        const val = rowData.monthlyTargets[i.toString()];
-        monthlyValues.push(val ?? "");
-        if (val != null && val !== "" && !isNaN(Number(val))) {
-          total += Number(val);
-        }
-      }
+      // 计算合计（目标合计 / 完成合计）
+      let totalTarget = 0;
+      let totalAchieved = 0;
 
       const rowDataObj: any = {
         department: rowData.department,
@@ -1117,12 +1119,24 @@ const handleExport = async () => {
         username: rowData.username
       };
 
-      // 添加1-12月数据
+      // 添加1-12月目标 / 完成数据
       for (let i = 1; i <= 12; i++) {
-        rowDataObj[`month${i}`] = monthlyValues[i - 1];
+        const targetVal = rowData.monthlyTargets[i.toString()];
+        const achievedVal = rowData.monthlyAchieved[i.toString()];
+
+        rowDataObj[`month${i}Target`] = targetVal ?? "";
+        rowDataObj[`month${i}Achieved`] = achievedVal ?? "";
+
+        if (targetVal != null && targetVal !== "" && !isNaN(Number(targetVal))) {
+          totalTarget += Number(targetVal);
+        }
+        if (achievedVal != null && achievedVal !== "" && !isNaN(Number(achievedVal))) {
+          totalAchieved += Number(achievedVal);
+        }
       }
 
-      rowDataObj.total = total;
+      rowDataObj.totalTarget = totalTarget;
+      rowDataObj.totalAchieved = totalAchieved;
       rowDataObj.remark = ""; // 备注列留空
 
       const row = worksheet.addRow(rowDataObj);
