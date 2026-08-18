@@ -45,5 +45,6 @@
     "v-perms",
     "v-ripple"
   ],
-  "vscodeCustomCodeColor.highlightValueColor": "#b392f0"
+  "vscodeCustomCodeColor.highlightValueColor": "#b392f0",
+  "vue3snippets.enable-compile-vue-file-on-did-save-code": false
 }

@@ -29,16 +29,20 @@ const getFirstDayOfMonth = (year: number, month: number) => {
 };
 
 // 在对象数组里查找month为指定日期的对象
-const findObjectByMonthWithFirstDay = (array: any[], month: number) => {
+const findObjectByMonthWithFirstDay = (
+  array: any[],
+  month: number,
+  year?: number
+) => {
   return array.find(
-    obj => obj.month === getFirstDayOfMonth(dayjs().year(), month)
+    obj => obj.month === getFirstDayOfMonth(year || dayjs().year(), month)
   );
 };
 
 // 在对象数组里查找month为指定日期的对象 在 数组中的索引
-const findObjectByMonthIndex = (array: any[], month: number) => {
+const findObjectByMonthIndex = (array: any[], month: number, year?: number) => {
   const idx = array.findIndex(
-    obj => obj.month === getFirstDayOfMonth(dayjs().year(), month)
+    obj => obj.month === getFirstDayOfMonth(year || dayjs().year(), month)
   );
   if (idx < 0) return -1;
   return idx;
@@ -252,15 +256,20 @@ const transformMonthlyMetricData = (records: MonthlyMetricResultRecord[]) => {
 /**
  * 检查上月手填数据是否符合要求
  * @param rawData 原始数据
+ * @param year 指定年份，默认当前年
+ * @param month 指定当前月份（1-12），默认当前月
  * @returns 是否符合要求，以及不符合时的错误信息
  */
-const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
-  // 获取当前年份和月份
-  const now = dayjs(); // 2026-07-07
-  const currentYear = now.year(); // 2026
-  const currentMonth = now.month() + 1; // 7 (因为 month() 是 0-11)
-  const previousMonth = currentMonth - 1; // 6
-  const previousMonthDate = getFirstDayOfMonth(currentYear, previousMonth); // 2026-06-01
+const checkLastMonthManualData = (
+  rawData: MonthlyMetricResultRecord[],
+  year?: number,
+  month?: number
+) => {
+  // 获取指定年份和月份（默认当前）
+  const currentYear = year || dayjs().year();
+  const currentMonth = month || dayjs().month() + 1; // month() 是 0-11
+  const previousMonth = currentMonth - 1;
+  const previousMonthDate = getFirstDayOfMonth(currentYear, previousMonth);
 
   // console.log(
   //   `检查 ${currentYear}年${previousMonth}月 (${previousMonthDate}) 的手填数据...`
@@ -364,19 +373,23 @@ const checkLastMonthManualData = (rawData: MonthlyMetricResultRecord[]) => {
 /**
  * 计算月度指标数据并返回处理后的数组（不导出Excel，不做校验）
  * @param year 指定年份，默认当前年
+ * @param currentMonth 指定当前月份（1-12），默认当前月
  * @returns 处理后的月度指标数据数组
  */
 export const calculateMonthlyMetricData = async (
-  year?: number
+  year?: number,
+  currentMonth?: number
 ): Promise<ProcessedMonthlyMetricData[]> => {
   try {
+    // 获取实际使用的年份和月份（参数优先，默认当前）
+    const curYear = year || dayjs().year();
+    const curMonth = currentMonth || dayjs().month() + 1; // 当前月份（1-12）
+
     // 获取月度指标数据并转换格式
-    const rawData = await fetchMonthlyMetricFullData(year);
+    const rawData = await fetchMonthlyMetricFullData(curYear);
     const apiTableData = transformMonthlyMetricData(rawData);
 
-    // 获取当前月份
-    const currentMonth = dayjs().month() + 1; // 当前月份（1-12）
-    const previousMonth = currentMonth - 1; // 上个月份
+    const previousMonth = curMonth - 1; // 上个月份
 
     const result: ProcessedMonthlyMetricData[] = [];
 
@@ -416,36 +429,40 @@ export const calculateMonthlyMetricData = async (
       if (calculationType === 1) {
         // 混合模式：目标值累计，实际值当月
         valueI = targetData
-          .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
+          .slice(0, findObjectByMonthIndex(targetData, previousMonth, curYear) + 1)
           .reduce(sumDataValue, 0);
 
         valueK =
-          findObjectByMonthWithFirstDay(actualData, previousMonth)?.value || 0;
+          findObjectByMonthWithFirstDay(actualData, previousMonth, curYear)
+            ?.value || 0;
 
         valueO = targetData
-          .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
+          .slice(0, findObjectByMonthIndex(targetData, curMonth, curYear) + 1)
           .reduce(sumDataValue, 0);
       } else if (calculationType === 2) {
         // 累计模式：目标值和实际值都累计
         valueI = targetData
-          .slice(0, findObjectByMonthIndex(targetData, previousMonth) + 1)
+          .slice(0, findObjectByMonthIndex(targetData, previousMonth, curYear) + 1)
           .reduce(sumDataValue, 0);
 
         valueK = actualData
-          .slice(0, findObjectByMonthIndex(actualData, previousMonth) + 1)
+          .slice(0, findObjectByMonthIndex(actualData, previousMonth, curYear) + 1)
           .reduce(sumDataValue, 0);
 
         valueO = targetData
-          .slice(0, findObjectByMonthIndex(targetData, currentMonth) + 1)
+          .slice(0, findObjectByMonthIndex(targetData, curMonth, curYear) + 1)
           .reduce(sumDataValue, 0);
       } else if (calculationType === 3) {
         // 当月模式：目标值和实际值都取当月
         valueI =
-          findObjectByMonthWithFirstDay(targetData, previousMonth)?.value || 0;
+          findObjectByMonthWithFirstDay(targetData, previousMonth, curYear)
+            ?.value || 0;
         valueK =
-          findObjectByMonthWithFirstDay(actualData, previousMonth)?.value || 0;
+          findObjectByMonthWithFirstDay(actualData, previousMonth, curYear)
+            ?.value || 0;
         valueO =
-          findObjectByMonthWithFirstDay(targetData, currentMonth)?.value || 0;
+          findObjectByMonthWithFirstDay(targetData, curMonth, curYear)?.value ||
+          0;
       } else if (calculationType === 4) {
         // 自定义模式：需要在这里单独写逻辑的指标
         if (
@@ -457,21 +474,21 @@ export const calculateMonthlyMetricData = async (
           valueI = targetData
             .slice(
               0,
-              findObjectByMonthIndex(targetData, previousMonth - 1) + 1
+              findObjectByMonthIndex(targetData, previousMonth - 1, curYear) + 1
             )
             .reduce(sumDataValue, 0);
 
           valueK = actualData
             .slice(
               0,
-              findObjectByMonthIndex(actualData, previousMonth - 1) + 1
+              findObjectByMonthIndex(actualData, previousMonth - 1, curYear) + 1
             )
             .reduce(sumDataValue, 0);
 
           valueO = targetData
             .slice(
               0,
-              findObjectByMonthIndex(targetData, currentMonth - 1) + 1
+              findObjectByMonthIndex(targetData, curMonth - 1, curYear) + 1
             )
             .reduce(sumDataValue, 0);
         } else {
@@ -484,11 +501,14 @@ export const calculateMonthlyMetricData = async (
       } else if (calculationType === -1) {
         // 人工填报：直接取上个月的目标值和实际值，以及当前月的目标值
         valueI =
-          findObjectByMonthWithFirstDay(targetData, previousMonth)?.value || 0;
+          findObjectByMonthWithFirstDay(targetData, previousMonth, curYear)
+            ?.value || 0;
         valueK =
-          findObjectByMonthWithFirstDay(actualData, previousMonth)?.value || 0;
+          findObjectByMonthWithFirstDay(actualData, previousMonth, curYear)
+            ?.value || 0;
         valueO =
-          findObjectByMonthWithFirstDay(targetData, currentMonth)?.value || 0;
+          findObjectByMonthWithFirstDay(targetData, curMonth, curYear)?.value ||
+          0;
       }
 
       // 统一转成 number
@@ -532,17 +552,23 @@ export const calculateMonthlyMetricData = async (
  * @param sourceFileName 源文件名
  * @param outputFileName 输出文件名（不含扩展名）
  * @param year 指定年份，默认当前年
+ * @param currentMonth 指定当前月份（1-12），默认当前月
  */
 export const processAndExportMonthlyMetricForHR = async (
   sourceFileName?: string,
   outputFileName?: string,
-  year?: number
+  year?: number,
+  currentMonth?: number
 ) => {
   try {
     const fileName = sourceFileName || "考核应用报表导出模板_202607031452.xlsx";
 
+    // 获取当前年月（参数优先，默认当前）
+    const curYear = year || dayjs().year();
+    const curMonth = currentMonth || dayjs().month() + 1;
+
     // 获取月度指标数据并转换格式
-    const rawData = await fetchMonthlyMetricFullData(year);
+    const rawData = await fetchMonthlyMetricFullData(curYear);
 
     // 获取当前登录用户信息
     let currentUserId = "";
@@ -559,14 +585,12 @@ export const processAndExportMonthlyMetricForHR = async (
     // 检查当前用户是否在白名单中，不在白名单才进行检查
     if (!SKIP_CHECK_USER_IDS.includes(currentUserId)) {
       // 检查上月手填数据
-      const checkResult = checkLastMonthManualData(rawData);
+      const checkResult = checkLastMonthManualData(rawData, curYear, curMonth);
       if (!checkResult.isValid) {
         // 构建错误信息
-        const currentYear = dayjs().year();
-        const currentMonth = dayjs().month() + 1;
-        const previousMonth = currentMonth - 1;
+        const previousMonth = curMonth - 1;
 
-        let errorMsg = `${currentYear}年${previousMonth}月数据中存在手填类型数据不符合要求：共发现 ${checkResult.invalidRecords.length} 条`;
+        let errorMsg = `${curYear}年${previousMonth}月数据中存在手填类型数据不符合要求：共发现 ${checkResult.invalidRecords.length} 条`;
         // console.log("详细不符合要求的记录:", checkResult.invalidRecords);
         throw new Error(errorMsg);
       }
@@ -621,11 +645,10 @@ export const processAndExportMonthlyMetricForHR = async (
     }
 
     // 先计算好所有数据
-    const processedData = await calculateMonthlyMetricData(year);
+    const processedData = await calculateMonthlyMetricData(curYear, curMonth);
 
     // 获取当前月份
-    const currentMonth = dayjs().month() + 1; // 当前月份（1-12）
-    const previousMonth = currentMonth - 1; // 上个月份
+    const previousMonth = curMonth - 1; // 上个月份
 
     let modifiedCount = 0;
 

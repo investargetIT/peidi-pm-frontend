@@ -1178,16 +1178,52 @@ const hrExportLoading = ref(false);
 const exportLoading = ref(false);
 const targetPerformanceExportLoading = ref(false);
 
-const handleExportForHR = async () => {
+// 人事导出 - 月份选择弹窗
+const hrExportDialogVisible = ref(false);
+const hrExportSelectedMonth = ref<string>("");
+const hrExportConfirmChecked = ref(false);
+
+const openHrExportDialog = () => {
   if (!isDeveloper()) {
     ElMessage.warning("只有开发者可以导出");
+    return;
+  }
+  // 默认选中当前月
+  hrExportSelectedMonth.value = dayjs().startOf("month").format("YYYY-MM-DD");
+  hrExportConfirmChecked.value = false;
+  hrExportDialogVisible.value = true;
+};
+
+const handleExportForHR = async () => {
+  // 改为打开月份选择弹窗
+  openHrExportDialog();
+};
+
+const confirmHrExport = async () => {
+  if (!hrExportConfirmChecked.value) {
+    ElMessage.warning("请先勾选确认");
+    return;
+  }
+  if (!hrExportSelectedMonth.value) {
+    ElMessage.warning("请选择导出月份");
     return;
   }
 
   try {
     hrExportLoading.value = true;
-    await processAndExportMonthlyMetricForHR();
-    ElMessage.success("人事导出成功");
+    hrExportDialogVisible.value = false;
+
+    const selectedDate = dayjs(hrExportSelectedMonth.value);
+    const year = selectedDate.year();
+    const month = selectedDate.month() + 1;
+
+    await processAndExportMonthlyMetricForHR(
+      undefined,
+      undefined,
+      year,
+      month
+    );
+    ElMessage.success(`人事导出成功（${year}年${month}月）`);
   } catch (error) {
     console.error("人事导出失败:", error);
     // 显示详细错误信息
@@ -1212,6 +1248,11 @@ const handleExportForHR = async () => {
   } finally {
     hrExportLoading.value = false;
   }
+};
+
+const cancelHrExport = () => {
+  hrExportDialogVisible.value = false;
+  hrExportConfirmChecked.value = false;
 };
 
 const handleExportTargetPerformance = async () => {
@@ -2027,6 +2068,51 @@ onMounted(() => {
       </template>
     </el-dialog>
 
+    <!-- 人事导出 - 月份选择对话框 -->
+    <el-dialog
+      v-model="hrExportDialogVisible"
+      title="人事导出"
+      width="420px"
+      :close-on-click-modal="false"
+      class="hr-export-dialog"
+    >
+      <div class="unlock-month-select">
+        <el-form-item label="导出月份">
+          <el-date-picker
+            v-model="hrExportSelectedMonth"
+            type="month"
+            placeholder="选择月份（默认当前月）"
+            value-format="YYYY-MM-DD"
+            format="YYYY 年 MM 月"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <div class="hr-export-tip">
+          ⚠ 非必要请勿修改月份，默认即为当前月<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;例如：考核 7 月，请选择 8 月（系统将自动取 7 月数据）
+        </div>
+      </div>
+      <div class="notify-checkbox">
+        <el-checkbox v-model="hrExportConfirmChecked" size="large">
+          我已确认要导出该月份的指标数据
+        </el-checkbox>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button size="large" @click="cancelHrExport">取消</el-button>
+          <el-button
+            type="primary"
+            size="large"
+            :loading="hrExportLoading"
+            :disabled="!hrExportConfirmChecked || !hrExportSelectedMonth"
+            @click="confirmHrExport"
+          >
+            导出
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- 表格填写状态设置对话框 -->
     <el-dialog
       v-model="tableStatusDialogVisible"
@@ -2178,6 +2264,13 @@ onMounted(() => {
 .unlock-month-select {
   padding: 0 20px;
   margin-bottom: 16px;
+}
+
+.hr-export-tip {
+  font-size: 12px;
+  color: #e6a23c;
+  line-height: 1.8;
+  margin-top: 6px;
 }
 
 .notify-confirm-content {
