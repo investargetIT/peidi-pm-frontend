@@ -118,6 +118,16 @@ watch(activeName, newVal => {
 });
 
 onMounted(() => {
+  // 检查是否为首次登录进入，强制刷新确保全局样式正确覆盖
+  if (route.query.firstLogin === "true") {
+    const newQuery = { ...route.query };
+    delete newQuery.firstLogin;
+    router.replace({ query: newQuery }).then(() => {
+      window.location.reload();
+    });
+    return;
+  }
+
   initActiveName();
 });
 </script>
