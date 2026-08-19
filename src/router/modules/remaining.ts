@@ -48,5 +48,16 @@ export default [
       // showParent: false,
       showLink: false
     }
+  },
+  {
+    path: "/workHoursBoard",
+    name: "workHoursBoard",
+    component: () => import("@/views/workHoursBoard/index.vue"),
+    meta: {
+      title: "工时看板",
+      icon: "ri:calendar-line",
+      // showParent: false,
+      showLink: false
+    }
   }
 ] satisfies Array<RouteConfigsTable>;
