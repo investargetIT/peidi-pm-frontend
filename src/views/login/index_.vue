@@ -102,9 +102,16 @@ onMounted(() => {
               });
             } else if (redirectPath.includes("/aiDrawingApp")) {
               return initRouter().then(() => {
+                // 解析原始路径的 query 参数，加上 firstLogin 标记
+                const redirectUrl = new URL(redirectPath, window.location.origin);
+                const query: Record<string, string> = {};
+                redirectUrl.searchParams.forEach((value, key) => {
+                  query[key] = value;
+                });
+                query.firstLogin = "true";
                 router.push({
                   path: "/aiDrawingApp",
-                  query: { firstLogin: "true" }
+                  query
                 });
               });
             } else if (route.query.tabName == "worker") {
