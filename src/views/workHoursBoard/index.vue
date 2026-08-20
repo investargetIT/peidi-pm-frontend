@@ -8,7 +8,10 @@ import dayjs from "dayjs";
 import NavBar from "./navBar.vue";
 import {
   getDailySummary,
-  type AttendanceDailySummaryDTO
+  getDeptTree,
+  TimeResultEnum,
+  type AttendanceDailySummaryDTO,
+  type DeptNode
 } from "@/api/attendance";
 
 // 引入全局样式（覆盖主应用样式）
@@ -28,6 +31,87 @@ const usernameOptions = computed(() => {
   });
   return Array.from(set).sort((a, b) => a.localeCompare(b, "zh-CN"));
 });
+
+// 部门树数据
+const deptTreeData = ref<DeptNode[]>([]);
+// 选中的部门ID
+const selectedDeptId = ref<string | number | null>(null);
+
+// 部门ID -> 部门节点 映射表（O(1) 查找，性能优化）
+// 统一用 string 类型 key，避免 number/string 类型不匹配导致查不到
+const deptIdMap = computed<Map<string, DeptNode>>(() => {
+  const map = new Map<string, DeptNode>();
+  const traverse = (nodes: DeptNode[]) => {
+    nodes.forEach(node => {
+      if (node.deptId !== undefined && node.deptId !== null) {
+        map.set(String(node.deptId), node);
+      }
+      if (node.children?.length) {
+        traverse(node.children);
+      }
+    });
+  };
+  traverse(deptTreeData.value);
+  return map;
+});
+
+// 第一层（顶级）部门列表（用于下拉选择展示）
+const flatDeptList = computed<DeptNode[]>(() => {
+  return [...deptTreeData.value].sort((a, b) =>
+    (a.deptName || "").localeCompare(b.deptName || "", "zh-CN")
+  );
+});
+
+// 根据 deptId 获取部门名称（使用映射表，O(1) 查找）
+const getDeptNameById = (deptId?: string | number): string => {
+  if (!deptId) return "-";
+  return deptIdMap.value.get(String(deptId))?.deptName || "-";
+};
+
+// 部门ID -> 顶级（第一层）部门节点 映射表（O(1) 查找，性能优化）
+// 例："857967870"(设计) -> "前台"
+const topDeptMap = computed<Map<string, DeptNode>>(() => {
+  const map = new Map<string, DeptNode>();
+  deptTreeData.value.forEach(topDept => {
+    // 顶级部门自身也加入映射
+    if (topDept.deptId !== undefined && topDept.deptId !== null) {
+      map.set(String(topDept.deptId), topDept);
+    }
+    // 递归遍历所有子部门，指向顶级部门
+    const traverse = (nodes: DeptNode[]) => {
+      nodes.forEach(node => {
+        if (node.deptId !== undefined && node.deptId !== null) {
+          map.set(String(node.deptId), topDept);
+        }
+        if (node.children?.length) {
+          traverse(node.children);
+        }
+      });
+    };
+    if (topDept.children?.length) {
+      traverse(topDept.children);
+    }
+  });
+  return map;
+});
+
+// 根据 deptId 获取顶级（第一层）部门名称（使用映射表，O(1) 查找）
+const getTopDeptNameById = (deptId?: string | number): string => {
+  if (!deptId) return "-";
+  return topDeptMap.value.get(String(deptId))?.deptName || "-";
+};
+
+// 加载部门树
+const fetchDeptTree = async () => {
+  try {
+    const res: any = await getDeptTree();
+    if (res?.success) {
+      deptTreeData.value = res.data || res.list || [];
+    }
+  } catch (error: any) {
+    console.error("加载部门树失败:", error.message);
+  }
+};
 
 // 获取当前年月，默认起始月份和结束月份均为当月
 const getDefaultMonthRange = (): [string, string] => {
@@ -78,6 +162,8 @@ const loading = ref(false);
 interface UserMonthRaw {
   username: string;
   dingUserId: string;
+  deptId?: string;
+  deptName: string;
   totalHours: Record<string, number>; // 每月总工时
   dayCount: Record<string, number>; // 每月打卡天数
 }
@@ -88,11 +174,20 @@ const rawSummary = computed<UserMonthRaw[]>(() => {
   allDailyData.value.forEach(item => {
     if (!item.username || !item.workDay) return;
     if (nameSet.size > 0 && !nameSet.has(item.username)) return;
+    // 部门筛选（顶级部门匹配）
+    if (selectedDeptId.value) {
+      const topDept = topDeptMap.value.get(String(item.deptId));
+      if (!topDept || String(topDept.deptId) !== String(selectedDeptId.value)) {
+        return;
+      }
+    }
     const key = item.username;
     if (!map.has(key)) {
       const row: UserMonthRaw = {
         username: item.username,
         dingUserId: item.dingUserId || "",
+        deptId: item.deptId,
+        deptName: getTopDeptNameById(item.deptId),
         totalHours: {},
         dayCount: {}
       };
@@ -116,14 +211,18 @@ const rawSummary = computed<UserMonthRaw[]>(() => {
 interface DisplayRow {
   username: string;
   dingUserId: string;
-  [key: string]: string | number;
+  deptId?: string;
+  deptName: string;
+  [key: string]: string | number | undefined;
 }
 
 const summaryTableData = computed<DisplayRow[]>(() => {
   return rawSummary.value.map(raw => {
     const row: DisplayRow = {
       username: raw.username,
-      dingUserId: raw.dingUserId
+      dingUserId: raw.dingUserId,
+      deptId: raw.deptId,
+      deptName: raw.deptName
     };
     monthColumns.value.forEach(m => {
       const total = raw.totalHours[m] || 0;
@@ -169,14 +268,39 @@ const detailMonthStats = computed(() => {
 });
 
 // 查看详情
-const handleViewDetail = (row: UserMonthSummary) => {
+const handleViewDetail = (row: DisplayRow) => {
   detailUser.value = row;
   detailActiveTab.value = monthColumns.value[0] || "";
   detailVisible.value = true;
 };
 
-// 判断上班是否迟到（当天晚于9点）
-const isLate = (time?: string, workDay?: string): boolean => {
+// 判断上班是否异常（未打卡、迟到、严重迟到、旷工迟到）
+const isOnDutyAbnormal = (item: AttendanceDailySummaryDTO): boolean => {
+  const result = item.onDutyTimeResult;
+  if (!result) return false;
+  return result === TimeResultEnum.NotSigned
+    || result === TimeResultEnum.Late
+    || result === TimeResultEnum.SeriousLate
+    || result === TimeResultEnum.Absenteeism;
+};
+
+// 判断下班是否异常（未打卡、早退）
+const isOffDutyAbnormal = (item: AttendanceDailySummaryDTO): boolean => {
+  const result = item.offDutyTimeResult;
+  if (!result) return false;
+  return result === TimeResultEnum.NotSigned
+    || result === TimeResultEnum.Early;
+};
+
+// 判断上班是否迟到（当天晚于9点）— 兼容旧逻辑，优先使用打卡结果字段
+const isLate = (time?: string, workDay?: string, item?: AttendanceDailySummaryDTO): boolean => {
+  // 优先使用打卡结果字段
+  if (item?.onDutyTimeResult) {
+    return item.onDutyTimeResult === TimeResultEnum.Late
+      || item.onDutyTimeResult === TimeResultEnum.SeriousLate
+      || item.onDutyTimeResult === TimeResultEnum.Absenteeism
+      || item.onDutyTimeResult === TimeResultEnum.NotSigned;
+  }
   if (!time) return false;
   const t = dayjs(time);
   // 如果打卡日期和工作日不是同一天，算异常（默认标红）
@@ -186,8 +310,13 @@ const isLate = (time?: string, workDay?: string): boolean => {
   return t.hour() > 9 || (t.hour() === 9 && t.minute() > 0);
 };
 
-// 判断下班是否早走（当天早于18点，跨天加班不算早走）
-const isEarlyLeave = (time?: string, workDay?: string): boolean => {
+// 判断下班是否早走（当天早于18点，跨天加班不算早走）— 兼容旧逻辑，优先使用打卡结果字段
+const isEarlyLeave = (time?: string, workDay?: string, item?: AttendanceDailySummaryDTO): boolean => {
+  // 优先使用打卡结果字段
+  if (item?.offDutyTimeResult) {
+    return item.offDutyTimeResult === TimeResultEnum.Early
+      || item.offDutyTimeResult === TimeResultEnum.NotSigned;
+  }
   if (!time) return false;
   // 如果下班日期和工作日不是同一天（跨天加班），不算早走
   if (workDay && !dayjs(time).isSame(workDay, "day")) {
@@ -200,13 +329,18 @@ const isEarlyLeave = (time?: string, workDay?: string): boolean => {
 // 计算有效工时（扣除午休、晚餐等）
 const calcEffectiveHours = (item: AttendanceDailySummaryDTO): number => {
   if (!item.onDutyTime || !item.offDutyTime) return 0;
+  // 如果上下班都是未打卡，工时直接算0，不扣午休晚餐
+  if (item.onDutyTimeResult === TimeResultEnum.NotSigned
+      && item.offDutyTimeResult === TimeResultEnum.NotSigned) {
+    return 0;
+  }
   const hours = Number(item.durationHours || 0) - calcDeductedHours(item);
   return Math.max(0, hours);
 };
 
 // 判断当天是否异常（迟到或早走）
 const isAbnormal = (item: AttendanceDailySummaryDTO): boolean => {
-  return isLate(item.onDutyTime, item.workDay) || isEarlyLeave(item.offDutyTime, item.workDay);
+  return isLate(item.onDutyTime, item.workDay, item) || isEarlyLeave(item.offDutyTime, item.workDay, item);
 };
 
 // 详情表格行样式
@@ -216,8 +350,30 @@ const detailTableRowClassName = ({ row }: { row: AttendanceDailySummaryDTO }) =>
   return "";
 };
 
+// 打卡结果中文映射
+const timeResultTextMap: Record<string, string> = {
+  [TimeResultEnum.Normal]: "正常",
+  [TimeResultEnum.Early]: "早退",
+  [TimeResultEnum.Late]: "迟到",
+  [TimeResultEnum.SeriousLate]: "严重迟到",
+  [TimeResultEnum.Absenteeism]: "旷工迟到",
+  [TimeResultEnum.NotSigned]: "未打卡"
+};
+
+// 获取上班打卡结果文本
+const getOnDutyResultText = (item: AttendanceDailySummaryDTO): string => {
+  if (!item.onDutyTimeResult) return "正常";
+  return timeResultTextMap[item.onDutyTimeResult] || item.onDutyTimeResult;
+};
+
+// 获取下班打卡结果文本
+const getOffDutyResultText = (item: AttendanceDailySummaryDTO): string => {
+  if (!item.offDutyTimeResult) return "正常";
+  return timeResultTextMap[item.offDutyTimeResult] || item.offDutyTimeResult;
+};
+
 // 获取状态标签类型
-const getStatusTagType = (item: AttendanceDailySummaryDTO): "success" | "primary" | "danger" => {
+const getStatusTagType = (item: AttendanceDailySummaryDTO): "success" | "primary" | "danger" | "warning" => {
   if (isAbnormal(item)) return "danger";
   if (item.overtime) return "primary";
   return "success";
@@ -225,7 +381,14 @@ const getStatusTagType = (item: AttendanceDailySummaryDTO): "success" | "primary
 
 // 获取状态文本
 const getStatusText = (item: AttendanceDailySummaryDTO): string => {
-  if (isAbnormal(item)) return "异常";
+  const results: string[] = [];
+  if (item.onDutyTimeResult && item.onDutyTimeResult !== TimeResultEnum.Normal) {
+    results.push(timeResultTextMap[item.onDutyTimeResult] || item.onDutyTimeResult);
+  }
+  if (item.offDutyTimeResult && item.offDutyTimeResult !== TimeResultEnum.Normal) {
+    results.push(timeResultTextMap[item.offDutyTimeResult] || item.offDutyTimeResult);
+  }
+  if (results.length > 0) return results.join(" / ");
   if (item.overtime) return "加班";
   return "正常";
 };
@@ -356,10 +519,11 @@ const handleReset = () => {
   monthRange.value = defaultRange;
   activeMonthRange.value = defaultRange;
   filterKeywords.value = [];
+  selectedDeptId.value = null;
   fetchAllData();
 };
 
-onMounted(() => {
+onMounted(async () => {
   // 检查是否为首次登录进入，强制刷新确保全局样式正确覆盖
   if (route.query.firstLogin === "true") {
     const newQuery = { ...route.query };
@@ -370,6 +534,8 @@ onMounted(() => {
     return;
   }
 
+  // 并行加载部门树和工时数据
+  fetchDeptTree();
   fetchAllData();
 });
 </script>
@@ -394,7 +560,8 @@ onMounted(() => {
               <span class="desc-value">
                 有效工时 = 下班打卡时间 - 上班打卡时间 - 扣除项<br />
                 <strong>扣除项 1：</strong>午休（12:15~13:15）1 小时 — 上下班时间覆盖该时段则扣除<br />
-                <strong>扣除项 2：</strong>晚餐（18:00~19:00）1 小时 — 加班标识为 true 且下班晚于 19:00 则扣除
+                <strong>扣除项 2：</strong>晚餐（18:00~19:00）1 小时 — 加班标识为 true 且下班晚于 19:00 则扣除<br />
+                <strong>特殊情况：</strong>上下班均为「未打卡」时，工时直接记为 0，不扣除午休/晚餐
               </span>
             </div>
             <div class="desc-item">
@@ -408,9 +575,13 @@ onMounted(() => {
             <div class="desc-item">
               <span class="desc-label">颜色规则</span>
               <span class="desc-value">
-                <span class="text-red">红色</span>：上班晚于 09:00 或下班早于 18:00
+                <span class="text-red">红色</span>：上班异常（迟到/严重迟到/旷工迟到/未打卡）或下班异常（早退/未打卡）
                 <span class="text-green">绿色</span>：正常打卡（跨天加班算正常）
               </span>
+            </div>
+            <div class="desc-item">
+              <span class="desc-label">部门归属</span>
+              <span class="desc-value">按顶级部门展示，子部门人员统一归属到其一级部门</span>
             </div>
             <div class="desc-item">
               <span class="desc-label">数据来源</span>
@@ -462,6 +633,21 @@ onMounted(() => {
               </el-radio-group>
             </div>
             <div class="title-right">
+              <el-select
+                v-model="selectedDeptId"
+                placeholder="全部部门"
+                clearable
+                filterable
+                size="small"
+                style="width: 160px; margin-right: 12px"
+              >
+                <el-option
+                  v-for="dept in flatDeptList"
+                  :key="dept.deptId"
+                  :label="dept.deptName"
+                  :value="dept.deptId"
+                />
+              </el-select>
               <el-select
                 v-model="filterKeywords"
                 placeholder="筛选姓名"
@@ -516,8 +702,15 @@ onMounted(() => {
             <el-table-column
               prop="username"
               label="姓名"
+              width="120"
+              align="center"
+            />
+            <el-table-column
+              prop="deptName"
+              label="部门"
               width="140"
               align="center"
+              show-overflow-tooltip
             />
             <el-table-column
               v-for="month in monthColumns"
@@ -563,7 +756,11 @@ onMounted(() => {
     >
       <template v-if="detailUser" #header>
         <span style="font-size: 16px; font-weight: 600">
-          {{ detailUser.username }} - 工时详情
+          {{ detailUser.username }}
+          <span v-if="detailUser.deptName" style="font-size: 13px; color: #909399; font-weight: 400; margin-left: 8px">
+            {{ detailUser.deptName }}
+          </span>
+          - 工时详情
         </span>
       </template>
       <el-tabs v-model="detailActiveTab">
@@ -626,7 +823,7 @@ onMounted(() => {
           width="110"
           align="center"
         />
-        <el-table-column label="状态" width="70" align="center">
+        <el-table-column label="状态" width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusTagType(row)" size="small">
               {{ getStatusText(row) }}
@@ -647,8 +844,8 @@ onMounted(() => {
           <template #default="{ row }">
             <span
               :class="{
-                'text-red': isLate(row.onDutyTime, row.workDay),
-                'text-green': !isLate(row.onDutyTime, row.workDay) && row.onDutyTime
+                'text-red': isLate(row.onDutyTime, row.workDay, row),
+                'text-green': !isLate(row.onDutyTime, row.workDay, row) && row.onDutyTime
               }"
             >
               {{ row.onDutyTime || "-" }}
@@ -659,9 +856,9 @@ onMounted(() => {
           <template #default="{ row }">
             <span
               :class="{
-                'text-red': isEarlyLeave(row.offDutyTime, row.workDay),
+                'text-red': isEarlyLeave(row.offDutyTime, row.workDay, row),
                 'text-green':
-                  !isEarlyLeave(row.offDutyTime, row.workDay) && row.offDutyTime
+                  !isEarlyLeave(row.offDutyTime, row.workDay, row) && row.offDutyTime
               }"
             >
               {{ row.offDutyTime || "-" }}
