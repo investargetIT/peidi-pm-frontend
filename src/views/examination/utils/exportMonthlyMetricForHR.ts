@@ -55,7 +55,8 @@ const SKIP_CHECK_USER_IDS = [
   "1926449443739600965", // 沈皓钰
   "1850741012504838145", // 张思宇
   "1887377779519434753", // 王家琦
-  "1926449443739601629" // 杨世豪
+  "1926449443739601629", // 杨世豪
+  "1926449443739601753" //刘汪洋
 ];
 
 interface MonthlyMetricOtherConfig {
@@ -193,7 +194,11 @@ const transformMonthlyMetricData = (records: MonthlyMetricResultRecord[]) => {
 
     // 对于梁钰的数据，或者 examination 数组为空的情况下，始终重新初始化
     const isLiangYu = username === "梁钰";
-    if (!groupedData[key] || isLiangYu || groupedData[key].examination.length === 0) {
+    if (
+      !groupedData[key] ||
+      isLiangYu ||
+      groupedData[key].examination.length === 0
+    ) {
       groupedData[key] = {
         id: null,
         month: null,
@@ -429,7 +434,10 @@ export const calculateMonthlyMetricData = async (
       if (calculationType === 1) {
         // 混合模式：目标值累计，实际值当月
         valueI = targetData
-          .slice(0, findObjectByMonthIndex(targetData, previousMonth, curYear) + 1)
+          .slice(
+            0,
+            findObjectByMonthIndex(targetData, previousMonth, curYear) + 1
+          )
           .reduce(sumDataValue, 0);
 
         valueK =
@@ -442,11 +450,17 @@ export const calculateMonthlyMetricData = async (
       } else if (calculationType === 2) {
         // 累计模式：目标值和实际值都累计
         valueI = targetData
-          .slice(0, findObjectByMonthIndex(targetData, previousMonth, curYear) + 1)
+          .slice(
+            0,
+            findObjectByMonthIndex(targetData, previousMonth, curYear) + 1
+          )
           .reduce(sumDataValue, 0);
 
         valueK = actualData
-          .slice(0, findObjectByMonthIndex(actualData, previousMonth, curYear) + 1)
+          .slice(
+            0,
+            findObjectByMonthIndex(actualData, previousMonth, curYear) + 1
+          )
           .reduce(sumDataValue, 0);
 
         valueO = targetData
@@ -761,13 +775,19 @@ export const processAndExportMonthlyMetricForHR = async (
         }
 
         // 填充到对应列
-        row.getCell(8).value = Number(processedItem.previousMonthTarget?.toFixed(4) || 0);
+        row.getCell(8).value = Number(
+          processedItem.previousMonthTarget?.toFixed(4) || 0
+        );
         row.getCell(9).value = "元";
-        row.getCell(10).value = Number(processedItem.previousMonthActual?.toFixed(4) || 0);
+        row.getCell(10).value = Number(
+          processedItem.previousMonthActual?.toFixed(4) || 0
+        );
         row.getCell(11).value = "元";
         row.getCell(12).value = processedItem.completionRate;
         row.getCell(13).value = "%";
-        row.getCell(14).value = Number(processedItem.currentMonthTarget?.toFixed(4) || 0);
+        row.getCell(14).value = Number(
+          processedItem.currentMonthTarget?.toFixed(4) || 0
+        );
         row.getCell(15).value = "元";
 
         // 添加调试日志
@@ -815,7 +835,10 @@ export const processAndExportMonthlyMetricForHR = async (
     if (!SKIP_CHECK_USER_IDS.includes(currentUserId)) {
       try {
         // 获取上个月的第一天作为锁表月份
-        const monthStr = dayjs().subtract(1, "month").startOf("month").format("YYYY-MM-DD");
+        const monthStr = dayjs()
+          .subtract(1, "month")
+          .startOf("month")
+          .format("YYYY-MM-DD");
 
         await updateEditStatusApi({
           isEdit: 0,

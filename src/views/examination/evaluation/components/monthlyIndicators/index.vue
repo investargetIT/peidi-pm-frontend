@@ -189,7 +189,8 @@ const CORE_DEVELOPER_USER_IDS = [
   "1846392647319093250", // Summer
   "1926449443739600965", // 沈皓钰
   "1850741012504838145", // 张思宇
-  "1926449443739601629" // 杨世豪
+  "1926449443739601629", // 杨世豪
+  "1926449443739601753" //刘汪洋
 ];
 const DEVELOPER_USER_IDS = [
   ...CORE_DEVELOPER_USER_IDS,
@@ -1127,10 +1128,18 @@ const handleExport = async () => {
         rowDataObj[`month${i}Target`] = targetVal ?? "";
         rowDataObj[`month${i}Achieved`] = achievedVal ?? "";
 
-        if (targetVal != null && targetVal !== "" && !isNaN(Number(targetVal))) {
+        if (
+          targetVal != null &&
+          targetVal !== "" &&
+          !isNaN(Number(targetVal))
+        ) {
           totalTarget += Number(targetVal);
         }
-        if (achievedVal != null && achievedVal !== "" && !isNaN(Number(achievedVal))) {
+        if (
+          achievedVal != null &&
+          achievedVal !== "" &&
+          !isNaN(Number(achievedVal))
+        ) {
           totalAchieved += Number(achievedVal);
         }
       }
@@ -1231,12 +1240,7 @@ const confirmHrExport = async () => {
     const year = selectedDate.year();
     const month = selectedDate.month() + 1;
 
-    await processAndExportMonthlyMetricForHR(
-      undefined,
-      undefined,
-      year,
-      month
-    );
+    await processAndExportMonthlyMetricForHR(undefined, undefined, year, month);
     ElMessage.success(`人事导出成功（${year}年${month}月）`);
   } catch (error) {
     console.error("人事导出失败:", error);
@@ -2103,7 +2107,8 @@ onMounted(() => {
         </el-form-item>
         <div class="hr-export-tip">
           ⚠ 非必要请勿修改月份，默认即为当前月<br />
-          &nbsp;&nbsp;&nbsp;&nbsp;例如：考核 7 月，请选择 8 月（系统将自动取 7 月数据）
+          &nbsp;&nbsp;&nbsp;&nbsp;例如：考核 7 月，请选择 8 月（系统将自动取 7
+          月数据）
         </div>
       </div>
       <div class="notify-checkbox">
