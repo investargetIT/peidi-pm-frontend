@@ -1,8 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from "vue";
+import { onMounted, ref, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Search, Refresh, DataLine, ArrowDown } from "@element-plus/icons-vue";
+import {
+  Search,
+  Refresh,
+  DataLine,
+  ArrowDown,
+  ArrowLeft,
+  OfficeBuilding,
+  User
+} from "@element-plus/icons-vue";
 import dayjs from "dayjs";
 
 import NavBar from "./navBar.vue";
@@ -23,19 +31,28 @@ const router = useRouter();
 // 姓名筛选（前端过滤，多选，直接生效）
 const filterKeywords = ref<string[]>([]);
 
-// 从已有数据中提取所有用户名，作为下拉选项
+// 姓名下拉选项：跟随当前下钻部门（含子部门），顶层显示全员
 const usernameOptions = computed(() => {
   const set = new Set<string>();
   allDailyData.value.forEach(item => {
-    if (item.username) set.add(item.username);
+    if (!item.username) return;
+    // 下钻时只展示当前部门（含子部门）内的人，缩短查找范围
+    if (currentDeptId.value) {
+      const chain = item.deptId
+        ? pathMap.value.get(String(item.deptId)) || []
+        : [];
+      const hit = chain.some(
+        d => String(d.deptId) === String(currentDeptId.value)
+      );
+      if (!hit) return;
+    }
+    set.add(item.username);
   });
   return Array.from(set).sort((a, b) => a.localeCompare(b, "zh-CN"));
 });
 
 // 部门树数据
 const deptTreeData = ref<DeptNode[]>([]);
-// 选中的部门ID
-const selectedDeptId = ref<string | number | null>(null);
 
 // 部门ID -> 部门节点 映射表（O(1) 查找，性能优化）
 // 统一用 string 类型 key，避免 number/string 类型不匹配导致查不到
@@ -55,50 +72,63 @@ const deptIdMap = computed<Map<string, DeptNode>>(() => {
   return map;
 });
 
-// 第一层（顶级）部门列表（用于下拉选择展示）
-const flatDeptList = computed<DeptNode[]>(() => {
-  return [...deptTreeData.value].sort((a, b) =>
-    (a.deptName || "").localeCompare(b.deptName || "", "zh-CN")
-  );
-});
-
-// 根据 deptId 获取部门名称（使用映射表，O(1) 查找）
-const getDeptNameById = (deptId?: string | number): string => {
-  if (!deptId) return "-";
-  return deptIdMap.value.get(String(deptId))?.deptName || "-";
-};
-
-// 部门ID -> 顶级（第一层）部门节点 映射表（O(1) 查找，性能优化）
-// 例："857967870"(设计) -> "前台"
-const topDeptMap = computed<Map<string, DeptNode>>(() => {
-  const map = new Map<string, DeptNode>();
-  deptTreeData.value.forEach(topDept => {
-    // 顶级部门自身也加入映射
-    if (topDept.deptId !== undefined && topDept.deptId !== null) {
-      map.set(String(topDept.deptId), topDept);
-    }
-    // 递归遍历所有子部门，指向顶级部门
-    const traverse = (nodes: DeptNode[]) => {
-      nodes.forEach(node => {
-        if (node.deptId !== undefined && node.deptId !== null) {
-          map.set(String(node.deptId), topDept);
-        }
-        if (node.children?.length) {
-          traverse(node.children);
-        }
-      });
-    };
-    if (topDept.children?.length) {
-      traverse(topDept.children);
-    }
-  });
+// 每个部门 -> 从顶级到自身的完整链路 [top, ..., node]（用于下钻/面包屑/归属）
+const pathMap = computed<Map<string, DeptNode[]>>(() => {
+  const map = new Map<string, DeptNode[]>();
+  const walk = (nodes: DeptNode[], prefix: DeptNode[]) => {
+    nodes.forEach(node => {
+      const chain = [...prefix, node];
+      if (node.deptId !== undefined && node.deptId !== null) {
+        map.set(String(node.deptId), chain);
+      }
+      if (node.children?.length) walk(node.children, chain);
+    });
+  };
+  walk(deptTreeData.value, []);
   return map;
 });
 
-// 根据 deptId 获取顶级（第一层）部门名称（使用映射表，O(1) 查找）
-const getTopDeptNameById = (deptId?: string | number): string => {
-  if (!deptId) return "-";
-  return topDeptMap.value.get(String(deptId))?.deptName || "-";
+// 当前下钻到的部门ID（null 表示顶层，展示一级部门）
+const currentDeptId = ref<string | number | null>(null);
+
+// 是否处于"筛选结果"扁平视图（多选跨部门人员时展示）
+const showFilterResult = ref(false);
+
+// 当前下钻路径（用于面包屑）
+const currentPath = computed<DeptNode[]>(() => {
+  if (!currentDeptId.value) return [];
+  return pathMap.value.get(String(currentDeptId.value)) || [];
+});
+
+// 返回上级
+const handleBack = () => {
+  // 先退出"筛选结果"视图
+  if (showFilterResult.value) {
+    showFilterResult.value = false;
+    currentDeptId.value = null;
+    return;
+  }
+  if (!currentDeptId.value) {
+    ElMessage.info("已在顶层");
+    return;
+  }
+  const path = currentPath.value;
+  if (path.length <= 1) {
+    currentDeptId.value = null;
+  } else {
+    currentDeptId.value = path[path.length - 2].deptId ?? null;
+  }
+};
+
+// 面包屑跳转（-1 表示回到顶层）
+const handleBreadcrumbClick = (idx: number) => {
+  showFilterResult.value = false;
+  if (idx === -1) {
+    currentDeptId.value = null;
+    return;
+  }
+  const node = currentPath.value[idx];
+  currentDeptId.value = node.deptId ?? null;
 };
 
 // 加载部门树
@@ -150,7 +180,7 @@ const monthColumns = computed(() => {
 });
 
 // 展示模式：total=总工时，avg=平均工时
-const displayMode = ref<"total" | "avg">("total");
+const displayMode = ref<"total" | "avg">("avg");
 // 数据说明展开状态
 const descExpanded = ref(false);
 
@@ -158,36 +188,31 @@ const descExpanded = ref(false);
 const allDailyData = ref<AttendanceDailySummaryDTO[]>([]);
 const loading = ref(false);
 
-// 按人员+月份聚合后的原始数据（保存总工时和天数）
-interface UserMonthRaw {
+// 按人员+月份聚合的数据（保存总工时和天数）
+interface PersonData {
   username: string;
   dingUserId: string;
   deptId?: string;
-  deptName: string;
+  chain: DeptNode[]; // 从顶级到所在部门的完整链路
   totalHours: Record<string, number>; // 每月总工时
   dayCount: Record<string, number>; // 每月打卡天数
 }
 
-const rawSummary = computed<UserMonthRaw[]>(() => {
-  const map = new Map<string, UserMonthRaw>();
-  const nameSet = new Set(filterKeywords.value);
+// 全部人员聚合数据（不套用姓名筛选，用于部门汇总口径）
+const allPersons = computed<PersonData[]>(() => {
+  const map = new Map<string, PersonData>();
   allDailyData.value.forEach(item => {
     if (!item.username || !item.workDay) return;
-    if (nameSet.size > 0 && !nameSet.has(item.username)) return;
-    // 部门筛选（顶级部门匹配）
-    if (selectedDeptId.value) {
-      const topDept = topDeptMap.value.get(String(item.deptId));
-      if (!topDept || String(topDept.deptId) !== String(selectedDeptId.value)) {
-        return;
-      }
-    }
     const key = item.username;
     if (!map.has(key)) {
-      const row: UserMonthRaw = {
+      const chain = item.deptId
+        ? pathMap.value.get(String(item.deptId)) || []
+        : [];
+      const row: PersonData = {
         username: item.username,
         dingUserId: item.dingUserId || "",
         deptId: item.deptId,
-        deptName: getTopDeptNameById(item.deptId),
+        chain,
         totalHours: {},
         dayCount: {}
       };
@@ -197,49 +222,267 @@ const rawSummary = computed<UserMonthRaw[]>(() => {
       });
       map.set(key, row);
     }
-    const row = map.get(key)!;
+    const p = map.get(key)!;
     const workMonth = item.workDay.substring(0, 7);
-    if (row.totalHours[workMonth] !== undefined) {
-      row.totalHours[workMonth] += calcEffectiveHours(item);
-      row.dayCount[workMonth] += 1;
+    if (p.totalHours[workMonth] !== undefined) {
+      p.totalHours[workMonth] += calcEffectiveHours(item);
+      p.dayCount[workMonth] += 1;
     }
   });
   return Array.from(map.values());
 });
 
-// 展示用表格数据（根据模式计算显示值）
-interface DisplayRow {
-  username: string;
-  dingUserId: string;
-  deptId?: string;
-  deptName: string;
-  [key: string]: string | number | undefined;
+// 姓名筛选后的人员（仅用于最末级的人员列表展示）
+const persons = computed<PersonData[]>(() => {
+  const nameSet = new Set(filterKeywords.value);
+  if (nameSet.size === 0) return allPersons.value;
+  return allPersons.value.filter(p => nameSet.has(p.username));
+});
+
+// 获取某个部门（含其所有子部门）下的所有人员（部门汇总保持完整、不受姓名筛选影响）
+const personsInDept = (deptId: string): PersonData[] => {
+  return allPersons.value.filter(p =>
+    p.chain.some(d => String(d.deptId) === String(deptId))
+  );
+};
+
+// 筛选结果视图中处于"折叠"状态的分组（key 为一级部门名）
+const expandedGroups = ref<Set<string>>(new Set());
+
+// 展开/收起某个分组
+const handleToggleGroup = (row: ViewRow) => {
+  if (row.type !== "group" || !row.name) return;
+  const key = row.name;
+  const next = new Set(expandedGroups.value);
+  if (next.has(key)) {
+    next.delete(key);
+  } else {
+    next.add(key);
+  }
+  expandedGroups.value = next;
+};
+
+// 定位筛选人员：单人选进入其部门，多选进入"筛选结果"分组视图
+const handleLocatePerson = () => {
+  const list = persons.value;
+  if (list.length === 0) {
+    ElMessage.info("所选人员暂无考勤记录，无法定位");
+    return;
+  }
+  if (list.length === 1) {
+    // 单个人：定位到其所在的最末级部门
+    const p = list[0];
+    showFilterResult.value = false;
+    if (p.chain.length) {
+      currentDeptId.value = p.chain[p.chain.length - 1].deptId ?? null;
+    }
+    return;
+  }
+  // 多个人（可能跨部门）：进入"筛选结果"分组视图，默认全展开
+  showFilterResult.value = true;
+  currentDeptId.value = null;
+  expandedGroups.value = new Set();
+};
+
+// 表格行类名
+const tableRowClassName = ({ row }: { row: ViewRow }) => {
+  if (row.type === "group") return "row-group-header";
+  return "";
+};
+
+// 聚合一组人员的月度数据
+const calcGroup = (plist: PersonData[], months: string[]) => {
+  const total: Record<string, number> = {};
+  const day: Record<string, number> = {};
+  const avgByPerson: Record<string, number> = {};
+  months.forEach(m => {
+    total[m] = 0;
+    day[m] = 0;
+    avgByPerson[m] = 0;
+  });
+  plist.forEach(p => {
+    months.forEach(m => {
+      total[m] = (total[m] || 0) + (p.totalHours[m] || 0);
+      day[m] = (day[m] || 0) + (p.dayCount[m] || 0);
+      // 个人平均 = 总工时 / 出勤天数；0 天则记 0
+      const days = p.dayCount[m] || 0;
+      avgByPerson[m] =
+        (avgByPerson[m] || 0) + (days > 0 ? (p.totalHours[m] || 0) / days : 0);
+    });
+  });
+  return { totalHours: total, dayCount: day, avgByPerson, headcount: plist.length };
+};
+
+// 看板行：部门 / 人员 / 筛选结果分组头
+interface ViewRow {
+  type: "dept" | "person" | "group";
+  key: string;
+  name: string;
+  deptId?: string | number;
+  dingUserId?: string;
+  hasChildren: boolean;
+  headcount: number;
+  totalHours: Record<string, number>;
+  dayCount: Record<string, number>;
+  // 每月"个人平均工时"的求和（供部门平均 = 该求和 ÷ 人数 使用）
+  avgByPerson?: Record<string, number>;
+  // 所属部门路径（筛选结果视图展示用）
+  deptPath?: string;
+  // 筛选结果分组行：该组对应的命中的人员
+  groupPersons?: PersonData[];
 }
 
-const summaryTableData = computed<DisplayRow[]>(() => {
-  return rawSummary.value.map(raw => {
-    const row: DisplayRow = {
-      username: raw.username,
-      dingUserId: raw.dingUserId,
-      deptId: raw.deptId,
-      deptName: raw.deptName
-    };
-    monthColumns.value.forEach(m => {
-      const total = raw.totalHours[m] || 0;
-      const days = raw.dayCount[m] || 0;
-      if (displayMode.value === "avg") {
-        row[m] = days > 0 ? total / days : 0;
-      } else {
-        row[m] = total;
+// 根据当前下钻层级生成展示行
+const viewRows = computed<ViewRow[]>(() => {
+  const months = monthColumns.value;
+
+  // "筛选结果"视图：按一级部门分组，可展开/折叠，展示命中的筛选人员
+  if (showFilterResult.value) {
+    const rows: ViewRow[] = [];
+    const groups = new Map<string, PersonData[]>();
+    persons.value.forEach(p => {
+      const top = p.chain[0]?.deptName || "未分组";
+      if (!groups.has(top)) groups.set(top, []);
+      groups.get(top)!.push(p);
+    });
+    groups.forEach((plist, top) => {
+      const agg = calcGroup(plist, months);
+      const collapsed = expandedGroups.value.has(top);
+      rows.push({
+        type: "group",
+        key: "g-" + top,
+        name: top,
+        hasChildren: true,
+        headcount: plist.length,
+        ...agg,
+        groupPersons: plist
+      });
+      if (!collapsed) {
+        plist.forEach(p =>
+          rows.push({
+            type: "person",
+            key: p.username,
+            name: p.username,
+            dingUserId: p.dingUserId,
+            deptId: p.deptId,
+            hasChildren: false,
+            headcount: 1,
+            totalHours: p.totalHours,
+            dayCount: p.dayCount,
+            deptPath: p.chain.length
+              ? p.chain.map(d => d.deptName).filter(Boolean).join(" / ")
+              : "-"
+          })
+        );
       }
     });
-    return row;
-  });
+    return rows;
+  }
+
+  // 顶层：展示一级部门，聚合其所有子部门/人员
+  if (!currentDeptId.value) {
+    return deptTreeData.value.map(top => {
+      const agg = calcGroup(personsInDept(String(top.deptId)), months);
+      return {
+        type: "dept",
+        key: String(top.deptId),
+        name: top.deptName || "-",
+        deptId: top.deptId,
+        hasChildren: !!top.children?.length,
+        ...agg
+      };
+    });
+  }
+
+  const node = deptIdMap.value.get(String(currentDeptId.value));
+  if (!node) return [];
+
+  // 有子部门：展示下一级子部门 + 当前部门的直属人员（可能存在一边挂子部门一边挂人员的混合部门）
+  if (node.children?.length) {
+    const deptRows: ViewRow[] = node.children.map(child => {
+      const agg = calcGroup(personsInDept(String(child.deptId)), months);
+      return {
+        type: "dept",
+        key: String(child.deptId),
+        name: child.deptName || "-",
+        deptId: child.deptId,
+        hasChildren: !!child.children?.length,
+        ...agg
+      };
+    });
+    // 当前部门的直属人员（deptId 严格等于本部门，不属于任何子部门）
+    const directPersons = persons.value.filter(
+      p => String(p.deptId || "") === String(node.deptId)
+    );
+    const personRows: ViewRow[] = directPersons.map(p => ({
+      type: "person",
+      key: p.username,
+      name: p.username,
+      dingUserId: p.dingUserId,
+      deptId: p.deptId,
+      hasChildren: false,
+      headcount: 1,
+      totalHours: p.totalHours,
+      dayCount: p.dayCount
+    }));
+    return [...deptRows, ...personRows];
+  }
+
+  // 最末级部门：展示具体人员
+  return persons.value
+    .filter(p => String(p.deptId || "") === String(node.deptId))
+    .map(p => ({
+      type: "person",
+      key: p.username,
+      name: p.username,
+      dingUserId: p.dingUserId,
+      deptId: p.deptId,
+      hasChildren: false,
+      headcount: 1,
+      totalHours: p.totalHours,
+      dayCount: p.dayCount
+    }));
 });
+
+// 单元格显示值（按展示模式计算）
+const cellValue = (row: ViewRow, m: string): number => {
+  const total = row.totalHours[m] || 0;
+  if (displayMode.value === "avg") {
+    if (row.type === "dept" || row.type === "group") {
+      // 部门/分组平均工时 = 组内每人"平均工时"求和 ÷ 人数
+      const avgByPerson = row.avgByPerson?.[m] || 0;
+      return row.headcount > 0 ? avgByPerson / row.headcount : 0;
+    }
+    // 个人平均工时 = 有效工时总和 ÷ 出勤天数
+    const days = row.dayCount[m] || 0;
+    return days > 0 ? total / days : 0;
+  }
+  return total;
+};
+
+// 进入下级部门
+const handleEnterDept = (row: ViewRow) => {
+  if (row.type !== "dept") return;
+  showFilterResult.value = false;
+  currentDeptId.value = row.deptId ?? null;
+};
+
+// 行点击：分组展开/收起，部门进入下级，人员查看详情
+const handleRowClick = (row: ViewRow) => {
+  if (row.type === "group") {
+    handleToggleGroup(row);
+    return;
+  }
+  if (row.type === "dept") {
+    handleEnterDept(row);
+    return;
+  }
+  handleViewDetail(row);
+};
 
 // 详情弹窗相关
 const detailVisible = ref(false);
-const detailUser = ref<DisplayRow | null>(null);
+const detailUser = ref<{ username: string; deptName: string } | null>(null);
 const detailActiveTab = ref("");
 
 const detailMonthData = computed<AttendanceDailySummaryDTO[]>(() => {
@@ -268,8 +511,12 @@ const detailMonthStats = computed(() => {
 });
 
 // 查看详情
-const handleViewDetail = (row: DisplayRow) => {
-  detailUser.value = row;
+const handleViewDetail = (row: ViewRow) => {
+  const topDeptName =
+    row.type === "person" && row.deptId
+      ? pathMap.value.get(String(row.deptId))?.[0]?.deptName || "-"
+      : "-";
+  detailUser.value = { username: row.name, deptName: topDeptName };
   detailActiveTab.value = monthColumns.value[0] || "";
   detailVisible.value = true;
 };
@@ -326,7 +573,7 @@ const isEarlyLeave = (time?: string, workDay?: string, item?: AttendanceDailySum
   return t.hour() < 18;
 };
 
-// 计算有效工时（扣除午休、晚餐等）
+// 计算有效工时（扣除午休、晚餐等）。请假不参与工时计算，按打卡结果原样判定
 const calcEffectiveHours = (item: AttendanceDailySummaryDTO): number => {
   if (!item.onDutyTime || !item.offDutyTime) return 0;
   // 如果上下班都是未打卡，工时直接算0，不扣午休晚餐
@@ -519,9 +766,22 @@ const handleReset = () => {
   monthRange.value = defaultRange;
   activeMonthRange.value = defaultRange;
   filterKeywords.value = [];
-  selectedDeptId.value = null;
+  currentDeptId.value = null;
+  showFilterResult.value = false;
   fetchAllData();
 };
+
+// 当姓名筛选被清空时，退出"筛选结果"视图
+watch(
+  () => filterKeywords.value.length,
+  len => {
+    if (len === 0) {
+      showFilterResult.value = false;
+      currentDeptId.value = null;
+      expandedGroups.value = new Set();
+    }
+  }
+);
 
 onMounted(async () => {
   // 检查是否为首次登录进入，强制刷新确保全局样式正确覆盖
@@ -564,13 +824,24 @@ onMounted(async () => {
                 <strong>特殊情况：</strong>上下班均为「未打卡」时，工时直接记为 0，不扣除午休/晚餐
               </span>
             </div>
-            <div class="desc-item">
-              <span class="desc-label">总工时</span>
-              <span class="desc-value">选定月份范围内，该员工所有打卡天数的<strong>有效工时</strong>总和</span>
+            <div class="desc-item desc-highlight">
+              <span class="desc-label">平均工时</span>
+              <span class="desc-value">
+                <strong>员工个人平均工时 =</strong> 该员工当月有效工时总和 ÷ 当月出勤天数<br />
+                <strong>部门平均工时 =</strong> 部门内每一名员工「个人平均工时」<strong>逐人相加</strong>后 ÷ 部门人数<br />
+                <span style="color: #909399; font-size: 12px">
+                  例：某部门 A、B 两人，A 个人平均 9h、B 个人平均 7h ⇒ 部门平均 = (9+7) ÷ 2 = 8h
+                </span>
+              </span>
             </div>
             <div class="desc-item">
-              <span class="desc-label">平均工时</span>
-              <span class="desc-value"><strong>有效工时</strong>总和 ÷ 当月有打卡记录的天数</span>
+              <span class="desc-label">总工时</span>
+              <span class="desc-value">选定月份范围内，该部门/员工所有打卡天数的<strong>有效工时</strong>总和。<br />
+                部门总工时 = 部门内所有成员有效工时相加；员工总工时 = 该员工有效工时总和</span>
+            </div>
+            <div class="desc-item">
+              <span class="desc-label">下钻规则</span>
+              <span class="desc-value">按钉钉组织架构逐级下钻：一级部门 → 二级部门 → … → 具体人员；最末级部门展示其直属人员</span>
             </div>
             <div class="desc-item">
               <span class="desc-label">颜色规则</span>
@@ -580,8 +851,8 @@ onMounted(async () => {
               </span>
             </div>
             <div class="desc-item">
-              <span class="desc-label">部门归属</span>
-              <span class="desc-value">按顶级部门展示，子部门人员统一归属到其一级部门</span>
+              <span class="desc-label">请假标识</span>
+              <span class="desc-value">详情中「请假」列仅为当天是否有<strong>请假审批</strong>的标识状态，<strong>不代表当天全天请假</strong>，不参与工时/打卡状态的计算</span>
             </div>
             <div class="desc-item">
               <span class="desc-label">数据来源</span>
@@ -620,53 +891,100 @@ onMounted(async () => {
 
         <!-- 数据列表 -->
         <div class="table-section">
-          <div class="section-title">
-            <div class="title-left">
-              <span>工时汇总（小时）</span>
-              <el-radio-group
-                v-model="displayMode"
-                size="small"
-                style="margin-left: 16px"
-              >
-                <el-radio-button label="total">总工时</el-radio-button>
-                <el-radio-button label="avg">平均工时</el-radio-button>
-              </el-radio-group>
+          <div class="section-header">
+            <div class="section-title">
+              <div class="title-left">
+                <span>工时汇总（小时）</span>
+                <el-radio-group
+                  v-model="displayMode"
+                  size="small"
+                  style="margin-left: 16px"
+                >
+                  <el-radio-button label="avg">平均工时</el-radio-button>
+                  <el-radio-button label="total">总工时</el-radio-button>
+                </el-radio-group>
+              </div>
+              <div class="title-right">
+                <el-select
+                  v-model="filterKeywords"
+                  placeholder="筛选姓名"
+                  filterable
+                  multiple
+                  collapse-tags
+                  collapse-tags-tooltip
+                  clearable
+                  size="small"
+                  style="width: 240px; margin-right: 12px"
+                >
+                  <el-option
+                    v-for="name in usernameOptions"
+                    :key="name"
+                    :label="name"
+                    :value="name"
+                  />
+                </el-select>
+                <span class="total-count">
+                  共 {{ viewRows.length }}
+                  {{ showFilterResult ? "人" : currentDeptId ? "项" : "个部门" }}
+                </span>
+              </div>
             </div>
-            <div class="title-right">
-              <el-select
-                v-model="selectedDeptId"
-                placeholder="全部部门"
-                clearable
-                filterable
+
+            <!-- 面包屑 / 返回上级 -->
+            <div class="breadcrumb-bar">
+              <el-button
+                :icon="ArrowLeft"
+                text
                 size="small"
-                style="width: 160px; margin-right: 12px"
+                :disabled="!currentDeptId && !showFilterResult"
+                @click="handleBack"
               >
-                <el-option
-                  v-for="dept in flatDeptList"
-                  :key="dept.deptId"
-                  :label="dept.deptName"
-                  :value="dept.deptId"
-                />
-              </el-select>
-              <el-select
-                v-model="filterKeywords"
-                placeholder="筛选姓名"
-                filterable
-                multiple
-                collapse-tags
-                collapse-tags-tooltip
-                clearable
+                返回上级
+              </el-button>
+              <el-breadcrumb separator="/">
+                <el-breadcrumb-item
+                  :class="{ 'is-link': !!currentDeptId || showFilterResult }"
+                  @click="handleBreadcrumbClick(-1)"
+                >
+                  全部部门
+                </el-breadcrumb-item>
+                <el-breadcrumb-item v-if="showFilterResult">筛选结果</el-breadcrumb-item>
+                <el-breadcrumb-item
+                  v-for="(d, idx) in currentPath"
+                  :key="d.deptId"
+                  :class="{ 'is-link': idx < currentPath.length - 1 }"
+                  @click="handleBreadcrumbClick(idx)"
+                >
+                  {{ d.deptName }}
+                </el-breadcrumb-item>
+              </el-breadcrumb>
+            </div>
+
+            <!-- 筛选状态提示 -->
+            <div v-if="filterKeywords.length > 0" class="filter-tip">
+              <span class="filter-tip-text">
+                已筛选姓名（<strong>{{ filterKeywords.length }}</strong> 个）：命中
+                <strong>{{ persons.length }}</strong> 人 ·
+                部门汇总保持完整，筛选在最末级人员列表显示
+              </span>
+              <el-button
+                text
                 size="small"
-                style="width: 240px; margin-right: 12px"
+                type="primary"
+                style="padding: 0 4px"
+                @click="handleLocatePerson"
               >
-                <el-option
-                  v-for="name in usernameOptions"
-                  :key="name"
-                  :label="name"
-                  :value="name"
-                />
-              </el-select>
-              <span class="total-count">共 {{ summaryTableData.length }} 人</span>
+                定位到人员
+              </el-button>
+              <el-button
+                text
+                size="small"
+                type="primary"
+                style="padding: 0 4px"
+                @click="filterKeywords = []"
+              >
+                清空筛选
+              </el-button>
             </div>
           </div>
 
@@ -683,11 +1001,13 @@ onMounted(async () => {
 
           <el-table
             v-loading="loading"
-            :data="summaryTableData"
+            :data="viewRows"
             border
             stripe
             size="small"
             style="width: 100%"
+            :row-class-name="tableRowClassName"
+            @row-click="handleRowClick"
           >
             <el-table-column
               label="序号"
@@ -700,18 +1020,67 @@ onMounted(async () => {
               </template>
             </el-table-column>
             <el-table-column
-              prop="username"
-              label="姓名"
-              width="120"
-              align="center"
-            />
-            <el-table-column
-              prop="deptName"
-              label="部门"
-              width="140"
-              align="center"
+              :label="showFilterResult || currentDeptId ? '部门 / 姓名' : '部门'"
+              width="160"
+              align="left"
               show-overflow-tooltip
-            />
+            >
+              <template #default="{ row }">
+  <span
+    class="name-cell"
+    :class="{ 'group-header': row.type === 'group' }"
+  >
+    <el-icon
+      v-if="row.type === 'dept' || row.type === 'group'"
+      class="dept-icon"
+    >
+      <OfficeBuilding />
+    </el-icon>
+    <el-icon
+      v-else-if="row.type === 'person'"
+      class="person-icon"
+    >
+      <User />
+    </el-icon>
+    {{ row.name }}
+    <span
+      v-if="row.type === 'group'"
+      class="group-count"
+    >
+      ({{ row.headcount }}人)
+    </span>
+    <el-icon
+      v-if="row.type === 'group'"
+      class="group-arrow"
+      :class="{ 'is-collapsed': expandedGroups.has(row.name) }"
+      style="margin-left: 6px; vertical-align: -2px"
+    >
+      <ArrowDown />
+    </el-icon>
+  </span>
+</template>
+            </el-table-column>
+            <el-table-column
+              v-if="showFilterResult"
+              label="所属部门"
+              width="240"
+              align="left"
+              show-overflow-tooltip
+            >
+              <template #default="{ row }">
+                {{ row.type === "group" ? "-" : row.deptPath || "-" }}
+              </template>
+            </el-table-column>
+            <el-table-column
+              v-if="!showFilterResult"
+              label="人数"
+              width="80"
+              align="center"
+            >
+              <template #default="{ row }">
+                {{ row.type === "dept" ? row.headcount : "-" }}
+              </template>
+            </el-table-column>
             <el-table-column
               v-for="month in monthColumns"
               :key="month"
@@ -719,10 +1088,10 @@ onMounted(async () => {
               width="140"
               align="center"
               sortable
-              :sort-method="(a: any, b: any) => Number(a[month]) - Number(b[month])"
+              :sort-method="(a: any, b: any) => Number(cellValue(a, month)) - Number(cellValue(b, month))"
             >
               <template #default="{ row }">
-                {{ formatHours(row[month]) }}
+                {{ formatHours(cellValue(row, month)) }}
               </template>
             </el-table-column>
             <el-table-column
@@ -733,10 +1102,27 @@ onMounted(async () => {
             >
               <template #default="{ row }">
                 <el-button
+                  v-if="row.type === 'group'"
+                  type="primary"
+                  text
+                  @click.stop="handleToggleGroup(row)"
+                >
+                  {{ expandedGroups.has(row.name) ? "收起" : "展开" }}
+                </el-button>
+                <el-button
+                  v-else-if="row.type === 'dept'"
+                  type="primary"
+                  text
+                  @click.stop="handleEnterDept(row)"
+                >
+                  进入
+                </el-button>
+                <el-button
+                  v-else
                   type="primary"
                   text
                   :icon="DataLine"
-                  @click="handleViewDetail(row)"
+                  @click.stop="handleViewDetail(row)"
                 >
                   详情
                 </el-button>
@@ -782,9 +1168,13 @@ onMounted(async () => {
           <el-tag type="primary" size="small" effect="dark">加班</el-tag>
           <span class="legend-text">有加班记录</span>
         </span>
-        <span class="legend-item">
+                <span class="legend-item">
           <el-tag type="danger" size="small" effect="dark">异常</el-tag>
           <span class="legend-text">迟到或早走</span>
+        </span>
+        <span class="legend-item">
+          <span class="text-leave">请假</span>
+          <span class="legend-text">当天有请假审批（标识，不代表全天请假）</span>
         </span>
         <span class="legend-tip">
           总工时、平均工时均按有效工时计算（扣除午休及加班晚餐时长）
@@ -828,6 +1218,13 @@ onMounted(async () => {
             <el-tag :type="getStatusTagType(row)" size="small">
               {{ getStatusText(row) }}
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="请假" width="80" align="center">
+          <template #default="{ row }">
+            <span :class="{ 'text-leave': row.leave }">
+              {{ row.leave ? "请假" : "-" }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column label="原始工时" width="80" align="center">
@@ -1031,13 +1428,16 @@ onMounted(async () => {
   padding: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 
+  .section-header {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ebeef5;
+  }
+
   .section-title {
     font-size: 16px;
     font-weight: 600;
     color: #303133;
-    margin-bottom: 12px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #ebeef5;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1059,6 +1459,78 @@ onMounted(async () => {
     }
   }
 
+  .breadcrumb-bar {
+    display: flex;
+    align-items: center;
+    margin-top: 8px;
+
+    .is-link {
+      cursor: pointer;
+      color: #409eff;
+    }
+  }
+
+  .filter-tip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: #ecf5ff;
+    border: 1px solid #b3d8ff;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #606266;
+
+    .filter-tip-text {
+      strong {
+        color: #409eff;
+      }
+    }
+  }
+
+  .name-cell {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+
+    &:hover {
+      color: #409eff;
+    }
+
+    &.group-header {
+      font-weight: 600;
+      color: #303133;
+    }
+
+    // 部门/分组图标（蓝色建筑）
+    .dept-icon {
+      color: #409eff;
+      vertical-align: -2px;
+      margin-right: 6px;
+    }
+
+    // 人员图标（青绿色人形，与部门区分）
+    .person-icon {
+      color: #0f9d8f;
+      vertical-align: -2px;
+      margin-right: 6px;
+    }
+
+    .group-count {
+      font-weight: 400;
+      color: #909399;
+    }
+
+    .group-arrow {
+      transition: transform 0.2s;
+
+      &.is-collapsed {
+        transform: rotate(-90deg);
+      }
+    }
+  }
+
   .loading-progress {
     margin-bottom: 12px;
     display: flex;
@@ -1074,6 +1546,17 @@ onMounted(async () => {
       color: #909399;
       white-space: nowrap;
     }
+  }
+}
+
+// 筛选结果分组头行颜色
+:deep(.row-group-header) {
+  --el-table-tr-bg-color: #f0f4ff;
+  --el-table-striped-odd-row-bg-color: #f0f4ff;
+  font-weight: 600;
+
+  &:hover > td {
+    background-color: #e6efff !important;
   }
 }
 
@@ -1128,6 +1611,11 @@ onMounted(async () => {
 
 .text-green {
   color: #67c23a;
+  font-weight: 600;
+}
+
+.text-leave {
+  color: #e6a23c;
   font-weight: 600;
 }
 
