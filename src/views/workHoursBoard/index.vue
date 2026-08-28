@@ -149,6 +149,16 @@ const getDefaultMonthRange = (): [string, string] => {
   return [now, now];
 };
 
+// 数据最早月份（该月之前存在数据，禁止选择）
+const MIN_MONTH = dayjs("2026-03-01");
+// 默认结束月份为当前月（禁止选择未来月份）
+const CURRENT_MONTH = dayjs().startOf("month");
+// 月份范围选择器禁选月份：早于最早数据月份 或 晚于当前月
+const disabledMonth = (date: Date) => {
+  const m = dayjs(date).startOf("month");
+  return m.isBefore(MIN_MONTH.startOf("month")) || m.isAfter(CURRENT_MONTH);
+};
+
 // 根据 yyyy-MM 计算该月第一天和最后一天
 const getMonthRange = (monthStr: string): [string, string] => {
   return [
@@ -188,19 +198,22 @@ const descExpanded = ref(false);
 const allDailyData = ref<AttendanceDailySummaryDTO[]>([]);
 const loading = ref(false);
 
-// 按人员+月份聚合的数据（保存总工时和天数）
+// 按人员+月份聚合的数据（保存有效工时总和、应出勤/请假天数）
 interface PersonData {
   username: string;
   dingUserId: string;
   deptId?: string;
   chain: DeptNode[]; // 从顶级到所在部门的完整链路
-  totalHours: Record<string, number>; // 每月总工时
-  dayCount: Record<string, number>; // 每月打卡天数
+  totalHours: Record<string, number>; // 每月有效工时总和（扣除午休/晚餐）
+  scheduledDays: Record<string, number>; // 每月应出勤天数（周一~五）
+  leaveDays: Record<string, number>; // 每月请假天数（扣减口径，同详情弹窗）
 }
 
 // 全部人员聚合数据（不套用姓名筛选，用于部门汇总口径）
 const allPersons = computed<PersonData[]>(() => {
   const map = new Map<string, PersonData>();
+  // 每人每月原始日记录（用于计算请假天数，同详情弹窗口径）
+  const rawByPerson = new Map<string, Record<string, AttendanceDailySummaryDTO[]>>();
   allDailyData.value.forEach(item => {
     if (!item.username || !item.workDay) return;
     const key = item.username;
@@ -214,11 +227,13 @@ const allPersons = computed<PersonData[]>(() => {
         deptId: item.deptId,
         chain,
         totalHours: {},
-        dayCount: {}
+        scheduledDays: {},
+        leaveDays: {}
       };
       monthColumns.value.forEach(m => {
         row.totalHours[m] = 0;
-        row.dayCount[m] = 0;
+        row.scheduledDays[m] = 0;
+        row.leaveDays[m] = 0;
       });
       map.set(key, row);
     }
@@ -226,8 +241,18 @@ const allPersons = computed<PersonData[]>(() => {
     const workMonth = item.workDay.substring(0, 7);
     if (p.totalHours[workMonth] !== undefined) {
       p.totalHours[workMonth] += calcEffectiveHours(item);
-      p.dayCount[workMonth] += 1;
+      if (!rawByPerson.has(key)) rawByPerson.set(key, {});
+      const byMonth = rawByPerson.get(key)!;
+      (byMonth[workMonth] || (byMonth[workMonth] = [])).push(item);
     }
+  });
+  // 逐人逐月补算应出勤天数与请假天数
+  map.forEach((p, key) => {
+    monthColumns.value.forEach(m => {
+      p.scheduledDays[m] = calcScheduledDays(m);
+      const items = rawByPerson.get(key)?.[m];
+      p.leaveDays[m] = items && items.length ? calcLeaveDays(items, m) : 0;
+    });
   });
   return Array.from(map.values());
 });
@@ -291,26 +316,25 @@ const tableRowClassName = ({ row }: { row: ViewRow }) => {
 };
 
 // 聚合一组人员的月度数据
+// 聚合一组人员：组内每人"有效工时列 / 实际工时列"取值的求和
+// （两列取值同详情弹窗口径：有效工时=总和÷应出勤，实际工时=总和÷实际出勤）
 const calcGroup = (plist: PersonData[], months: string[]) => {
-  const total: Record<string, number> = {};
-  const day: Record<string, number> = {};
-  const avgByPerson: Record<string, number> = {};
+  const effVal: Record<string, number> = {};
+  const actVal: Record<string, number> = {};
   months.forEach(m => {
-    total[m] = 0;
-    day[m] = 0;
-    avgByPerson[m] = 0;
+    effVal[m] = 0;
+    actVal[m] = 0;
   });
   plist.forEach(p => {
     months.forEach(m => {
-      total[m] = (total[m] || 0) + (p.totalHours[m] || 0);
-      day[m] = (day[m] || 0) + (p.dayCount[m] || 0);
-      // 个人平均 = 总工时 / 出勤天数；0 天则记 0
-      const days = p.dayCount[m] || 0;
-      avgByPerson[m] =
-        (avgByPerson[m] || 0) + (days > 0 ? (p.totalHours[m] || 0) / days : 0);
+      const total = p.totalHours[m] || 0;
+      const sch = p.scheduledDays[m] || 0;
+      const act = Math.max(0, sch - (p.leaveDays[m] || 0));
+      effVal[m] += sch > 0 ? total / sch : 0;
+      actVal[m] += act > 0 ? total / act : 0;
     });
   });
-  return { totalHours: total, dayCount: day, avgByPerson, headcount: plist.length };
+  return { effVal, actVal, headcount: plist.length };
 };
 
 // 看板行：部门 / 人员 / 筛选结果分组头
@@ -322,10 +346,13 @@ interface ViewRow {
   dingUserId?: string;
   hasChildren: boolean;
   headcount: number;
-  totalHours: Record<string, number>;
-  dayCount: Record<string, number>;
-  // 每月"个人平均工时"的求和（供部门平均 = 该求和 ÷ 人数 使用）
-  avgByPerson?: Record<string, number>;
+  // 人员行：原始口径（用于计算人日均有效/实际工时，入职详情弹窗）
+  totalHours?: Record<string, number>; // 每月有效工时总和
+  scheduledDays?: Record<string, number>; // 每月应出勤天数
+  leaveDays?: Record<string, number>; // 每月请假天数
+  // 部门/分组行：组内每人"两列值"的求和（平均=÷人数，总=原样）
+  effVal?: Record<string, number>; // 组内"有效工时列"求和
+  actVal?: Record<string, number>; // 组内"实际工时列"求和
   // 所属部门路径（筛选结果视图展示用）
   deptPath?: string;
   // 筛选结果分组行：该组对应的命中的人员
@@ -368,7 +395,8 @@ const viewRows = computed<ViewRow[]>(() => {
             hasChildren: false,
             headcount: 1,
             totalHours: p.totalHours,
-            dayCount: p.dayCount,
+            scheduledDays: p.scheduledDays,
+            leaveDays: p.leaveDays,
             deptPath: p.chain.length
               ? p.chain.map(d => d.deptName).filter(Boolean).join(" / ")
               : "-"
@@ -423,7 +451,8 @@ const viewRows = computed<ViewRow[]>(() => {
       hasChildren: false,
       headcount: 1,
       totalHours: p.totalHours,
-      dayCount: p.dayCount
+      scheduledDays: p.scheduledDays,
+      leaveDays: p.leaveDays
     }));
     return [...deptRows, ...personRows];
   }
@@ -440,24 +469,34 @@ const viewRows = computed<ViewRow[]>(() => {
       hasChildren: false,
       headcount: 1,
       totalHours: p.totalHours,
-      dayCount: p.dayCount
+      scheduledDays: p.scheduledDays,
+      leaveDays: p.leaveDays
     }));
 });
 
-// 单元格显示值（按展示模式计算）
-const cellValue = (row: ViewRow, m: string): number => {
-  const total = row.totalHours[m] || 0;
-  if (displayMode.value === "avg") {
-    if (row.type === "dept" || row.type === "group") {
-      // 部门/分组平均工时 = 组内每人"平均工时"求和 ÷ 人数
-      const avgByPerson = row.avgByPerson?.[m] || 0;
-      return row.headcount > 0 ? avgByPerson / row.headcount : 0;
-    }
-    // 个人平均工时 = 有效工时总和 ÷ 出勤天数
-    const days = row.dayCount[m] || 0;
-    return days > 0 ? total / days : 0;
+// 单元格显示值（按展示模式 + 口径计算）
+// metric: "effective"=有效工时， "actual"=实际工时（原始打卡时长）
+// 单元格显示值
+// metric: "effective"=有效工时列（总和÷应出勤天数），"actual"=实际工时列（总和÷实际出勤天数）
+// 人员行：两列取值固定（人日均口径，同详情弹窗），不受 average/total 切换影响
+// 部门/分组行：average=组内每人两列值相加÷人数，total=组内每人两列值相加
+const cellValue = (
+  row: ViewRow,
+  m: string,
+  metric: "effective" | "actual"
+): number => {
+  if (row.type === "person") {
+    const total = row.totalHours?.[m] || 0;
+    const sch = row.scheduledDays?.[m] || 0;
+    const act = Math.max(0, sch - (row.leaveDays?.[m] || 0));
+    if (metric === "effective") return sch > 0 ? total / sch : 0;
+    return act > 0 ? total / act : 0;
   }
-  return total;
+  // 部门/分组
+  const sum =
+    metric === "effective" ? row.effVal?.[m] || 0 : row.actVal?.[m] || 0;
+  if (displayMode.value === "total") return sum;
+  return row.headcount > 0 ? sum / row.headcount : 0;
 };
 
 // 进入下级部门
@@ -494,6 +533,108 @@ const detailMonthData = computed<AttendanceDailySummaryDTO[]>(() => {
   );
 });
 
+// 计算某月份应出勤天数（周一至周五，不含周末）
+const calcScheduledDays = (monthStr: string): number => {
+  if (!monthStr) return 0;
+  const d = dayjs(monthStr + "-01");
+  const total = d.daysInMonth();
+  let count = 0;
+  for (let i = 0; i < total; i++) {
+    const weekday = d.add(i, "day").day();
+    if (weekday >= 1 && weekday <= 5) count++;
+  }
+  return count;
+};
+
+// 计算某天请假时段覆盖的有效工时（工作时段 9:00~12:15、13:15~18:00），返回小时数
+const calcLeaveWorkHours = (
+  dayStart: dayjs.Dayjs,
+  start: dayjs.Dayjs,
+  end: dayjs.Dayjs
+): number => {
+  const slots: [dayjs.Dayjs, dayjs.Dayjs][] = [
+    [dayStart.hour(9).minute(0).second(0), dayStart.hour(12).minute(15).second(0)],
+    [dayStart.hour(13).minute(15).second(0), dayStart.hour(18).minute(0).second(0)]
+  ];
+  let minutes = 0;
+  slots.forEach(([ws, we]) => {
+    const ovs = start.isAfter(ws) ? start : ws;
+    const ove = end.isBefore(we) ? end : we;
+    if (ove.isAfter(ovs)) minutes += ove.diff(ovs, "minute");
+  });
+  return minutes / 60;
+};
+
+// 计算某条记录当天被请假扣除的天数（用于详情「请假」列旁展示）
+// 该工作日的请假与当天工作时段 9:00~18:00 取交集，覆盖时长折算：全天（>=6 小时）=1 天，上/下午=0.5 天
+const calcDayLeaveDays = (item: AttendanceDailySummaryDTO): number => {
+  if (!item.leaveStartTime || !item.leaveEndTime) return 0;
+  const dayStart = dayjs(item.workDay);
+  const start = dayjs(item.leaveStartTime);
+  const end = dayjs(item.leaveEndTime);
+  if (!dayStart.isValid() || !start.isValid() || !end.isValid()) return 0;
+  const d0 = dayStart.startOf("day");
+  const d1 = dayStart.endOf("day");
+  // 请假区间与当天取交集
+  const s = start.isBefore(d0) ? d0 : start;
+  const e = end.isAfter(d1) ? d1 : end;
+  // 无交集或交集为空
+  if (e.isBefore(s) || e.isSame(s)) return 0;
+  const hours = calcLeaveWorkHours(dayStart, s, e);
+  if (hours <= 0) return 0;
+  return hours >= 6 ? 1 : 0.5;
+};
+
+// 请假天数展示格式：整数不带小数，0.5 保留 1 位
+const formatLeaveDays = (days: number): string => {
+  return Number.isInteger(days) ? `${days}` : days.toFixed(1);
+};
+
+// 计算该月实际请假天数
+// 注意：后端会把整段请假区间（如 2026-07-13 ~ 2026-08-13）复制到每一天的记录上，
+// 所以不能按"每条记录各自展开区间"累计（会导致重复虚增）。这里合并成真实请假区间后再按覆盖工作日统计。
+// 覆盖了当天（工作日）即算当天的假；全天 9:00~18:00 = 1 天，上午/下午 = 0.5 天
+const calcLeaveDays = (list: AttendanceDailySummaryDTO[], monthStr: string): number => {
+  if (!monthStr) return 0;
+  // 1) 收集请假区间并合并（取并集）
+  const spans = list
+    .filter(i => i.leaveStartTime && i.leaveEndTime)
+    .map(i => ({ start: dayjs(i.leaveStartTime), end: dayjs(i.leaveEndTime) }))
+    .filter(s => s.start.isValid() && s.end.isValid())
+    .sort((a, b) => a.start.valueOf() - b.start.valueOf());
+
+  const merged: { start: dayjs.Dayjs; end: dayjs.Dayjs }[] = [];
+  for (const s of spans) {
+    const last = merged[merged.length - 1];
+    if (last && !s.start.isAfter(last.end)) {
+      if (s.end.isAfter(last.end)) last.end = s.end;
+    } else {
+      merged.push({ ...s });
+    }
+  }
+
+  // 2) 统计合并后区间覆盖到的当月工作日（周一~五）
+  const seenDays = new Set<string>();
+  let days = 0;
+  merged.forEach(({ start, end }) => {
+    let cur = start.startOf("day");
+    const last = end.startOf("day");
+    while (cur.isBefore(last) || cur.isSame(last, "day")) {
+      const dayKey = cur.format("YYYY-MM-DD");
+      const weekday = cur.day();
+      if (dayKey.startsWith(monthStr) && weekday >= 1 && weekday <= 5 && !seenDays.has(dayKey)) {
+        seenDays.add(dayKey);
+        const s = start.isBefore(cur) ? cur : start;
+        const e = end.isAfter(cur.endOf("day")) ? cur.endOf("day") : end;
+        const hours = calcLeaveWorkHours(cur, s, e);
+        if (hours > 0) days += hours >= 6 ? 1 : 0.5;
+      }
+      cur = cur.add(1, "day");
+    }
+  });
+  return days;
+};
+
 // 详情弹窗当前月统计
 const detailMonthStats = computed(() => {
   const list = detailMonthData.value;
@@ -501,12 +642,32 @@ const detailMonthStats = computed(() => {
     (sum, item) => sum + calcEffectiveHours(item),
     0
   );
-  const dayCount = list.length;
-  const avgHours = dayCount > 0 ? totalHours / dayCount : 0;
+  const scheduledDays = calcScheduledDays(detailActiveTab.value);
+  const leaveDays = calcLeaveDays(list, detailActiveTab.value);
+  const actualAttendanceDays = Math.max(0, scheduledDays - leaveDays);
+  const avgHours = scheduledDays > 0 ? totalHours / scheduledDays : 0;
+  const actualAvgHours = actualAttendanceDays > 0 ? totalHours / actualAttendanceDays : 0;
+  // TODO: 临时调试日志（肖嘉玲），排查完请删除
+  if (detailUser.value?.username === "肖嘉玲") {
+    console.log(
+      `[调试] ${detailUser.value.username} ${detailActiveTab.value}`,
+      { scheduledDays, leaveDays, actualAttendanceDays, totalHours },
+      list.map(i => ({
+        day: i.workDay,
+        leaveStart: i.leaveStartTime,
+        leaveEnd: i.leaveEndTime,
+        onResult: i.onDutyTimeResult,
+        offResult: i.offDutyTimeResult
+      }))
+    );
+  }
   return {
     totalHours,
-    dayCount,
-    avgHours
+    scheduledDays,
+    leaveDays,
+    actualAttendanceDays,
+    avgHours,
+    actualAvgHours
   };
 });
 
@@ -573,14 +734,19 @@ const isEarlyLeave = (time?: string, workDay?: string, item?: AttendanceDailySum
   return t.hour() < 18;
 };
 
+// 早晚都不打卡时的默认工时（小时）
+const DEFAULT_NOT_SIGNED_HOURS = 8;
+
 // 计算有效工时（扣除午休、晚餐等）。请假不参与工时计算，按打卡结果原样判定
 const calcEffectiveHours = (item: AttendanceDailySummaryDTO): number => {
-  if (!item.onDutyTime || !item.offDutyTime) return 0;
-  // 如果上下班都是未打卡，工时直接算0，不扣午休晚餐
+  // 早晚都不打卡：默认按 8 小时有效工时计，不扣午休/晚餐
   if (item.onDutyTimeResult === TimeResultEnum.NotSigned
       && item.offDutyTimeResult === TimeResultEnum.NotSigned) {
-    return 0;
+    return DEFAULT_NOT_SIGNED_HOURS;
   }
+  // 未打卡时会按默认排班时间回填，因此一般情况下 onDutyTime/offDutyTime 都有值，
+  // 此分支为防御性兜底，理论上不可达
+  if (!item.onDutyTime || !item.offDutyTime) return 0;
   const hours = Number(item.durationHours || 0) - calcDeductedHours(item);
   return Math.max(0, hours);
 };
@@ -672,6 +838,12 @@ const formatHours = (val?: number | string): string => {
   return Number(val).toFixed(2);
 };
 
+// 格式化天数：整数显示整数，小数保留1位（半天 0.5）
+const formatAttendanceDays = (val?: number): string => {
+  if (val === undefined || val === null) return "-";
+  return Math.round(val) === val ? String(val) : Number(val).toFixed(1);
+};
+
 // 是否跨年
 const isCrossYear = computed(() => {
   if (!activeMonthRange.value?.[0] || !activeMonthRange.value?.[1]) return false;
@@ -756,6 +928,15 @@ const fetchAllData = async () => {
 
 // 搜索
 const handleSearch = () => {
+  const [startMonth, endMonth] = monthRange.value;
+  if (startMonth && dayjs(startMonth + "-01").isBefore(MIN_MONTH)) {
+    ElMessage.warning("数据自 2026 年 3 月起，起始月份不能早于 2026-03");
+    return;
+  }
+  if (endMonth && dayjs(endMonth + "-01").isAfter(CURRENT_MONTH)) {
+    ElMessage.warning("结束月份不能晚于当前月");
+    return;
+  }
   activeMonthRange.value = [...monthRange.value] as [string, string];
   fetchAllData();
 };
@@ -821,23 +1002,27 @@ onMounted(async () => {
                 有效工时 = 下班打卡时间 - 上班打卡时间 - 扣除项<br />
                 <strong>扣除项 1：</strong>午休（12:15~13:15）1 小时 — 上下班时间覆盖该时段则扣除<br />
                 <strong>扣除项 2：</strong>晚餐（18:00~19:00）1 小时 — 加班标识为 true 且下班晚于 19:00 则扣除<br />
-                <strong>特殊情况：</strong>上下班均为「未打卡」时，工时直接记为 0，不扣除午休/晚餐
+                <strong>特殊情况：</strong>上下班均为「未打卡」时，默认按 <strong>8 小时</strong>有效工时计，不扣除午休/晚餐
               </span>
             </div>
             <div class="desc-item desc-highlight">
-              <span class="desc-label">平均工时</span>
+              <span class="desc-label">有效工时 / 实际工时</span>
               <span class="desc-value">
-                <strong>员工个人平均工时 =</strong> 该员工当月有效工时总和 ÷ 当月出勤天数<br />
-                <strong>部门平均工时 =</strong> 部门内每一名员工「个人平均工时」<strong>逐人相加</strong>后 ÷ 部门人数<br />
+                <strong>有效工时（列）=</strong> 当月有效工时总和 ÷ 应出勤天数（周一至周五）<br />
+                <strong>实际工时（列）=</strong> 当月有效工时总和 ÷ 实际出勤天数（应出勤 - 请假）<br />
                 <span style="color: #909399; font-size: 12px">
-                  例：某部门 A、B 两人，A 个人平均 9h、B 个人平均 7h ⇒ 部门平均 = (9+7) ÷ 2 = 8h
+                  两列分子均为有效工时总和（扣除午休/加班晚餐），仅分母不同；与「详情弹窗」月度统计口径一致
                 </span>
               </span>
             </div>
             <div class="desc-item">
-              <span class="desc-label">总工时</span>
-              <span class="desc-value">选定月份范围内，该部门/员工所有打卡天数的<strong>有效工时</strong>总和。<br />
-                部门总工时 = 部门内所有成员有效工时相加；员工总工时 = 该员工有效工时总和</span>
+              <span class="desc-label">平均 / 总工时</span>
+              <span class="desc-value">
+                <strong>该切换仅影响部门 / 分组的聚合方式：</strong><br />
+                <strong>人员行</strong>始终展示本人的「有效工时 / 实际工时」两列取值，不随切换变化。<br />
+                <strong>部门平均 =</strong> 部门内每人「有效工时 / 实际工时」取值相加 ÷ 部门人数<br />
+                <strong>部门总工时 =</strong> 部门内每人「有效工时 / 实际工时」取值相加
+              </span>
             </div>
             <div class="desc-item">
               <span class="desc-label">下钻规则</span>
@@ -852,7 +1037,7 @@ onMounted(async () => {
             </div>
             <div class="desc-item">
               <span class="desc-label">请假标识</span>
-              <span class="desc-value">详情中「请假」列仅为当天是否有<strong>请假审批</strong>的标识状态，<strong>不代表当天全天请假</strong>，不参与工时/打卡状态的计算</span>
+              <span class="desc-value">详情中「请假」列为当天是否有<strong>请假审批</strong>的标识状态（不代表当天全天请假）；同时请假区间会折算为当月<strong>请假天数</strong>，参与「实际出勤天数」与「实际工时」的计算（有效工时 ÷ 实际出勤天数）</span>
             </div>
             <div class="desc-item">
               <span class="desc-label">数据来源</span>
@@ -864,6 +1049,21 @@ onMounted(async () => {
             </div>
           </div>
         </div>
+
+        <!-- 历史数据采集范围提示（醒目） -->
+        <el-alert
+          type="warning"
+          :closable="false"
+          show-icon
+          class="history-range-alert"
+          title="历史数据采集限制（仅早期补数阶段）"
+        >
+          <template #default>
+            后续系统<strong>每日自动采集</strong>，新数据不受影响；仅在早期补数阶段，受钉钉接口限制无法采集更早历史数据：
+            <strong>打卡记录</strong>近 6 个月（约 180 天）、<strong>加班审批</strong>近 365 天（单次 120 天）、
+            <strong>请假信息</strong>近 180 天。补数时按时间窗口分段循环请求，避免漏数据。
+          </template>
+        </el-alert>
 
         <!-- 搜索筛选区域 -->
         <div class="search-section">
@@ -878,6 +1078,7 @@ onMounted(async () => {
                 end-placeholder="结束月份"
                 value-format="YYYY-MM"
                 style="width: 280px"
+                :disabled-date="disabledMonth"
               />
             </el-form-item>
             <el-form-item>
@@ -1085,14 +1286,30 @@ onMounted(async () => {
               v-for="month in monthColumns"
               :key="month"
               :label="formatMonthLabel(month)"
-              width="140"
               align="center"
-              sortable
-              :sort-method="(a: any, b: any) => Number(cellValue(a, month)) - Number(cellValue(b, month))"
             >
-              <template #default="{ row }">
-                {{ formatHours(cellValue(row, month)) }}
-              </template>
+              <el-table-column
+                label="有效工时"
+                width="90"
+                align="center"
+                sortable
+                :sort-method="(a: any, b: any) => Number(cellValue(a, month, 'effective')) - Number(cellValue(b, month, 'effective'))"
+              >
+                <template #default="{ row }">
+                  {{ formatHours(cellValue(row, month, "effective")) }}
+                </template>
+              </el-table-column>
+              <el-table-column
+                label="实际工时"
+                width="90"
+                align="center"
+                sortable
+                :sort-method="(a: any, b: any) => Number(cellValue(a, month, 'actual')) - Number(cellValue(b, month, 'actual'))"
+              >
+                <template #default="{ row }">
+                  {{ formatHours(cellValue(row, month, "actual")) }}
+                </template>
+              </el-table-column>
             </el-table-column>
             <el-table-column
               label="操作"
@@ -1174,10 +1391,13 @@ onMounted(async () => {
         </span>
         <span class="legend-item">
           <span class="text-leave">请假</span>
-          <span class="legend-text">当天有请假审批（标识，不代表全天请假）</span>
+          <span class="legend-text">当天有请假审批（标识，不代表全天请假），请假区间会折算为月请假天数，参与实际出勤天数与实际工时计算</span>
         </span>
         <span class="legend-tip">
-          总工时、平均工时均按有效工时计算（扣除午休及加班晚餐时长）
+          <span class="tip-title">统计口径（与汇总月度统计一致）：</span>
+          <span class="tip-line">有效工时（小时）＝ 有效工时总和 ÷ <strong>应出勤天数</strong></span>
+          <span class="tip-line">实际工时（小时）＝ 有效工时总和 ÷ <strong>实际出勤天数</strong>（应出勤 - 请假）</span>
+          <span class="tip-line tip-note">总工时、有效工时均按有效工时计算（扣除午休及加班晚餐时长）</span>
         </span>
       </div>
 
@@ -1189,13 +1409,23 @@ onMounted(async () => {
         </div>
         <div class="stat-divider" />
         <div class="stat-item">
-          <div class="stat-label">出勤天数</div>
-          <div class="stat-value">{{ detailMonthStats.dayCount }} 天</div>
+          <div class="stat-label">应出勤天数</div>
+          <div class="stat-value">{{ detailMonthStats.scheduledDays }} 天</div>
         </div>
         <div class="stat-divider" />
         <div class="stat-item">
-          <div class="stat-label">平均工时（小时）</div>
+          <div class="stat-label">实际出勤天数</div>
+          <div class="stat-value">{{ formatAttendanceDays(detailMonthStats.actualAttendanceDays) }} 天</div>
+        </div>
+        <div class="stat-divider" />
+        <div class="stat-item">
+          <div class="stat-label">有效工时（小时）</div>
           <div class="stat-value">{{ formatHours(detailMonthStats.avgHours) }}</div>
+        </div>
+        <div class="stat-divider" />
+        <div class="stat-item">
+          <div class="stat-label">实际工时（小时）</div>
+          <div class="stat-value">{{ formatHours(detailMonthStats.actualAvgHours) }}</div>
         </div>
       </div>
 
@@ -1213,6 +1443,11 @@ onMounted(async () => {
           width="110"
           align="center"
         />
+        <el-table-column label="有效工时" width="80" align="center">
+          <template #default="{ row }">
+            {{ formatHours(calcEffectiveHours(row)) }}
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusTagType(row)" size="small">
@@ -1220,10 +1455,13 @@ onMounted(async () => {
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="请假" width="80" align="center">
+        <el-table-column label="请假" width="140" align="center">
           <template #default="{ row }">
             <span :class="{ 'text-leave': row.leave }">
               {{ row.leave ? "请假" : "-" }}
+              <template v-if="row.leave && calcDayLeaveDays(row) > 0">
+                （扣 {{ formatLeaveDays(calcDayLeaveDays(row)) }} 天）
+              </template>
             </span>
           </template>
         </el-table-column>
@@ -1260,11 +1498,6 @@ onMounted(async () => {
             >
               {{ row.offDutyTime || "-" }}
             </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="有效工时" width="80" align="center">
-          <template #default="{ row }">
-            {{ formatHours(calcEffectiveHours(row)) }}
           </template>
         </el-table-column>
       </el-table>
@@ -1362,27 +1595,37 @@ onMounted(async () => {
 
     .desc-item {
       display: flex;
-      padding: 6px 0;
+      align-items: flex-start;
+      padding: 8px 0;
       font-size: 13px;
-      line-height: 1.6;
+      line-height: 1.7;
 
       .desc-label {
         flex-shrink: 0;
-        width: 70px;
+        min-width: 92px;
+        padding-right: 18px;
+        white-space: nowrap;
         color: #909399;
+        font-weight: 500;
       }
 
       .desc-value {
         flex: 1;
         color: #606266;
+        text-align: justify;
       }
 
       &.desc-highlight {
-        background: #ecf5ff;
-        border: 1px solid #b3d8ff;
-        border-radius: 6px;
-        padding: 10px 12px;
-        margin: 4px 0;
+        background: linear-gradient(
+          90deg,
+          rgba(64, 158, 255, 0.08),
+          rgba(64, 158, 255, 0.02)
+        );
+        border: 1px solid #d7e8ff;
+        border-left: 3px solid #409eff;
+        border-radius: 4px;
+        padding: 10px 14px;
+        margin: 8px 0;
 
         .desc-label {
           color: #409eff;
@@ -1398,6 +1641,16 @@ onMounted(async () => {
 }
 
 // 搜索筛选区域
+.history-range-alert {
+  margin-bottom: 16px;
+  border-radius: 8px;
+
+  :deep(.el-alert__content) p {
+    line-height: 1.7;
+    margin: 0;
+  }
+}
+
 .search-section {
   background: #fff;
   padding: 16px 20px;
@@ -1598,9 +1851,30 @@ onMounted(async () => {
   }
 
   .legend-tip {
+    width: 100%;
     font-size: 12px;
+    line-height: 1.8;
     color: #909399;
-    margin-left: auto;
+    margin-top: 2px;
+    padding: 8px 10px;
+    background: #f7f8fa;
+    border-radius: 6px;
+
+    .tip-title {
+      display: block;
+      font-weight: 600;
+      color: #606266;
+      margin-bottom: 2px;
+    }
+
+    .tip-line {
+      display: block;
+    }
+
+    .tip-note {
+      color: #a8abb2;
+      margin-top: 2px;
+    }
   }
 }
 

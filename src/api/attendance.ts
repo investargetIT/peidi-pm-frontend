@@ -54,6 +54,10 @@ export interface AttendanceDailySummaryDTO {
   offDutyTime?: string;
   /** 上班打卡时间 */
   onDutyTime?: string;
+  /** 请假开始时间 */
+  leaveStartTime?: string | null;
+  /** 请假结束时间 */
+  leaveEndTime?: string | null;
   /** 用户姓名 */
   username?: string;
   /** 工作日 */
