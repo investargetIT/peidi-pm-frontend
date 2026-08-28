@@ -249,7 +249,11 @@ const allPersons = computed<PersonData[]>(() => {
   // 逐人逐月补算应出勤天数与请假天数
   map.forEach((p, key) => {
     monthColumns.value.forEach(m => {
-      p.scheduledDays[m] = calcScheduledDays(m);
+      // 本月以实际数据条数为准（月中仅统计到已产生数据的日期），历史月份按整月周一~五计算
+      const isCurrentMonth = m === dayjs().format("YYYY-MM");
+      p.scheduledDays[m] = isCurrentMonth
+        ? (rawByPerson.get(key)?.[m]?.length || 0)
+        : calcScheduledDays(m);
       const items = rawByPerson.get(key)?.[m];
       p.leaveDays[m] = items && items.length ? calcLeaveDays(items, m) : 0;
     });
@@ -409,17 +413,19 @@ const viewRows = computed<ViewRow[]>(() => {
 
   // 顶层：展示一级部门，聚合其所有子部门/人员
   if (!currentDeptId.value) {
-    return deptTreeData.value.map(top => {
-      const agg = calcGroup(personsInDept(String(top.deptId)), months);
-      return {
-        type: "dept",
-        key: String(top.deptId),
-        name: top.deptName || "-",
-        deptId: top.deptId,
-        hasChildren: !!top.children?.length,
-        ...agg
-      };
-    });
+    return deptTreeData.value
+      .map(top => {
+        const agg = calcGroup(personsInDept(String(top.deptId)), months);
+        return {
+          type: "dept",
+          key: String(top.deptId),
+          name: top.deptName || "-",
+          deptId: top.deptId,
+          hasChildren: !!top.children?.length,
+          ...agg
+        };
+      })
+      .filter(row => (row.headcount || 0) > 0);
   }
 
   const node = deptIdMap.value.get(String(currentDeptId.value));
@@ -427,17 +433,20 @@ const viewRows = computed<ViewRow[]>(() => {
 
   // 有子部门：展示下一级子部门 + 当前部门的直属人员（可能存在一边挂子部门一边挂人员的混合部门）
   if (node.children?.length) {
-    const deptRows: ViewRow[] = node.children.map(child => {
-      const agg = calcGroup(personsInDept(String(child.deptId)), months);
-      return {
-        type: "dept",
-        key: String(child.deptId),
-        name: child.deptName || "-",
-        deptId: child.deptId,
-        hasChildren: !!child.children?.length,
-        ...agg
-      };
-    });
+    // 自动隐藏人数为 0 的部门（该部门无考勤数据）
+    const deptRows: ViewRow[] = node.children
+      .map(child => {
+        const agg = calcGroup(personsInDept(String(child.deptId)), months);
+        return {
+          type: "dept",
+          key: String(child.deptId),
+          name: child.deptName || "-",
+          deptId: child.deptId,
+          hasChildren: !!child.children?.length,
+          ...agg
+        };
+      })
+      .filter(row => (row.headcount || 0) > 0);
     // 当前部门的直属人员（deptId 严格等于本部门，不属于任何子部门）
     const directPersons = persons.value.filter(
       p => String(p.deptId || "") === String(node.deptId)
@@ -642,7 +651,10 @@ const detailMonthStats = computed(() => {
     (sum, item) => sum + calcEffectiveHours(item),
     0
   );
-  const scheduledDays = calcScheduledDays(detailActiveTab.value);
+  // 本月以当前表格实际数据条数为准（月中仅统计到已产生数据的日期）；
+  // 历史月份按整月周一至周五计算，避免月中按整月平均导致工时被摊薄
+  const isCurrentMonth = detailActiveTab.value === dayjs().format("YYYY-MM");
+  const scheduledDays = isCurrentMonth ? list.length : calcScheduledDays(detailActiveTab.value);
   const leaveDays = calcLeaveDays(list, detailActiveTab.value);
   const actualAttendanceDays = Math.max(0, scheduledDays - leaveDays);
   const avgHours = scheduledDays > 0 ? totalHours / scheduledDays : 0;
@@ -739,6 +751,8 @@ const DEFAULT_NOT_SIGNED_HOURS = 8;
 
 // 计算有效工时（扣除午休、晚餐等）。请假不参与工时计算，按打卡结果原样判定
 const calcEffectiveHours = (item: AttendanceDailySummaryDTO): number => {
+  // 全天请假（请假扣除满 1 天）：当天有效工时为 0
+  if (calcDayLeaveDays(item) >= 1) return 0;
   // 早晚都不打卡：默认按 8 小时有效工时计，不扣午休/晚餐
   if (item.onDutyTimeResult === TimeResultEnum.NotSigned
       && item.offDutyTimeResult === TimeResultEnum.NotSigned) {
@@ -997,21 +1011,21 @@ onMounted(async () => {
           </div>
           <div v-show="descExpanded" class="desc-content">
             <div class="desc-item desc-highlight">
-              <span class="desc-label">工时计算</span>
+              <span class="desc-label">工时计算（单日）</span>
               <span class="desc-value">
-                有效工时 = 下班打卡时间 - 上班打卡时间 - 扣除项<br />
+                <strong>当日有效工时</strong> = 下班打卡时间 - 上班打卡时间 - 扣除项<br />
                 <strong>扣除项 1：</strong>午休（12:15~13:15）1 小时 — 上下班时间覆盖该时段则扣除<br />
                 <strong>扣除项 2：</strong>晚餐（18:00~19:00）1 小时 — 加班标识为 true 且下班晚于 19:00 则扣除<br />
-                <strong>特殊情况：</strong>上下班均为「未打卡」时，默认按 <strong>8 小时</strong>有效工时计，不扣除午休/晚餐
+                <strong>特殊情况：</strong>全天请假（扣除满 1 天）时当日有效工时按 <strong>0 小时</strong>计；上下班均为「未打卡」时默认按 <strong>8 小时</strong>计，不扣除午休/晚餐
               </span>
             </div>
             <div class="desc-item desc-highlight">
               <span class="desc-label">有效工时 / 实际工时</span>
               <span class="desc-value">
-                <strong>有效工时（列）=</strong> 当月有效工时总和 ÷ 应出勤天数（周一至周五）<br />
-                <strong>实际工时（列）=</strong> 当月有效工时总和 ÷ 实际出勤天数（应出勤 - 请假）<br />
+                <strong>有效工时（列）=</strong> 当月「当日有效工时」总和 ÷ 应出勤天数（周一至周五）<br />
+                <strong>实际工时（列）=</strong> 当月「当日有效工时」总和 ÷ 实际出勤天数（应出勤 - 请假）<br />
                 <span style="color: #909399; font-size: 12px">
-                  两列分子均为有效工时总和（扣除午休/加班晚餐），仅分母不同；与「详情弹窗」月度统计口径一致
+                  两列分子均为当月各日「当日有效工时」之和（扣除午休/加班晚餐），仅分母不同；与「详情弹窗」月度统计口径一致
                 </span>
               </span>
             </div>
@@ -1037,7 +1051,7 @@ onMounted(async () => {
             </div>
             <div class="desc-item">
               <span class="desc-label">请假标识</span>
-              <span class="desc-value">详情中「请假」列为当天是否有<strong>请假审批</strong>的标识状态（不代表当天全天请假）；同时请假区间会折算为当月<strong>请假天数</strong>，参与「实际出勤天数」与「实际工时」的计算（有效工时 ÷ 实际出勤天数）</span>
+              <span class="desc-value">详情中「请假」列为当天是否有<strong>请假审批</strong>的标识状态（不代表当天全天请假）；同时请假区间会折算为当月<strong>请假天数</strong>，参与「实际出勤天数」与「实际工时」的计算（当月「当日有效工时」总和 ÷ 实际出勤天数）</span>
             </div>
             <div class="desc-item">
               <span class="desc-label">数据来源</span>
@@ -1395,9 +1409,11 @@ onMounted(async () => {
         </span>
         <span class="legend-tip">
           <span class="tip-title">统计口径（与汇总月度统计一致）：</span>
-          <span class="tip-line">有效工时（小时）＝ 有效工时总和 ÷ <strong>应出勤天数</strong></span>
-          <span class="tip-line">实际工时（小时）＝ 有效工时总和 ÷ <strong>实际出勤天数</strong>（应出勤 - 请假）</span>
-          <span class="tip-line tip-note">总工时、有效工时均按有效工时计算（扣除午休及加班晚餐时长）</span>
+          <span class="tip-line">当日有效工时＝ 打卡工时 − 午休 − 加班晚餐（单日口径）</span>
+          <span class="tip-line">有效工时（小时）＝ 当月「当日有效工时」总和 ÷ <strong>应出勤天数</strong></span>
+          <span class="tip-line">实际工时（小时）＝ 当月「当日有效工时」总和 ÷ <strong>实际出勤天数</strong>（应出勤 - 请假）</span>
+          <span class="tip-line tip-note">总工时（小时）＝ 当月「当日有效工时」之和，非打卡原始时长</span>
+          <span class="tip-line tip-note">特殊情况：全天请假（扣除满 1 天）当日有效工时按 <strong>0 小时</strong>计；上下班均未打卡默认按 <strong>8 小时</strong>计</span>
         </span>
       </div>
 
@@ -1443,11 +1459,6 @@ onMounted(async () => {
           width="110"
           align="center"
         />
-        <el-table-column label="有效工时" width="80" align="center">
-          <template #default="{ row }">
-            {{ formatHours(calcEffectiveHours(row)) }}
-          </template>
-        </el-table-column>
         <el-table-column label="状态" width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusTagType(row)" size="small">
@@ -1465,7 +1476,12 @@ onMounted(async () => {
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="原始工时" width="80" align="center">
+        <el-table-column label="当日有效工时" width="90" align="center">
+          <template #default="{ row }">
+            {{ formatHours(calcEffectiveHours(row)) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="打卡工时" width="80" align="center">
           <template #default="{ row }">
             {{ formatHours(row.durationHours) }}
           </template>
