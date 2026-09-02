@@ -205,7 +205,7 @@ interface PersonData {
   deptId?: string;
   chain: DeptNode[]; // 从顶级到所在部门的完整链路
   totalHours: Record<string, number>; // 每月有效工时总和（扣除午休/晚餐）
-  scheduledDays: Record<string, number>; // 每月应出勤天数（周一~五）
+  scheduledDays: Record<string, number>; // 每月应出勤天数（当月实际数据条数）
   leaveDays: Record<string, number>; // 每月请假天数（扣减口径，同详情弹窗）
 }
 
@@ -249,11 +249,8 @@ const allPersons = computed<PersonData[]>(() => {
   // 逐人逐月补算应出勤天数与请假天数
   map.forEach((p, key) => {
     monthColumns.value.forEach(m => {
-      // 本月以实际数据条数为准（月中仅统计到已产生数据的日期），历史月份按整月周一~五计算
-      const isCurrentMonth = m === dayjs().format("YYYY-MM");
-      p.scheduledDays[m] = isCurrentMonth
-        ? (rawByPerson.get(key)?.[m]?.length || 0)
-        : calcScheduledDays(m);
+      // 应出勤天数直接用实际数据条数（有多少条记录就算多少天）
+      p.scheduledDays[m] = rawByPerson.get(key)?.[m]?.length || 0;
       const items = rawByPerson.get(key)?.[m];
       p.leaveDays[m] = items && items.length ? calcLeaveDays(items, m) : 0;
     });
@@ -542,18 +539,6 @@ const detailMonthData = computed<AttendanceDailySummaryDTO[]>(() => {
   );
 });
 
-// 计算某月份应出勤天数（周一至周五，不含周末）
-const calcScheduledDays = (monthStr: string): number => {
-  if (!monthStr) return 0;
-  const d = dayjs(monthStr + "-01");
-  const total = d.daysInMonth();
-  let count = 0;
-  for (let i = 0; i < total; i++) {
-    const weekday = d.add(i, "day").day();
-    if (weekday >= 1 && weekday <= 5) count++;
-  }
-  return count;
-};
 
 // 计算某天请假时段覆盖的有效工时（工作时段 9:00~12:15、13:15~18:00），返回小时数
 const calcLeaveWorkHours = (
@@ -651,10 +636,8 @@ const detailMonthStats = computed(() => {
     (sum, item) => sum + calcEffectiveHours(item),
     0
   );
-  // 本月以当前表格实际数据条数为准（月中仅统计到已产生数据的日期）；
-  // 历史月份按整月周一至周五计算，避免月中按整月平均导致工时被摊薄
-  const isCurrentMonth = detailActiveTab.value === dayjs().format("YYYY-MM");
-  const scheduledDays = isCurrentMonth ? list.length : calcScheduledDays(detailActiveTab.value);
+  // 应出勤天数直接用表格实际数据条数（有多少条记录就算多少天）
+  const scheduledDays = list.length;
   const leaveDays = calcLeaveDays(list, detailActiveTab.value);
   const actualAttendanceDays = Math.max(0, scheduledDays - leaveDays);
   const avgHours = scheduledDays > 0 ? totalHours / scheduledDays : 0;
@@ -1022,7 +1005,7 @@ onMounted(async () => {
             <div class="desc-item desc-highlight">
               <span class="desc-label">有效工时 / 实际工时</span>
               <span class="desc-value">
-                <strong>有效工时（列）=</strong> 当月「当日有效工时」总和 ÷ 应出勤天数（周一至周五）<br />
+                <strong>有效工时（列）=</strong> 当月「当日有效工时」总和 ÷ 应出勤天数（当月实际数据条数）<br />
                 <strong>实际工时（列）=</strong> 当月「当日有效工时」总和 ÷ 实际出勤天数（应出勤 - 请假）<br />
                 <span style="color: #909399; font-size: 12px">
                   两列分子均为当月各日「当日有效工时」之和（扣除午休/加班晚餐），仅分母不同；与「详情弹窗」月度统计口径一致
