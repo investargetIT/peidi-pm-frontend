@@ -63,7 +63,8 @@ const getStoredIndex = (): number => {
       return config.index;
     }
   }
-  return 0;
+  // 未指定或无效的 subTab，返回 -1，由用户实际权限决定默认模块
+  return -1;
 };
 
 const getCurrentUserInfo = () => {
@@ -142,8 +143,14 @@ const hasAnyPermission = computed(() =>
 
 const setFirstPermittedComponent = () => {
   const firstPermittedIndex = componentPermissions.value.findIndex(Boolean);
+  // 没有任何有权模块
+  if (firstPermittedIndex === -1) {
+    activeIndex.value = -1;
+    return;
+  }
+  // 当前 activeIndex 无效（-1）或无权限时，自动切换到第一个有权限的模块
   if (
-    firstPermittedIndex !== -1 &&
+    activeIndex.value === -1 ||
     !componentPermissions.value[activeIndex.value]
   ) {
     activeIndex.value = firstPermittedIndex;
@@ -207,7 +214,7 @@ watch(
         activeIndex.value = config.index;
       }
     } else if (!newSubTab) {
-      activeIndex.value = 0;
+      activeIndex.value = -1;
     }
   }
 );
@@ -245,7 +252,10 @@ onMounted(() => {
         v-else-if="!hasAnyPermission"
         description="暂无可查看组件权限"
       />
-      <el-empty v-else-if="!hasCurrentPermission" description="暂无权限" />
+      <el-empty
+        v-else-if="!hasCurrentPermission"
+        description="该模块暂无访问权限，请点击上方其他模块切换"
+      />
       <template v-else>
         <div v-if="activeIndex === 0">
           <Organization />

@@ -105,13 +105,15 @@ onMounted(() => {
     // console.log("首次登录，执行初始化...");
 
     // 清除 URL 中的 firstLogin 参数，然后刷新页面
-    const newQuery = { ...route.query };
+    // 同步重写地址栏，确保 reload 时 firstLogin 一定已从 URL 清除，避免死循环
+    const newQuery = { ...(route.query as Record<string, string>) };
     delete newQuery.firstLogin;
-
-    // 使用 replace 清除参数后刷新
-    router.replace({ query: newQuery }).then(() => {
-      window.location.reload();
-    });
+    window.history.replaceState(
+      null,
+      "",
+      router.resolve({ path: "/aiDrawingApp", query: newQuery }).href
+    );
+    window.location.reload();
 
     return;
   }

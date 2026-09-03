@@ -1693,6 +1693,15 @@ onMounted(() => {
             :span-method="objectSpanMethod"
             :cell-style="tableCellStyle"
           >
+            <template #empty>
+              <div v-if="!loading" class="no-data-tip">
+                <span>暂无数据，请点击上方</span>
+                <el-button type="primary" link @click="handleSearch">
+                  查询
+                </el-button>
+                <span>试试（首次进入为自动加载，若未显示数据可手动查询）</span>
+              </div>
+            </template>
             <el-table-column label="序号" width="60" align="center">
               <template #default="{ $index }">
                 {{ getGroupIndex($index) }}
@@ -2624,6 +2633,30 @@ onMounted(() => {
 .editable-cell-disabled:hover {
   background: transparent;
   color: inherit;
+}
+
+/* 空数据提示 */
+.no-data-tip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 32px 0;
+  font-size: 14px;
+  color: #909399;
+
+  &:hover {
+    color: #606266;
+  }
+
+  .el-button {
+    font-size: 14px;
+  }
+
+  @media (max-width: 768px) {
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
 }
 
 /* 手机端输入框优化 */

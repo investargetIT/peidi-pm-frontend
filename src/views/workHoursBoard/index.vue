@@ -964,11 +964,15 @@ watch(
 onMounted(async () => {
   // 检查是否为首次登录进入，强制刷新确保全局样式正确覆盖
   if (route.query.firstLogin === "true") {
-    const newQuery = { ...route.query };
+    // 同步重写地址栏，确保 reload 时 firstLogin 一定已从 URL 清除，避免死循环
+    const newQuery = { ...(route.query as Record<string, string>) };
     delete newQuery.firstLogin;
-    router.replace({ query: newQuery }).then(() => {
-      window.location.reload();
-    });
+    window.history.replaceState(
+      null,
+      "",
+      router.resolve({ path: "/workHoursBoard", query: newQuery }).href
+    );
+    window.location.reload();
     return;
   }
 
