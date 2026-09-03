@@ -429,9 +429,11 @@ const tableData = ref([
 const handleTopicClick = row => {
   console.log("row", row, row.workers?.length);
   if (row.statusName == '已关闭') {
+    message("该任务已关闭,无法查看详情", { type: "warning" });
     return
   }
   if (!row.workers?.length) {
+    message("该任务暂无承接人,无法查看详情", { type: "warning" });
     return
   }
   taskDetailModal.value.taskDetail = row;
