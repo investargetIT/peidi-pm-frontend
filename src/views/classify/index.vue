@@ -36,6 +36,7 @@ import { useRouter, useRoute } from "vue-router";
 import CardDetail from "./cardDetail.vue";
 import CloseTask from "./closeTask.vue";
 import WorkerDetailModal from "./workerDetailModal.vue";
+import ExportTaskDialog from "./ExportTaskDialog.vue";
 
 const route = useRoute()
 ddAuthFun();
@@ -535,6 +536,10 @@ const workerDetailModalRefresh = (data) => {
   console.log('workerDetailModalRefresh', data);
   form.value.assignee = data;
 }
+const exportDialogShow = ref(false);
+const exportDialogClose = () => {
+  exportDialogShow.value = false;
+};
 </script>
 
 <template>
@@ -594,7 +599,9 @@ const workerDetailModalRefresh = (data) => {
 
           <el-col :span="10" style="text-align: right">
             <el-form-item>
-              <!-- <el-button color="#171719" type="success" icon="plus" @click="newTask">新建任务</el-button> -->
+              <el-button color="#171719" type="primary" icon="download" @click="exportDialogShow = true">
+                导出
+              </el-button>
             </el-form-item>
           </el-col>
         </el-row>
@@ -711,6 +718,7 @@ const workerDetailModalRefresh = (data) => {
     <CloseTask v-if="closeModalShow" v-model:closeModalShow="closeModalShow" :closeData="closeData"
       @refresh="getCurrentPage" />
     <WorkerDetailModal :workersData="form.assignee" @refresh="workerDetailModalRefresh" ref="workerDetailModalRef" />
+    <ExportTaskDialog v-if="exportDialogShow" @close="exportDialogClose" />
   </div>
 </template>
 
