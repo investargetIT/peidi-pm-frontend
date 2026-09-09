@@ -216,23 +216,24 @@ export const processAndExportOBMData = async (
           .reduce(sumDataValue, 0);
       } else if ((rowNumber >= 4 && rowNumber <= 32) || rowNumber === 61) {
         // 第 4-32 行：累计值计算（行号不变）
-        //#region 侯子洋 好适嘉项目累计净毛利 单独处理 取上上个月
+        //#region 侯子洋 好适嘉项目累计净毛利 单独处理 取上上个月的当月数据（单月，不累计）
         if (
           userName === "侯子洋" &&
           (examinationType === "好适嘉项目累计净毛利" ||
             examinationType === "好适嘉项目净毛利20%")
         ) {
-          valueI = targetData
-            .slice(0, findObjectByMonthIndex(targetData, previousMonth - 1) + 1)
-            .reduce(sumDataValue, 0);
+          // 例：导出8月（考核7月），上月取6月单月值，当月目标取7月单月值
+          valueI =
+            findObjectByMonthWithFirstDay(targetData, previousMonth - 1)?.value ||
+            0;
 
-          valueK = actualData
-            .slice(0, findObjectByMonthIndex(actualData, previousMonth - 1) + 1)
-            .reduce(sumDataValue, 0);
+          valueK =
+            findObjectByMonthWithFirstDay(actualData, previousMonth - 1)
+              ?.value || 0;
 
-          valueO = targetData
-            .slice(0, findObjectByMonthIndex(targetData, currentMonth - 1) + 1)
-            .reduce(sumDataValue, 0);
+          valueO =
+            findObjectByMonthWithFirstDay(targetData, currentMonth - 1)?.value ||
+            0;
         } else {
           // I 列：前 previousMonth 个月的目标值之和
           // console.log("累计", findObjectByMonthIndex(targetData, previousMonth));

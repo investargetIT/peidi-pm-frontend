@@ -1201,6 +1201,9 @@ const hrExportLoading = ref(false);
 const exportLoading = ref(false);
 const targetPerformanceExportLoading = ref(false);
 
+// 目标值口径说明弹窗（仅开发者可见，记录复杂/易遗忘的目标值计算口径）
+const calcLogicDialogVisible = ref(false);
+
 // 人事导出 - 月份选择弹窗
 const hrExportDialogVisible = ref(false);
 const hrExportSelectedMonth = ref<string>("");
@@ -1564,6 +1567,19 @@ onMounted(() => {
       <div class="section-title">快捷操作</div>
       <el-card shadow="never" class="action-card">
         <div class="action-bar">
+          <el-tooltip
+            content="查看容易遗忘的复杂目标值计算口径说明"
+            placement="top"
+          >
+            <el-button
+              v-if="isDeveloper()"
+              class="calc-logic-btn"
+              :icon="InfoFilled"
+              @click="calcLogicDialogVisible = true"
+            >
+              目标值口径说明
+            </el-button>
+          </el-tooltip>
           <el-button
             type="success"
             :loading="batchUpdating"
@@ -2141,6 +2157,59 @@ onMounted(() => {
       </template>
     </el-dialog>
 
+    <!-- 目标值口径说明对话框（仅开发者可见） -->
+    <el-dialog
+      v-model="calcLogicDialogVisible"
+      title="目标值口径说明"
+      width="760px"
+      :close-on-click-modal="false"
+      class="calc-logic-dialog"
+    >
+      <div class="calc-logic-tip">
+        <el-icon color="#409eff" style="margin-right: 6px"><InfoFilled /></el-icon>
+        以下为容易遗忘的复杂目标值计算口径，仅供掌握
+        <b>开发者权限</b>
+        的同学维护与核对
+      </div>
+
+      <div class="calc-logic-block">
+        <div class="calc-logic-title">
+          <el-tag type="danger" effect="dark" size="small">侯子洋</el-tag>
+          <span>好适嘉项目累计净毛利 / 好适嘉项目净毛利20%</span>
+        </div>
+        <div class="calc-logic-desc">
+          取 <b>上上个月</b> 的 <b>当月单月值</b>（不做累计求和）。
+          例：导出 8 月（考核 7 月）时——
+          上月目标/上月实际取 <b>6 月</b> 当月值，本月目标取 <b>7 月</b> 当月值。
+        </div>
+      </div>
+
+      <div class="calc-logic-block">
+        <div class="calc-logic-title">
+          <el-tag type="danger" effect="dark" size="small">王琳</el-tag>
+          <span>渠道累计收入（目标值）</span>
+        </div>
+        <div class="calc-logic-desc">
+          当月，<b>(王小龙 + 张震西 + 周环寰 + 范振吉 + 付阳)</b> 的
+          <b>累计月销售(GMV)达成之和</b> ＋ <b>梁钰</b> 的
+          <b>「销售收入达成率（抖音）」</b>。
+        </div>
+        <div class="calc-logic-warn">
+          ⚠️ 其中 <b>梁钰</b> 不取其个人 GMV，而是取
+          <b>「销售收入达成率（抖音）」</b> 这一指定指标计入；
+          其余 5 人取各自累计月销售(GMV)达成。
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="calcLogicDialogVisible = false">
+            知道了
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- 表格填写状态设置对话框 -->
     <el-dialog
       v-model="tableStatusDialogVisible"
@@ -2494,6 +2563,98 @@ onMounted(() => {
   background-color: #217346;
   border-color: #217346;
   color: #ffffff;
+}
+
+/* 目标值口径说明按钮 */
+.calc-logic-btn {
+  background-color: #606266;
+  border-color: #606266;
+  color: #ffffff;
+}
+
+.calc-logic-btn:hover {
+  background-color: #4e5053;
+  border-color: #4e5053;
+  color: #ffffff;
+}
+
+/* 目标值口径说明弹窗内部样式 */
+:deep(.calc-logic-dialog .el-dialog__header) {
+  text-align: center;
+  padding-bottom: 8px;
+}
+
+:deep(.calc-logic-dialog .el-dialog__title) {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.calc-logic-tip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 13px;
+  color: #909399;
+  background: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+}
+
+.calc-logic-tip b {
+  color: #606266;
+  font-weight: 600;
+}
+
+.calc-logic-block {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  background: #ffffff;
+}
+
+.calc-logic-block:last-of-type {
+  margin-bottom: 0;
+}
+
+.calc-logic-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.calc-logic-desc {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #303133;
+}
+
+.calc-logic-desc b {
+  color: #409eff;
+  font-weight: 600;
+}
+
+.calc-logic-warn {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #e6a23c;
+  background: #fff7e6;
+  border: 1px solid #ffe7ba;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.calc-logic-warn b {
+  color: #d48806;
+  font-weight: 600;
 }
 
 .excel-export-btn:hover {

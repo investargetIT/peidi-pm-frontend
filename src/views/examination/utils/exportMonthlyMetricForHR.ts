@@ -484,27 +484,28 @@ export const calculateMonthlyMetricData = async (
           (dataItem.examinationType === "好适嘉项目累计净毛利" ||
             dataItem.examinationType === "好适嘉项目净毛利20%")
         ) {
-          // 侯子洋 好适嘉项目累计净毛利 / 好适嘉项目净毛利20%：取上上个月
-          valueI = targetData
-            .slice(
-              0,
-              findObjectByMonthIndex(targetData, previousMonth - 1, curYear) + 1
-            )
-            .reduce(sumDataValue, 0);
+          // 侯子洋 好适嘉项目累计净毛利 / 好适嘉项目净毛利20%：取上上个月的当月数据（单月，不累计）
+          // 例：导出8月（考核7月），上月取6月单月值，本月目标取7月单月值
+          valueI =
+            findObjectByMonthWithFirstDay(
+              targetData,
+              previousMonth - 1,
+              curYear
+            )?.value || 0;
 
-          valueK = actualData
-            .slice(
-              0,
-              findObjectByMonthIndex(actualData, previousMonth - 1, curYear) + 1
-            )
-            .reduce(sumDataValue, 0);
+          valueK =
+            findObjectByMonthWithFirstDay(
+              actualData,
+              previousMonth - 1,
+              curYear
+            )?.value || 0;
 
-          valueO = targetData
-            .slice(
-              0,
-              findObjectByMonthIndex(targetData, curMonth - 1, curYear) + 1
-            )
-            .reduce(sumDataValue, 0);
+          valueO =
+            findObjectByMonthWithFirstDay(
+              targetData,
+              curMonth - 1,
+              curYear
+            )?.value || 0;
         } else {
           // 其他 calculationType 为 4 但没有定义逻辑的指标，不计算
           console.warn(
