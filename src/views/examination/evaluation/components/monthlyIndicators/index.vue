@@ -287,8 +287,12 @@ const tableCellStyle = ({
   let bgColor = "#ffffff";
   if (isManualRow(row) && [3, 4, 5, 6].includes(columnIndex)) {
     bgColor = "#fff3cd";
-  } else if (columnIndex === 4 && canEditRow(row)) {
-    // 目标值列在自动计算数据行也显示一个浅灰色，表示可以编辑，但只有在isEdit不为0时才显示
+  } else if (
+    columnIndex === 4 &&
+    canEditRow(row) &&
+    isDeveloper() // 目标值的「可编辑」浅灰色背景仅对开发者显示
+  ) {
+    // 目标值列在自动计算数据行也显示一个浅灰色，表示可以编辑，但只有在isEdit不为0且当前用户为开发者时才显示
     bgColor = "#f8f9fa";
   }
   return {
@@ -750,6 +754,11 @@ const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
     ElMessage.warning("当前数据已锁定，不可编辑");
     return;
   }
+  // 目标值仅开发者可编辑（即使行可见，非开发者也只能查看）
+  if (field === "target" && !isDeveloper()) {
+    ElMessage.warning("仅开发者可编辑目标值");
+    return;
+  }
   // 目标值可以随时编辑，完成值只有手填数据才可以编辑
   if (field === "achieved" && !isManualRow(row)) {
     ElMessage.warning("只有手填数据的完成值才可以修改");
@@ -817,6 +826,12 @@ const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
   // 如果isEdit为0，绝对不能编辑
   if (!canEditRow(row)) {
     ElMessage.warning("当前数据已锁定，不可编辑");
+    cancelEdit();
+    return;
+  }
+  // 目标值仅开发者可编辑（即使行可见，非开发者也只能查看）
+  if (field === "target" && !isDeveloper()) {
+    ElMessage.warning("仅开发者可编辑目标值");
     cancelEdit();
     return;
   }
@@ -1768,21 +1783,26 @@ onMounted(() => {
                   v-else
                   v-loading="isSaving(row, 'target')"
                   class="editable-cell"
-                  :class="{ 'editable-cell-disabled': !canEditRow(row) }"
+                  :class="{
+                    'editable-cell-disabled':
+                      !canEditRow(row) || !isDeveloper()
+                  }"
                   :title="
-                    canEditRow(row)
-                      ? isMobile
-                        ? '点击进入编辑（需确认）'
-                        : '双击修改'
-                      : '已锁定，不可编辑'
+                    !isDeveloper()
+                      ? '仅开发者可编辑目标值'
+                      : canEditRow(row)
+                        ? isMobile
+                          ? '点击进入编辑（需确认）'
+                          : '双击修改'
+                        : '已锁定，不可编辑'
                   "
                   @dblclick="
-                    !isMobile && canEditRow(row)
+                    !isMobile && canEditRow(row) && isDeveloper()
                       ? startEdit(row, 'target')
                       : undefined
                   "
                   @click="
-                    isMobile && canEditRow(row)
+                    isMobile && canEditRow(row) && isDeveloper()
                       ? handleCellClick(row, 'target')
                       : undefined
                   "
