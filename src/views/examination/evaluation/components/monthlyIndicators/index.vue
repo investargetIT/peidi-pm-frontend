@@ -205,7 +205,8 @@ const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
   方云: ["侯子洋", "王琳", "张洪亮", "黄向前"],
   付阳: ["黄文豪"],
   范振吉: ["邓苏", "孙舒欣", "潘明旺"],
-  黄向前: ["李源泰"]
+  黄向前: ["李源泰"],
+  毛若羽: ["毛若羽"]
 };
 const DEPARTMENT_LIST = [
   { name: "零食", deptId: 992836831 },
@@ -1700,6 +1701,12 @@ onMounted(() => {
             >黄色背景行为手填数据，浅灰色背景的目标值可随时编辑</span
           >
         </div>
+        <div class="table-tip table-tip-rate">
+          <el-tag size="small" type="info" effect="light">完成率说明</el-tag>
+          <span class="tip-text"
+            >表格中的「完成率」仅为界面速查（完成值 ÷ 目标值 × 100%），并非最终考核结果；最终结果请以「人事导出」Excel 中的计算逻辑为准。该列仅供检查是否有异常数据（如 100000% 这类离谱值）</span
+          >
+        </div>
         <!-- 黄向前的特殊通知 -->
         <div v-if="showHuangNotice" class="huang-notice">
           <el-icon color="#409eff" style="margin-right: 8px; font-size: 18px"
@@ -2538,6 +2545,16 @@ onMounted(() => {
   background-color: #fff3cd;
   border: 1px solid #ffc107;
   border-radius: 4px;
+}
+
+.table-tip-rate {
+  margin-top: 8px;
+  background-color: #ecf5ff;
+  border-color: #409eff;
+}
+
+.table-tip-rate .tip-text {
+  color: #409eff;
 }
 
 .tip-text {
