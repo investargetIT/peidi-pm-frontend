@@ -201,7 +201,7 @@ const DEVELOPER_USER_IDS = [
 ];
 const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
   邓苏: ["邓苏", "王永蝶", "夏立明", "潘明旺", "缪欣瑶"],
-  孙舒欣: ["孙舒欣"],
+  孙舒欣: ["孙舒欣", "毛若羽"],
   方云: ["侯子洋", "王琳", "张洪亮", "黄向前"],
   付阳: ["黄文豪"],
   范振吉: ["邓苏", "孙舒欣", "潘明旺"],
@@ -253,7 +253,7 @@ const getDefaultMonth = () =>
 
 // 搜索条件
 const searchParams = ref({
-  username: "",
+  usernames: [] as string[],
   treePathName: "",
   startDate: getDefaultMonth(),
   dataType: "" // ""全部/ "manual"手填/ "auto"自动计算
@@ -303,28 +303,39 @@ const tableCellStyle = ({
   };
 };
 
-const queryUserSuggestions = (queryString: string, cb: any) => {
-  let results = queryString
-    ? userList.value.filter((user: any) => {
-        const username = user.username || "";
-        const lowerQuery = queryString.toLowerCase();
+// 负责人多选下拉的可选项（支持用户名/拼音过滤）
+const filteredUserOptions = ref<any[]>([]);
 
-        // 直接匹配用户名
-        if (username.toLowerCase().includes(lowerQuery)) {
-          return true;
-        }
+const filterUsernameMethod = (queryString: string) => {
+  if (!queryString) {
+    filteredUserOptions.value = userList.value;
+    return;
+  }
+  const lowerQuery = queryString.toLowerCase();
+  filteredUserOptions.value = userList.value.filter((user: any) => {
+    const username = user.username || "";
 
-        // 使用 pinyin-pro 的 match 函数进行拼音匹配
-        try {
-          const matchResult = match(username, lowerQuery);
-          return matchResult && matchResult.length > 0;
-        } catch (e) {
-          console.error("拼音匹配错误:", e);
-          return false;
-        }
-      })
-    : userList.value;
-  cb(results.map((user: any) => ({ value: user.username })));
+    // 直接匹配用户名
+    if (username.toLowerCase().includes(lowerQuery)) {
+      return true;
+    }
+
+    // 使用 pinyin-pro 的 match 函数进行拼音匹配
+    try {
+      const matchResult = match(username, lowerQuery);
+      return matchResult && matchResult.length > 0;
+    } catch (e) {
+      console.error("拼音匹配错误:", e);
+      return false;
+    }
+  });
+};
+
+// 下拉展开时重置为全量选项，避免残留上次的过滤结果
+const handleUsernameVisibleChange = (visible: boolean) => {
+  if (visible) {
+    filteredUserOptions.value = userList.value;
+  }
 };
 
 const fetchUserList = async () => {
@@ -336,6 +347,7 @@ const fetchUserList = async () => {
       userList.value = res.data.sort((a: any, b: any) =>
         (a.username || "").localeCompare(b.username || "", "zh-CN")
       );
+      filteredUserOptions.value = userList.value;
     }
   } catch (error) {
     console.error("获取用户列表失败", error);
@@ -468,7 +480,6 @@ const fetchData = async () => {
   loading.value = true;
   try {
     const res = (await getPmKpiMonthMetricTargetPage({
-      username: searchParams.value.username || undefined,
       treePathName: searchParams.value.treePathName || undefined,
       startDate: searchParams.value.startDate || undefined,
       endDate: searchParams.value.startDate || undefined,
@@ -488,6 +499,18 @@ const fetchData = async () => {
             usernameSet.has(String(record.username || "").trim())
           )
         : allRecords.value;
+
+      // 再按负责人多选过滤（支持同时筛选多个负责人）
+      const selectedUsernameSet = new Set(
+        searchParams.value.usernames
+          .map(name => String(name || "").trim())
+          .filter(Boolean)
+      );
+      if (selectedUsernameSet.size > 0) {
+        filteredByPermission = filteredByPermission.filter(record =>
+          selectedUsernameSet.has(String(record.username || "").trim())
+        );
+      }
 
       // 再根据数据类型过滤
       visibleRecords.value = filteredByPermission
@@ -583,7 +606,7 @@ const handleSearch = () => {
 
 const handleReset = () => {
   searchParams.value = {
-    username: "",
+    usernames: [],
     treePathName: "",
     startDate: getDefaultMonth(),
     dataType: ""
@@ -990,6 +1013,13 @@ const handleExport = async () => {
     // 收集12个月的数据
     const allYearRecords: ApiRecordItem[] = [];
 
+    // 负责人多选筛选条件（客户端过滤）
+    const selectedUsernameSet = new Set(
+      searchParams.value.usernames
+        .map(name => String(name || "").trim())
+        .filter(Boolean)
+    );
+
     // 循环请求12个月的数据
     for (let month = 1; month <= 12; month++) {
       const monthDate = dayjs(`${currentYear}-${month}-01`).format(
@@ -997,7 +1027,6 @@ const handleExport = async () => {
       );
 
       const res = (await getPmKpiMonthMetricTargetPage({
-        username: searchParams.value.username || undefined,
         treePathName: searchParams.value.treePathName || undefined,
         startDate: monthDate,
         endDate: monthDate,
@@ -1006,7 +1035,13 @@ const handleExport = async () => {
       })) as ApiResponse;
 
       if (res?.success && res?.data?.records?.length) {
-        allYearRecords.push(...res.data.records);
+        const records =
+          selectedUsernameSet.size > 0
+            ? res.data.records.filter(record =>
+                selectedUsernameSet.has(String(record.username || "").trim())
+              )
+            : res.data.records;
+        allYearRecords.push(...records);
       }
     }
 
@@ -1516,14 +1551,26 @@ onMounted(() => {
       <el-card shadow="never" class="search-card">
         <el-form :model="searchParams" inline size="default">
           <el-form-item label="负责人">
-            <el-autocomplete
-              v-model="searchParams.username"
-              :fetch-suggestions="queryUserSuggestions"
-              placeholder="请输入负责人"
+            <el-select
+              v-model="searchParams.usernames"
+              multiple
+              filterable
               clearable
-              style="width: 200px"
-              :trigger-on-focus="true"
-            />
+              collapse-tags
+              collapse-tags-tooltip
+              :max-collapse-tags="2"
+              :filter-method="filterUsernameMethod"
+              placeholder="请输入负责人（可多选）"
+              style="width: 260px"
+              @visible-change="handleUsernameVisibleChange"
+            >
+              <el-option
+                v-for="user in filteredUserOptions"
+                :key="user.username"
+                :label="user.username"
+                :value="user.username"
+              />
+            </el-select>
           </el-form-item>
           <el-form-item label="组织路径">
             <el-input
@@ -1698,7 +1745,7 @@ onMounted(() => {
         <div class="table-tip">
           <el-tag size="small" type="warning" effect="light">提示</el-tag>
           <span class="tip-text"
-            >黄色背景行为手填数据，浅灰色背景的目标值可随时编辑</span
+            >黄色背景行为手填数据，浅灰色背景的目标值可随时编辑。备注：王琳每个月的「本月目标」和「次月目标」都一样，因此「次月目标」无参考价值</span
           >
         </div>
         <div class="table-tip table-tip-rate">
