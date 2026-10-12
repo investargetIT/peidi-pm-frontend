@@ -338,6 +338,11 @@ const handleUsernameVisibleChange = (visible: boolean) => {
   }
 };
 
+// 选中/移除后输入框关键字已被清空，同步把选项列表恢复为全量，保持一致
+const handleUsernameChange = () => {
+  filteredUserOptions.value = userList.value;
+};
+
 const fetchUserList = async () => {
   if (userList.value.length || userLoading.value) return;
   userLoading.value = true;
@@ -1559,9 +1564,11 @@ onMounted(() => {
               collapse-tags
               collapse-tags-tooltip
               :max-collapse-tags="2"
+              :reserve-keyword="false"
               :filter-method="filterUsernameMethod"
               placeholder="请输入负责人（可多选）"
               style="width: 260px"
+              @change="handleUsernameChange"
               @visible-change="handleUsernameVisibleChange"
             >
               <el-option
