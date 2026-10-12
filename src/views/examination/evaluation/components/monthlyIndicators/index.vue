@@ -282,19 +282,14 @@ const tableCellStyle = ({
   row: RecordItem;
   columnIndex: number;
 }) => {
-  // 目标值列(4)总是可以编辑，所以在手填数据行显示黄色背景，在自动计算行也可以有浅背景色
+  // 目标值(4)不分手填/自动计算，未锁定即可编辑：手填行显示黄色背景，自动计算行显示浅灰背景
   // 完成值(5)、完成率(6)只在手填数据行显示黄色背景
   // 黄色背景只和isManualRow关联，不受isEdit影响
-  // 浅灰色背景(目标值可编辑)受isEdit影响
   let bgColor = "#ffffff";
   if (isManualRow(row) && [3, 4, 5, 6].includes(columnIndex)) {
     bgColor = "#fff3cd";
-  } else if (
-    columnIndex === 4 &&
-    canEditRow(row) &&
-    isDeveloper() // 目标值的「可编辑」浅灰色背景仅对开发者显示
-  ) {
-    // 目标值列在自动计算数据行也显示一个浅灰色，表示可以编辑，但只有在isEdit不为0且当前用户为开发者时才显示
+  } else if (columnIndex === 4 && canEditRow(row)) {
+    // 目标值列在自动计算数据行也显示浅灰色，表示未锁定即可编辑
     bgColor = "#f8f9fa";
   }
   return {
@@ -784,12 +779,8 @@ const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
     ElMessage.warning("当前数据已锁定，不可编辑");
     return;
   }
-  // 目标值仅开发者可编辑（即使行可见，非开发者也只能查看）
-  if (field === "target" && !isDeveloper()) {
-    ElMessage.warning("仅开发者可编辑目标值");
-    return;
-  }
-  // 目标值可以随时编辑，完成值只有手填数据才可以编辑
+  // 目标值：不分手填/自动计算，未锁定即可编辑
+  // 完成值：只有手填数据才可以编辑（自动计算数据不可修改）
   if (field === "achieved" && !isManualRow(row)) {
     ElMessage.warning("只有手填数据的完成值才可以修改");
     return;
@@ -859,13 +850,8 @@ const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
     cancelEdit();
     return;
   }
-  // 目标值仅开发者可编辑（即使行可见，非开发者也只能查看）
-  if (field === "target" && !isDeveloper()) {
-    ElMessage.warning("仅开发者可编辑目标值");
-    cancelEdit();
-    return;
-  }
-  // 目标值可以随时编辑，完成值只有手填数据才可以编辑
+  // 目标值：不分手填/自动计算，未锁定即可编辑
+  // 完成值：只有手填数据才可以编辑（自动计算数据不可修改）
   if (field === "achieved" && !isManualRow(row)) {
     ElMessage.warning("只有手填数据的完成值才可以修改");
     cancelEdit();
@@ -1752,7 +1738,7 @@ onMounted(() => {
         <div class="table-tip">
           <el-tag size="small" type="warning" effect="light">提示</el-tag>
           <span class="tip-text"
-            >黄色背景行为手填数据，浅灰色背景的目标值可随时编辑。备注：王琳每个月的「本月目标」和「次月目标」都一样，因此「次月目标」无参考价值</span
+            >黄色背景行为手填数据；目标值不分手填/自动计算，未锁定即可编辑（自动计算行显示浅灰背景），完成值仅手填数据可编辑。备注：王琳每个月的「本月目标」和「次月目标」都一样，因此「次月目标」无参考价值</span
           >
         </div>
         <div class="table-tip table-tip-rate">
@@ -1846,25 +1832,22 @@ onMounted(() => {
                   v-loading="isSaving(row, 'target')"
                   class="editable-cell"
                   :class="{
-                    'editable-cell-disabled':
-                      !canEditRow(row) || !isDeveloper()
+                    'editable-cell-disabled': !canEditRow(row)
                   }"
                   :title="
-                    !isDeveloper()
-                      ? '仅开发者可编辑目标值'
-                      : canEditRow(row)
-                        ? isMobile
-                          ? '点击进入编辑（需确认）'
-                          : '双击修改'
-                        : '已锁定，不可编辑'
+                    !canEditRow(row)
+                      ? '已锁定，不可编辑'
+                      : isMobile
+                        ? '点击进入编辑（需确认）'
+                        : '双击修改'
                   "
                   @dblclick="
-                    !isMobile && canEditRow(row) && isDeveloper()
+                    !isMobile && canEditRow(row)
                       ? startEdit(row, 'target')
                       : undefined
                   "
                   @click="
-                    isMobile && canEditRow(row) && isDeveloper()
+                    isMobile && canEditRow(row)
                       ? handleCellClick(row, 'target')
                       : undefined
                   "

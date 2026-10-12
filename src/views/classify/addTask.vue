@@ -604,6 +604,9 @@ const workTypeChange = (val = false) => {
 };
 const workContentChange = () => {
   let item = workContentList.value.find(item => item.id == newTaskData.value.workContentId)
+  // 每次切换工作内容先清空下载按钮，避免选中“无附件”内容后仍残留上一项
+  downloadFileName.value = [];
+  if (!item) return;
   if (item.id && item.priority) {
     contentPrii = Number(item.priority);
 
