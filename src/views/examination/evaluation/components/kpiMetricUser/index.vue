@@ -62,6 +62,12 @@ interface FlatRow {
   userIndex: number;
   metric: MetricItem | null;
   notifyUserList?: number[];
+  rowKey: string;
+}
+
+interface GenerateTarget {
+  userId: number;
+  username: string;
 }
 
 interface ApiResponse {
@@ -120,7 +126,10 @@ const generateDialogVisible = ref(false);
 const generateLoading = ref(false);
 const generateMonths = ref<string[]>([]);
 const selectedMonths = ref<string[]>([]);
-const currentGenerateUser = ref<FlatRow | null>(null);
+const generateTargets = ref<GenerateTarget[]>([]);
+
+// 表格勾选（多人批量生成）
+const selectedUsers = ref<GenerateTarget[]>([]);
 
 // 添加月份
 const addMonths = () => {
@@ -236,14 +245,15 @@ const flatTableData = computed<FlatRow[]>(() => {
         isFirst: index === 0,
         userIndex: visibleUserIndex,
         metric,
-        notifyUserList: notifyList
+        notifyUserList: notifyList,
+        rowKey: `${record.userId}_${index}`
       });
     });
   });
   return result;
 });
 
-// 合并单元格规则：序号、工号、用户名、考核组、通知人、操作 按用户合并；计算类型不合并
+// 合并单元格规则：勾选框、序号、工号、用户名、考核组、通知人、操作 按用户合并；计算类型不合并
 const spanMethod = ({
   row,
   columnIndex
@@ -251,13 +261,27 @@ const spanMethod = ({
   row: FlatRow;
   columnIndex: number;
 }) => {
-  if ([0, 1, 2, 3, 10, 11].includes(columnIndex)) {
+  if ([0, 1, 2, 3, 4, 11, 12].includes(columnIndex)) {
     if (row.isFirst) {
       return { rowspan: row.rowSpan, colspan: 1 };
     }
     return { rowspan: 0, colspan: 0 };
   }
   return { rowspan: 1, colspan: 1 };
+};
+
+// 只有每个用户分组的首行（isFirst）可勾选，避免同一用户重复勾选
+const selectable = (row: FlatRow) => row.isFirst;
+
+// 表格勾选变化：按 userId 去重后记录选中的用户
+const handleSelectionChange = (rows: FlatRow[]) => {
+  const map = new Map<number, GenerateTarget>();
+  rows.forEach(row => {
+    if (!map.has(row.userId)) {
+      map.set(row.userId, { userId: row.userId, username: row.username });
+    }
+  });
+  selectedUsers.value = Array.from(map.values());
 };
 
 // 搜索条件
@@ -464,8 +488,8 @@ const isManualRow = (row: FlatRow): boolean => {
 
 // 表格单元格样式
 const tableCellStyle = ({ row, columnIndex }: { row: FlatRow; columnIndex: number }) => {
-  // 前4列（序号、工号、用户名、考核组）、通知人、操作列保持白色
-  if (columnIndex < 4 || [10, 11].includes(columnIndex)) {
+  // 勾选框、前4列（序号、工号、用户名、考核组）、通知人、操作列保持白色
+  if (columnIndex < 5 || [11, 12].includes(columnIndex)) {
     return {
       backgroundColor: '#ffffff',
       '--el-table-cell-hover-bg-color': '#ffffff'
@@ -502,21 +526,38 @@ const handleDelete = (row: FlatRow) => {
   }).catch(() => {});
 };
 
+// 单人：点击操作列日历图标
 const handleOpenGenerateDialog = (row: FlatRow) => {
-  currentGenerateUser.value = row;
+  generateTargets.value = [{ userId: row.userId, username: row.username }];
   generateMonths.value = [];
+  selectedMonths.value = [];
+  generateDialogVisible.value = true;
+};
+
+// 多人：点击顶部「批量生成指标数据」按钮
+const handleOpenBatchGenerateDialog = () => {
+  if (!selectedUsers.value.length) {
+    ElMessage.warning("请先勾选需要生成指标数据的用户");
+    return;
+  }
+  generateTargets.value = [...selectedUsers.value];
+  generateMonths.value = [];
+  selectedMonths.value = [];
   generateDialogVisible.value = true;
 };
 
 const handleGenerate = () => {
-  if (!currentGenerateUser.value) return;
+  if (!generateTargets.value.length) return;
   if (generateMonths.value.length === 0) {
     ElMessage.warning("请选择至少一个月份");
     return;
   }
 
+  const isBatch = generateTargets.value.length > 1;
+  const names = generateTargets.value.map(u => u.username).join("、");
+
   ElMessageBox.confirm(
-    `确定为用户「${currentGenerateUser.value.username}」生成${generateMonths.value.join('、')}的指标数据？`,
+    `确定为用户「${names}」生成${generateMonths.value.join('、')}的指标数据？`,
     "生成确认",
     {
       confirmButtonText: "确定",
@@ -525,23 +566,38 @@ const handleGenerate = () => {
     }
   ).then(async () => {
     generateLoading.value = true;
-    try {
-      const res = await generateKpiMonthMetricTargetByUserId({
-        userId: currentGenerateUser.value.userId,
-        months: generateMonths.value
-      }) as any;
-      if (res?.code === 200 || res?.success) {
-        ElMessage.success("生成成功");
-        generateDialogVisible.value = false;
-        fetchData();
-      } else {
-        ElMessage.error(res?.msg || "生成失败");
+    const successUsers: string[] = [];
+    const failUsers: string[] = [];
+    // 方案一：前端循环调用单人接口，逐个生成
+    for (const user of generateTargets.value) {
+      try {
+        const res = await generateKpiMonthMetricTargetByUserId({
+          userId: user.userId,
+          months: generateMonths.value
+        }) as any;
+        if (res?.code === 200 || res?.success) {
+          successUsers.push(user.username);
+        } else {
+          console.error(`用户 ${user.username} 生成失败：`, res?.msg);
+          failUsers.push(user.username);
+        }
+      } catch (error) {
+        console.error(`用户 ${user.username} 生成失败`, error);
+        failUsers.push(user.username);
       }
-    } catch (error) {
-      console.error("生成失败", error);
-      ElMessage.error("生成失败");
-    } finally {
-      generateLoading.value = false;
+    }
+    generateLoading.value = false;
+
+    if (!failUsers.length) {
+      ElMessage.success(isBatch ? `批量生成成功（${successUsers.length}人）` : "生成成功");
+      generateDialogVisible.value = false;
+      fetchData();
+    } else if (successUsers.length) {
+      ElMessage.warning(`部分生成成功：成功 ${successUsers.length} 人，失败 ${failUsers.length} 人（${failUsers.join("、")}）`);
+      generateDialogVisible.value = false;
+      fetchData();
+    } else {
+      ElMessage.error(`生成失败：${failUsers.join("、")}`);
     }
   }).catch(() => {});
 };
@@ -574,12 +630,24 @@ onMounted(() => {
         </el-form-item>
       </el-form>
 
-      <el-button type="primary" @click="handleAdd">
-        <template #icon>
-          <IconifyIconOffline :icon="RiAddLine" />
-        </template>
-        新增
-      </el-button>
+      <div class="action-buttons">
+        <el-button
+          type="success"
+          :disabled="!selectedUsers.length"
+          @click="handleOpenBatchGenerateDialog"
+        >
+          <template #icon>
+            <IconifyIconOffline :icon="RiCalendarEventLine" />
+          </template>
+          批量生成指标数据{{ selectedUsers.length ? `（${selectedUsers.length}）` : "" }}
+        </el-button>
+        <el-button type="primary" @click="handleAdd">
+          <template #icon>
+            <IconifyIconOffline :icon="RiAddLine" />
+          </template>
+          新增
+        </el-button>
+      </div>
     </div>
 
     <!-- 表格区域 -->
@@ -614,9 +682,17 @@ onMounted(() => {
           :span-method="spanMethod"
           :cell-style="tableCellStyle"
           :highlight-current-row="false"
+          row-key="rowKey"
           border
           class="kpi-table"
+          @selection-change="handleSelectionChange"
         >
+        <el-table-column
+          type="selection"
+          :selectable="selectable"
+          width="50"
+          align="center"
+        />
         <el-table-column label="序号" width="60" align="center">
           <template #default="{ row }">
             {{ row.isFirst ? row.userIndex : "" }}
@@ -759,10 +835,21 @@ onMounted(() => {
       <el-form :model="{}" label-position="top">
         <el-form-item label="选择用户">
           <el-input
-            :value="currentGenerateUser?.username"
+            v-if="generateTargets.length === 1"
+            :value="generateTargets[0]?.username"
             disabled
             placeholder="选择用户"
           />
+          <div v-else class="target-users">
+            <el-tag
+              v-for="user in generateTargets"
+              :key="user.userId"
+              size="small"
+              style="margin: 2px"
+            >
+              {{ user.username }}
+            </el-tag>
+          </div>
         </el-form-item>
         <el-form-item label="添加月份">
           <div class="month-selector">
@@ -857,6 +944,24 @@ onMounted(() => {
   margin-bottom: 0;
 }
 
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.target-users {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 4px 8px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
 
 /* 移动端搜索表单优化 */
 @media (max-width: 768px) {
@@ -891,8 +996,12 @@ onMounted(() => {
     align-items: stretch;
     gap: 12px;
 
-    > .el-button {
+    .action-buttons {
       width: 100%;
+
+      > .el-button {
+        flex: 1;
+      }
     }
   }
 }
