@@ -284,47 +284,99 @@ const handleSelectionChange = (rows: FlatRow[]) => {
   selectedUsers.value = Array.from(map.values());
 };
 
-// 搜索条件
+// 搜索条件（用户名为多选）
 const searchParams = ref({
-  username: ""
+  usernames: [] as string[]
 });
 
-const queryUserSuggestions = (queryString: string, cb: any) => {
-  let results = queryString
-    ? userList.value.filter((user: any) => {
-        const username = user.username || "";
-        const lowerQuery = queryString.toLowerCase();
+// 用户名多选下拉的可选项（支持用户名/拼音过滤）
+const filteredUserOptions = ref<UserItem[]>([]);
 
-        // 直接匹配
-        if (username.toLowerCase().includes(lowerQuery)) {
-          return true;
-        }
+const filterUsernameMethod = (queryString: string) => {
+  if (!queryString) {
+    filteredUserOptions.value = userList.value;
+    return;
+  }
+  const lowerQuery = queryString.toLowerCase();
+  filteredUserOptions.value = userList.value.filter((user: UserItem) => {
+    const username = user.username || "";
 
-        // 拼音匹配
-        try {
-          const matchResult = match(username, lowerQuery);
-          return matchResult && matchResult.length > 0;
-        } catch (e) {
-          console.error("拼音匹配错误:", e);
-          return false;
-        }
-      })
-    : userList.value;
-  cb(results.map((user: any) => ({ value: user.username })));
+    // 直接匹配用户名
+    if (username.toLowerCase().includes(lowerQuery)) {
+      return true;
+    }
+
+    // 拼音匹配
+    try {
+      const matchResult = match(username, lowerQuery);
+      return matchResult && matchResult.length > 0;
+    } catch (e) {
+      console.error("拼音匹配错误:", e);
+      return false;
+    }
+  });
+};
+
+// 下拉展开时重置为全量选项，避免残留上次的过滤结果
+const handleUsernameVisibleChange = (visible: boolean) => {
+  if (visible) {
+    filteredUserOptions.value = userList.value;
+  }
+};
+
+// 选中/移除后输入框关键字已被清空，同步把选项列表恢复为全量，保持一致
+const handleUsernameChange = () => {
+  filteredUserOptions.value = userList.value;
+};
+
+const ALL_PAGE_SIZE = 99999;
+
+// 全部KPI指标用户数据（不含用户名多选过滤，供前端筛选后再分页）
+const allRecords = ref<RecordItem[]>([]);
+// 经过用户名多选过滤后的数据
+const filteredRecords = ref<RecordItem[]>([]);
+
+// 按当前页/每页条数从过滤后的数据中截取表格数据（前端分页）
+const updateTableDataByPage = () => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  const end = start + pageSize.value;
+  tableData.value = filteredRecords.value.slice(start, end);
+};
+
+// 依据选中的用户名（多选）在已加载的全量数据上筛选，并重置分页
+const applyUsernameFilter = () => {
+  const selectedSet = new Set(
+    searchParams.value.usernames
+      .map(name => String(name || "").trim())
+      .filter(Boolean)
+  );
+  filteredRecords.value = selectedSet.size
+    ? allRecords.value.filter(record =>
+        selectedSet.has(String(record.username || "").trim())
+      )
+    : allRecords.value;
+
+  total.value = filteredRecords.value.length;
+
+  // 过滤后当前页可能越界，回退到最后一页
+  const maxPage = Math.max(1, Math.ceil(total.value / pageSize.value));
+  if (currentPage.value > maxPage) {
+    currentPage.value = maxPage;
+  }
+
+  updateTableDataByPage();
 };
 
 const fetchData = async () => {
   loading.value = true;
   try {
+    // 一次性拉取全部数据，用户名多选在前端筛选，再做前端分页
     const res = (await getPmKpiMetricUserPage({
-      username: searchParams.value.username || undefined,
-      pageNo: currentPage.value,
-      pageSize: pageSize.value
+      pageNo: 1,
+      pageSize: ALL_PAGE_SIZE
     })) as ApiResponse;
-    if (res.success && res.data) {
-      tableData.value = res.data.records;
-      total.value = res.data.total;
-    }
+    allRecords.value = res.success && res.data ? res.data.records || [] : [];
+    applyUsernameFilter();
   } catch (error) {
     console.error("获取KPI指标用户数据失败", error);
   } finally {
@@ -339,7 +391,7 @@ const handleSearch = () => {
 
 const handleReset = () => {
   searchParams.value = {
-    username: ""
+    usernames: []
   };
   currentPage.value = 1;
   fetchData();
@@ -347,13 +399,14 @@ const handleReset = () => {
 
 const handleCurrentChange = (page: number) => {
   currentPage.value = page;
-  fetchData();
+  // 前端分页：直接截取当前页数据，无需重新请求
+  updateTableDataByPage();
 };
 
 const handleSizeChange = (size: number) => {
   pageSize.value = size;
   currentPage.value = 1;
-  fetchData();
+  updateTableDataByPage();
 };
 
 const handleEdit = (row: FlatRow) => {
@@ -379,6 +432,8 @@ const fetchUserList = async () => {
       userList.value = res.data.sort((a: UserItem, b: UserItem) =>
         (a.username || "").localeCompare(b.username || "", "zh-CN")
       );
+      // 同步初始化多选下拉选项
+      filteredUserOptions.value = userList.value;
     }
   } catch (error) {
     console.error("获取用户列表失败", error);
@@ -615,14 +670,28 @@ onMounted(() => {
     <div class="search-section">
       <el-form :model="searchParams" inline size="default">
         <el-form-item label="用户名">
-          <el-autocomplete
-            v-model="searchParams.username"
-            :fetch-suggestions="queryUserSuggestions"
-            placeholder="请输入用户名"
+          <el-select
+            v-model="searchParams.usernames"
+            multiple
+            filterable
             clearable
-            style="width: 200px"
-            :trigger-on-focus="true"
-          />
+            collapse-tags
+            collapse-tags-tooltip
+            :max-collapse-tags="2"
+            :reserve-keyword="false"
+            :filter-method="filterUsernameMethod"
+            placeholder="请输入用户名（可多选）"
+            style="width: 260px"
+            @change="handleUsernameChange"
+            @visible-change="handleUsernameVisibleChange"
+          >
+            <el-option
+              v-for="user in filteredUserOptions"
+              :key="user.id"
+              :label="user.username"
+              :value="user.username"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
@@ -984,7 +1053,7 @@ onMounted(() => {
       }
     }
 
-    :deep(.el-autocomplete),
+    :deep(.el-select),
     :deep(.el-input) {
       width: 100% !important;
     }
@@ -1104,7 +1173,7 @@ onMounted(() => {
       width: 100%;
     }
 
-    :deep(.el-autocomplete),
+    :deep(.el-select),
     :deep(.el-input) {
       width: 100% !important;
     }
