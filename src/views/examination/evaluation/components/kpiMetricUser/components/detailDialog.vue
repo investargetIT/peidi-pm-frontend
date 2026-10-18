@@ -291,7 +291,8 @@ const buildMetricsByNode = (
       rate: config.rate || "",
       nodeId: nodeConfig.nodeId || 0,
       nodeName: nodeConfig.nodeName || "",
-      status: oldMetric?.status ?? 1,
+      // 新增用户时指标状态默认关闭(0)，编辑切换考核组时保持原默认(1)
+      status: oldMetric?.status ?? (props.mode === "add" ? 0 : 1),
       sqlExecConfig,
       otherConfig: Object.keys(newConfig).length > 0 ? JSON.stringify(newConfig) : null
     };
