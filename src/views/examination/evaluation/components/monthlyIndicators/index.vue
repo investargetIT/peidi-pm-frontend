@@ -206,7 +206,15 @@ const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
   付阳: ["黄文豪"],
   范振吉: ["邓苏", "孙舒欣", "潘明旺"],
   黄向前: ["李源泰"],
-  毛若羽: ["毛若羽"]
+  毛若羽: ["毛若羽"],
+  方林霞: ["方林霞"]
+};
+// 「代理」配置：key 用户可继承 value 中列出的用户对月度指标的完整可见范围
+// 场景：某人需要填写另一个人能填的人，无需把对方名单抄一遍；
+//      若对方是部门负责人，其部门成员由钉钉接口实时返回，人员增减会自动跟随。
+// 支持链式代理（A 代理 B、B 代理 C），内部用 visited 防环。
+const PROXY_VISIBLE_FROM_USERNAME_MAP: Record<string, string[]> = {
+  方林霞: ["梁钰"] // 方林霞继承梁钰（抖音电商组负责人）的全部可见人员
 };
 const DEPARTMENT_LIST = [
   { name: "零食", deptId: 992836831 },
@@ -393,6 +401,30 @@ const showHuangNotice = computed(() => {
   return isHuang && isTargetMonth;
 });
 
+// 计算某个用户名「自身」的可见范围（不含代理）：手动名单 ∪ 作为部门负责人可见的部门成员
+const computeSelfVisibleSet = (
+  username: string,
+  deptResponses: Array<DingDepartmentUsersResponse | null>
+) => {
+  const set = new Set<string>(MANUAL_VISIBLE_USERNAME_MAP[username] || []);
+
+  deptResponses.forEach(res => {
+    if (!res?.success || !res.data?.list?.length) return;
+
+    const currentUser = res.data.list.find(
+      user => String(user.name || "").trim() === username
+    );
+    if (currentUser?.leader) {
+      res.data.list.forEach(user => {
+        const name = String(user.name || "").trim();
+        if (name) set.add(name);
+      });
+    }
+  });
+
+  return set;
+};
+
 const fetchVisibleUsernameSet = async () => {
   if (isDeveloper()) return null;
 
@@ -408,23 +440,20 @@ const fetchVisibleUsernameSet = async () => {
     )
   )) as Array<DingDepartmentUsersResponse | null>;
 
-  const usernameSet = new Set<string>(
-    MANUAL_VISIBLE_USERNAME_MAP[currentUsername] || []
-  );
+  const usernameSet = new Set<string>();
+  const visited = new Set<string>();
 
-  responses.forEach(res => {
-    if (!res?.success || !res.data?.list?.length) return;
-
-    const currentUser = res.data.list.find(
-      user => String(user.name || "").trim() === currentUsername
+  // 收集 username 自身范围，再递归收集其代理对象的范围（visited 防环）
+  const collect = (username: string) => {
+    if (!username || visited.has(username)) return;
+    visited.add(username);
+    computeSelfVisibleSet(username, responses).forEach(name =>
+      usernameSet.add(name)
     );
-    if (currentUser?.leader) {
-      res.data.list.forEach(user => {
-        const username = String(user.name || "").trim();
-        if (username) usernameSet.add(username);
-      });
-    }
-  });
+    (PROXY_VISIBLE_FROM_USERNAME_MAP[username] || []).forEach(collect);
+  };
+
+  collect(currentUsername);
 
   return usernameSet;
 };
@@ -1744,7 +1773,10 @@ onMounted(() => {
         <div class="table-tip table-tip-rate">
           <el-tag size="small" type="info" effect="light">完成率说明</el-tag>
           <span class="tip-text"
-            >表格中的「完成率」仅为界面速查（完成值 ÷ 目标值 × 100%），并非最终考核结果；最终结果请以「人事导出」Excel 中的计算逻辑为准。该列仅供检查是否有异常数据（如 100000% 这类离谱值）</span
+            >表格中的「完成率」仅为界面速查（完成值 ÷ 目标值 ×
+            100%），并非最终考核结果；最终结果请以「人事导出」Excel
+            中的计算逻辑为准。该列仅供检查是否有异常数据（如 100000%
+            这类离谱值）</span
           >
         </div>
         <!-- 黄向前的特殊通知 -->
@@ -2231,7 +2263,9 @@ onMounted(() => {
       class="calc-logic-dialog"
     >
       <div class="calc-logic-tip">
-        <el-icon color="#409eff" style="margin-right: 6px"><InfoFilled /></el-icon>
+        <el-icon color="#409eff" style="margin-right: 6px"
+          ><InfoFilled
+        /></el-icon>
         以下为容易遗忘的复杂目标值计算口径，仅供掌握
         <b>开发者权限</b>
         的同学维护与核对
@@ -2243,9 +2277,9 @@ onMounted(() => {
           <span>好适嘉项目累计净毛利 / 好适嘉项目净毛利20%</span>
         </div>
         <div class="calc-logic-desc">
-          取 <b>上上个月</b> 的 <b>当月单月值</b>（不做累计求和）。
-          例：导出 8 月（考核 7 月）时——
-          上月目标/上月实际取 <b>6 月</b> 当月值，本月目标取 <b>7 月</b> 当月值。
+          取 <b>上上个月</b> 的 <b>当月单月值</b>（不做累计求和）。 例：导出 8
+          月（考核 7 月）时—— 上月目标/上月实际取 <b>6 月</b> 当月值，本月目标取
+          <b>7 月</b> 当月值。
         </div>
       </div>
 
@@ -2261,8 +2295,8 @@ onMounted(() => {
         </div>
         <div class="calc-logic-warn">
           ⚠️ 其中 <b>梁钰</b> 不取其个人 GMV，而是取
-          <b>「销售收入达成率（抖音）」</b> 这一指定指标计入；
-          其余 5 人取各自累计月销售(GMV)达成。
+          <b>「销售收入达成率（抖音）」</b> 这一指定指标计入； 其余 5
+          人取各自累计月销售(GMV)达成。
         </div>
       </div>
 
