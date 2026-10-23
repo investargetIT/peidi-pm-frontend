@@ -29,16 +29,16 @@ interface MonthData {
 /**
  * 模板文件名（放在 public/Examination/ 目录下）
  */
-const TEMPLATE_FILE_NAME = "2026年季度GMV目标模板_202607241622.xlsx";
+const TEMPLATE_FILE_NAME = "2026年季度GMV目标模板_202610231201.xlsx";
 
 /**
- * 需要拉取的月份（Q3: 7月、8月、9月）
- * 对应模板中的列：E列=7月, F列=8月, G列=9月
+ * 需要拉取的月份（Q4: 10月、11月、12月）
+ * 对应模板中的列：E列=10月, F列=11月, G列=12月
  */
 const MONTH_CONFIG = [
-  { month: 7, column: 5 }, // E列 = 7月
-  { month: 8, column: 6 }, // F列 = 8月
-  { month: 9, column: 7 }  // G列 = 9月
+  { month: 10, column: 5 }, // E列 = 10月
+  { month: 11, column: 6 }, // F列 = 11月
+  { month: 12, column: 7 }  // G列 = 12月
 ];
 
 /**
@@ -160,7 +160,7 @@ const fetchAllMonthData = async (): Promise<Map<string, Record<string, MonthData
  * 流程：
  * 1. 读取 public/Examination/ 下的模板文件
  * 2. 解析模板中每个人的姓名（C列）和数据库指标名称（I列）
- * 3. 调用 /pm/kpi-month-metric-target/page 接口拉取 Q3（7-9月）数据
+ * 3. 调用 /pm/kpi-month-metric-target/page 接口拉取 Q4（10-12月）数据
  * 4. 按 (username + targetName) 匹配，将 target 填入对应月份列
  * 5. 导出为新 Excel 文件
  */
@@ -215,7 +215,7 @@ export const exportTargetPerformance = async () => {
         continue;
       }
 
-      // 填充 7月、8月、9月 的 target 值
+      // 填充 10月、11月、12月 的 target 值
       for (const { month, column } of MONTH_CONFIG) {
         const data = monthData[month.toString()];
         if (data) {
@@ -236,13 +236,14 @@ export const exportTargetPerformance = async () => {
     }
 
     // 5. 生成并下载
-    // exceljs 有 bug：load → writeBuffer 会吞掉 numFmt 里的转义符（如 \. 变成 .）
-    // 此处用 JSZip 后处理 styles.xml，把被破坏的格式修回去
+    // exceljs 有 bug：load → writeBuffer 会破坏部分 XML，此处用 JSZip 后处理修回去
     let buffer = await workbook.xlsx.writeBuffer();
 
-    // 用 JSZip 修补被 exceljs 破坏的数字格式
     try {
       const zip = await JSZip.loadAsync(buffer);
+      let patched = false;
+
+      // 5.1 修复被 exceljs 吞掉转义符的数字格式（如 \. 变成 .）
       const stylesXml = await zip.file("xl/styles.xml")?.async("string");
       if (stylesXml) {
         // 原始模板 numFmt 是 0\.0,"万"（反斜杠转义小数点，配合千分逗号缩放）
@@ -255,13 +256,37 @@ export const exportTargetPerformance = async () => {
         );
         if (fixedXml !== stylesXml) {
           zip.file("xl/styles.xml", fixedXml);
-          buffer = await zip.generateAsync({ type: "arraybuffer" });
+          patched = true;
           console.log("🔧 已修复数字格式编码（0\\.0,\"万\"）");
         }
       }
+
+      // 5.2 删除空的 conditionalFormatting 标签
+      // 模板的隐藏工作表里存在「重复值」条件格式，exceljs 读取后会丢失 cfRule，
+      // 写出 <conditionalFormatting sqref="..."/>（无子节点），不符合 OOXML 规范，
+      // Excel 打开时会提示“有 XML 错误的 /xl/worksheets/sheetN.xml”并修复。
+      for (const name of Object.keys(zip.files)) {
+        if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) continue;
+
+        const sheetXml = await zip.file(name)?.async("string");
+        if (!sheetXml) continue;
+
+        const fixedXml = sheetXml
+          .replace(/\s*<conditionalFormatting\b[^>]*\/>/g, "")
+          .replace(/\s*<conditionalFormatting\b[^>]*>\s*<\/conditionalFormatting>/g, "");
+        if (fixedXml !== sheetXml) {
+          zip.file(name, fixedXml);
+          patched = true;
+          console.log(`🔧 已清理 ${name} 中的空 conditionalFormatting 标签`);
+        }
+      }
+
+      if (patched) {
+        buffer = await zip.generateAsync({ type: "arraybuffer" });
+      }
     } catch (patchError) {
       // 修补失败不阻止下载，只用 console 警告
-      console.warn("⚠️ 数字格式修补失败，显示可能异常:", patchError);
+      console.warn("⚠️ XML 修补失败，导出的 Excel 可能提示修复:", patchError);
     }
 
     const blob = new Blob([buffer], {
