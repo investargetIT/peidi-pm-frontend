@@ -29,7 +29,7 @@ interface MonthData {
 /**
  * 模板文件名（放在 public/Examination/ 目录下）
  */
-const TEMPLATE_FILE_NAME = "2026年季度GMV目标模板_202610231201.xlsx";
+const TEMPLATE_FILE_NAME = "2026年季度GMV目标模板_202610281542.xlsx";
 
 /**
  * 需要拉取的月份（Q4: 10月、11月、12月）

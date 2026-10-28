@@ -1,0 +1,41 @@
+packages:
+  - "."
+
+# 以下配置原位于 package.json 的 "pnpm" 字段和 .npmrc 中，
+# pnpm 11+ 起统一迁移到 pnpm-workspace.yaml（.npmrc 仅保留 registry/auth）
+
+# 允许使用的废弃版本告警豁免
+allowedDeprecatedVersions:
+  are-we-there-yet: "*"
+  sourcemap-codec: "*"
+  domexception: "*"
+  w3c-hr-time: "*"
+  inflight: "*"
+  npmlog: "*"
+  rimraf: "*"
+  stable: "*"
+  gauge: "*"
+  abab: "*"
+  glob: "*"
+
+# peer 依赖规则
+peerDependencyRules:
+  allowedVersions:
+    eslint: "9"
+
+# 依赖覆盖
+overrides:
+  "@modelcontextprotocol/sdk": "^1.25.1"
+
+# 允许执行安装脚本的依赖（由 pnpm approve-builds 生成）
+allowBuilds:
+  "@parcel/watcher": true
+  canvas: true
+  esbuild: true
+  vue-demi: true
+
+# 原 .npmrc 配置
+shellEmulator: true
+shamefullyHoist: true
+enablePrePostScripts: false
+strictPeerDependencies: false
