@@ -37,6 +37,20 @@ const treeRef = ref<TreeInstance>();
 const searchKeyword = ref("");
 const tooltipShowAfter = 800;
 
+// 记录已展开的节点 id，数据刷新（新增/删除节点）后回填给树的 default-expanded-keys
+// 以保持当前展开状态
+const expandedKeys = ref<number[]>([]);
+
+const handleNodeExpand = (data: TreeNode) => {
+  if (!expandedKeys.value.includes(data.id)) {
+    expandedKeys.value = [...expandedKeys.value, data.id];
+  }
+};
+
+const handleNodeCollapse = (data: TreeNode) => {
+  expandedKeys.value = expandedKeys.value.filter(id => id !== data.id);
+};
+
 const getNodeTypeLabel = (type: string) => {
   const map: Record<string, string> = {
     department: "部门",
@@ -146,9 +160,13 @@ const getNodeUsedUserCount = (node: TreeNode): number => {
         :show-checkbox="false"
         node-key="id"
         :default-expand-all="false"
+        :default-expanded-keys="expandedKeys"
+        :auto-expand-parent="false"
         :expand-on-click-node="false"
         :props="{ label: 'nodeName' }"
         :filter-node-method="filterNode"
+        @node-expand="handleNodeExpand"
+        @node-collapse="handleNodeCollapse"
         @node-click="data => emit('node-click', data)"
       >
         <template #default="{ node, data }">
