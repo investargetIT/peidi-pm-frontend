@@ -214,7 +214,7 @@ const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
 //      若对方是部门负责人，其部门成员由钉钉接口实时返回，人员增减会自动跟随。
 // 支持链式代理（A 代理 B、B 代理 C），内部用 visited 防环。
 const PROXY_VISIBLE_FROM_USERNAME_MAP: Record<string, string[]> = {
-  方林霞: ["梁钰"] // 方林霞继承梁钰（抖音电商组负责人）的全部可见人员
+  梁钰: ["方林霞"] // 梁钰 = 抖音商务（自己负责人）∪ 方林霞负责的抖音电商组
 };
 const DEPARTMENT_LIST = [
   { name: "零食", deptId: 992836831 },
@@ -222,6 +222,7 @@ const DEPARTMENT_LIST = [
   { name: "京东业务单元", deptId: 854710068 },
   { name: "运营支持", deptId: 1062696513 },
   { name: "抖音电商组", deptId: 854033863 },
+  { name: "抖音商务", deptId: 1126674073 },
   { name: "内容创作运营支持组", deptId: 1062707956 },
   { name: "销售一组", deptId: 854405501 },
   { name: "销售二组", deptId: 854421521 },
