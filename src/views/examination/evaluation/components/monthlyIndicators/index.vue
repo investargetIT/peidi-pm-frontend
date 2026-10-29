@@ -202,7 +202,16 @@ const DEVELOPER_USER_IDS = [
 const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
   邓苏: ["邓苏", "王永蝶", "夏立明", "潘明旺", "缪欣瑶"],
   孙舒欣: ["孙舒欣", "毛若羽"],
-  方云: ["侯子洋", "王琳", "张洪亮", "黄向前"],
+  方云: [
+    "侯子洋",
+    "王琳",
+    "张洪亮",
+    "黄向前",
+    "段英姿",
+    "俞梦秋",
+    "季节",
+    "蒙炳如"
+  ],
   付阳: ["黄文豪"],
   范振吉: ["邓苏", "孙舒欣", "潘明旺"],
   黄向前: ["李源泰"],
@@ -214,7 +223,8 @@ const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
 //      若对方是部门负责人，其部门成员由钉钉接口实时返回，人员增减会自动跟随。
 // 支持链式代理（A 代理 B、B 代理 C），内部用 visited 防环。
 const PROXY_VISIBLE_FROM_USERNAME_MAP: Record<string, string[]> = {
-  梁钰: ["方林霞"] // 梁钰 = 抖音商务（自己负责人）∪ 方林霞负责的抖音电商组
+  // 例：梁钰: ["方林霞"] // 梁钰 = 抖音商务（自己负责人）∪ 方林霞负责的抖音电商组
+  // 2026-10-29：梁钰不再继承方林霞的可见范围，已移除；需要恢复时把上面那行取消注释
 };
 const DEPARTMENT_LIST = [
   { name: "零食", deptId: 992836831 },
