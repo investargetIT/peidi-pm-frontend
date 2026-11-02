@@ -216,7 +216,8 @@ const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
   范振吉: ["邓苏", "孙舒欣", "潘明旺", "毛若羽"],
   黄向前: ["李源泰", "蒙炳如"],
   毛若羽: ["毛若羽"],
-  方林霞: ["方林霞"]
+  方林霞: ["方林霞"],
+  刘天然: ["刘天然"]
 };
 // 「代理」配置：key 用户可继承 value 中列出的用户对月度指标的完整可见范围
 // 场景：某人需要填写另一个人能填的人，无需把对方名单抄一遍；
@@ -1569,7 +1570,8 @@ watch(
 );
 
 onMounted(() => {
-  fetchData();
+  // 首次进入不自动加载数据，需手动点击「查询」；
+  // 这里只预取负责人下拉列表，避免下拉选项为空。
   fetchUserList();
 });
 </script>
@@ -1821,7 +1823,7 @@ onMounted(() => {
                 <el-button type="primary" link @click="handleSearch">
                   查询
                 </el-button>
-                <span>试试（首次进入为自动加载，若未显示数据可手动查询）</span>
+                <span>按钮加载数据（首次进入不会自动加载）</span>
               </div>
             </template>
             <el-table-column label="序号" width="60" align="center">
