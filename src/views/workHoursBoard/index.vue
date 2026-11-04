@@ -584,6 +584,18 @@ const formatLeaveDays = (days: number): string => {
   return Number.isInteger(days) ? `${days}` : days.toFixed(1);
 };
 
+// 临时补丁：2026 年国庆假期（10/1~10/7）按非工作日处理，不参与请假天数折算。
+// 跨假期的请假区间（如 9/30~10/8）在钉钉上是一段连续时间，展开时不能把假期算成请假。
+const TEMP_HOLIDAY_DAYS = new Set([
+  "2026-10-01",
+  "2026-10-02",
+  "2026-10-03",
+  "2026-10-04",
+  "2026-10-05",
+  "2026-10-06",
+  "2026-10-07"
+]);
+
 // 计算该月实际请假天数
 // 注意：后端会把整段请假区间（如 2026-07-13 ~ 2026-08-13）复制到每一天的记录上，
 // 所以不能按"每条记录各自展开区间"累计（会导致重复虚增）。这里合并成真实请假区间后再按覆盖工作日统计。
@@ -616,7 +628,13 @@ const calcLeaveDays = (list: AttendanceDailySummaryDTO[], monthStr: string): num
     while (cur.isBefore(last) || cur.isSame(last, "day")) {
       const dayKey = cur.format("YYYY-MM-DD");
       const weekday = cur.day();
-      if (dayKey.startsWith(monthStr) && weekday >= 1 && weekday <= 5 && !seenDays.has(dayKey)) {
+      if (
+        dayKey.startsWith(monthStr) &&
+        weekday >= 1 &&
+        weekday <= 5 &&
+        !TEMP_HOLIDAY_DAYS.has(dayKey) &&
+        !seenDays.has(dayKey)
+      ) {
         seenDays.add(dayKey);
         const s = start.isBefore(cur) ? cur : start;
         const e = end.isAfter(cur.endOf("day")) ? cur.endOf("day") : end;
@@ -1115,6 +1133,7 @@ onMounted(async () => {
                   collapse-tags
                   collapse-tags-tooltip
                   clearable
+                  :reserve-keyword="false"
                   size="small"
                   style="width: 240px; margin-right: 12px"
                 >
