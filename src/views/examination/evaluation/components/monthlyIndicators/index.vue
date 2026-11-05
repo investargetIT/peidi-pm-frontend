@@ -15,7 +15,11 @@ import {
   processAndExportMonthlyMetricForHR,
   calculateMonthlyMetricData
 } from "@/views/examination/utils/exportMonthlyMetricForHR";
-import { exportTargetPerformance } from "@/views/examination/utils/exportTargetPerformance";
+import {
+  exportTargetPerformance,
+  EXPORT_SCOPE_LABEL,
+  SIGNED_FILE_LABEL
+} from "@/views/examination/utils/exportTargetPerformance";
 import { ElMessage, ElMessageBox, ElCheckbox } from "element-plus";
 import {
   Download,
@@ -207,6 +211,8 @@ const MANUAL_VISIBLE_USERNAME_MAP: Record<string, string[]> = {
     "王琳",
     "张洪亮",
     "黄向前",
+    "梁钰",
+    "方林霞",
     "段英姿",
     "俞梦秋",
     "季节",
@@ -1366,15 +1372,58 @@ const handleExportTargetPerformance = async () => {
     return;
   }
 
+  // 导出前说明：本次仅导出 Q4，且 ZIP 内含两个文件
+  try {
+    await ElMessageBox.confirm(
+      `<div style="line-height: 1.8; font-size: 13px; text-align: left;">
+        <p style="margin: 0 0 10px; font-size: 14px;">
+          即将导出 <b style="color: #e6a23c;">${EXPORT_SCOPE_LABEL}</b> 的目标绩效数据。
+        </p>
+        <p style="margin: 0 0 6px;">导出内容为 <b>ZIP 压缩包</b>，包含 <b>2 个文件</b>：</p>
+        <ol style="margin: 0 0 10px; padding-left: 18px;">
+          <li style="margin-bottom: 6px;">
+            <b>目标绩效结果表</b>：按<b>系统当前目标值</b>填充生成，反映系统口径；
+          </li>
+          <li>
+            <b>${SIGNED_FILE_LABEL}</b>：领导确认的 2026 年度 Q4 前台渠道 GMV 目标
+            <b>原始签字版文件</b>，原样附带，未做任何修改。
+          </li>
+        </ol>
+        <p style="margin: 0; color: #909399;">
+          请以签字版为最终确认口径；如两个文件的目标值存在差异，请先核对系统数据。
+        </p>
+      </div>`,
+      "导出目标绩效结果表",
+      {
+        confirmButtonText: "确认导出",
+        cancelButtonText: "取消",
+        type: "warning",
+        dangerouslyUseHTMLString: true,
+        customClass: "target-performance-export-dialog"
+      }
+    );
+  } catch {
+    // 用户取消，不做任何操作
+    return;
+  }
+
   try {
     targetPerformanceExportLoading.value = true;
     const result = await exportTargetPerformance();
-    ElMessage.success(
-      `导出目标绩效结果表成功，共填充 ${result.filledCount} 行` +
-        (result.unmatchedCount > 0
-          ? `，${result.unmatchedCount} 行未匹配（详见控制台）`
-          : "")
-    );
+
+    const baseMsg =
+      `导出成功（${EXPORT_SCOPE_LABEL}），共填充 ${result.filledCount} 行` +
+      (result.unmatchedCount > 0
+        ? `，${result.unmatchedCount} 行未匹配（详见控制台）`
+        : "");
+
+    if (result.signedFileIncluded) {
+      ElMessage.success(`${baseMsg}，ZIP 已包含签字版文件`);
+    } else {
+      ElMessage.warning(
+        `${baseMsg}，但签字版文件读取失败，ZIP 中仅包含系统数据表（${result.signedFileError}）`
+      );
+    }
   } catch (error) {
     console.error("导出目标绩效结果表失败:", error);
     const errorMsg =
@@ -1756,7 +1805,7 @@ onMounted(() => {
               </el-button>
             </el-tooltip>
             <el-tooltip
-              content="读取季度GMV目标模板，按姓名和指标名称匹配填充目标值后导出"
+              content="导出 Q4（10-12月）目标绩效：ZIP 内含「按系统目标值生成的结果表」和「领导确认的签字版目标文件」"
               placement="top"
             >
               <el-button
@@ -2304,12 +2353,36 @@ onMounted(() => {
         <div class="calc-logic-desc">
           当月，<b>(王小龙 + 张震西 + 周环寰 + 范振吉 + 付阳)</b> 的
           <b>累计月销售(GMV)达成之和</b> ＋ <b>梁钰</b> 的
-          <b>「销售收入达成率（抖音）」</b>。
+          <b>「渠道全年累计销售收入GMV」</b>。
         </div>
         <div class="calc-logic-warn">
           ⚠️ 其中 <b>梁钰</b> 不取其个人 GMV，而是取
-          <b>「销售收入达成率（抖音）」</b> 这一指定指标计入； 其余 5
-          人取各自累计月销售(GMV)达成。
+          <b>「渠道全年累计销售收入GMV」</b> 计入（该值口径见下方「黄向前 / 梁钰 /
+          方林霞」说明）； 其余 5 人取各自累计月销售(GMV)达成。
+        </div>
+      </div>
+
+      <div class="calc-logic-block">
+        <div class="calc-logic-title">
+          <el-tag type="danger" effect="dark" size="small">黄向前</el-tag>
+          <el-tag type="danger" effect="dark" size="small">梁钰</el-tag>
+          <el-tag type="danger" effect="dark" size="small">方林霞</el-tag>
+          <span>渠道全年累计销售收入GMV</span>
+        </div>
+        <div class="calc-logic-desc">
+          三人该项指标<b>数值完全相同</b>，计算逻辑为以下三项
+          <b>月度目标达成率</b>之和：
+          <ol class="calc-logic-list">
+            <li><b>梁钰</b>的<b>达播销售收入</b>月度目标达成率</li>
+            <li>
+              <b>黄向前</b>的<b>商品卡 + 短视频（自营）销售收入</b>月度目标达成率
+            </li>
+            <li><b>方林霞</b>的<b>自播间销售收入</b>月度目标达成率</li>
+          </ol>
+        </div>
+        <div class="calc-logic-warn">
+          ⚠️ 即：渠道全年累计销售收入GMV = 达播达成率 ＋ 商品卡&短视频（自营）达成率
+          ＋ 自播间达成率。三人共用同一结果，<b>不是</b>各自 GMV 的累计求和，也不是各自独立的数值。
         </div>
       </div>
 
@@ -2763,6 +2836,20 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.calc-logic-list {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  list-style: decimal;
+
+  li {
+    line-height: 1.8;
+
+    & + li {
+      margin-top: 2px;
+    }
+  }
+}
+
 .calc-logic-warn {
   margin-top: 8px;
   font-size: 13px;
@@ -3043,6 +3130,20 @@ onMounted(() => {
         margin-left: 0 !important;
       }
     }
+  }
+}
+
+/* 目标绩效结果表导出说明弹窗（ElMessageBox 挂载在 body 上，需用 :global） */
+:global(.target-performance-export-dialog) {
+  width: 520px;
+  max-width: 92vw;
+
+  .el-message-box__message {
+    line-height: 1.8;
+  }
+
+  ol {
+    list-style: decimal;
   }
 }
 

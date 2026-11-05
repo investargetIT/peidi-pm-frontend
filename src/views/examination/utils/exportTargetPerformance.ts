@@ -29,7 +29,13 @@ interface MonthData {
 /**
  * 模板文件名（放在 public/Examination/ 目录下）
  */
-const TEMPLATE_FILE_NAME = "2026年季度GMV目标模板_202610281542.xlsx";
+const TEMPLATE_FILE_NAME = "2026年季度GMV目标模板_202611051627.xlsx";
+
+/**
+ * 领导确认的签字版目标文件（放在 public/Examination/ 目录下）
+ * 打包时会原样放入 ZIP，不做任何修改
+ */
+const SIGNED_FILE_NAME = "2026年Q4季度GMV目标（签字版).xlsx";
 
 /**
  * 需要拉取的月份（Q4: 10月、11月、12月）
@@ -45,6 +51,13 @@ const MONTH_CONFIG = [
  * 数据年份
  */
 const DATA_YEAR = 2026;
+
+/**
+ * 导出范围说明（供页面提示文案使用，避免文案与配置不一致）
+ */
+export const EXPORT_SCOPE_LABEL = `${DATA_YEAR} 年 Q4（10月、11月、12月）`;
+
+export const SIGNED_FILE_LABEL = SIGNED_FILE_NAME;
 
 //#endregion
 
@@ -155,6 +168,20 @@ const fetchAllMonthData = async (): Promise<Map<string, Record<string, MonthData
 //#region 导出主函数
 
 /**
+ * 读取 public/Examination/ 下的静态文件
+ */
+const fetchStaticFile = async (fileName: string): Promise<ArrayBuffer> => {
+  const filePath = `/Examination/${fileName}`;
+  console.log(`📄 读取文件: ${filePath}`);
+
+  const response = await fetch(filePath);
+  if (!response.ok) {
+    throw new Error(`无法访问文件：${fileName}（HTTP ${response.status}）`);
+  }
+  return response.arrayBuffer();
+};
+
+/**
  * 导出目标绩效结果表
  *
  * 流程：
@@ -162,20 +189,12 @@ const fetchAllMonthData = async (): Promise<Map<string, Record<string, MonthData
  * 2. 解析模板中每个人的姓名（C列）和数据库指标名称（I列）
  * 3. 调用 /pm/kpi-month-metric-target/page 接口拉取 Q4（10-12月）数据
  * 4. 按 (username + targetName) 匹配，将 target 填入对应月份列
- * 5. 导出为新 Excel 文件
+ * 5. 与领导确认的签字版目标文件一起打包成 ZIP 导出
  */
 export const exportTargetPerformance = async () => {
   try {
     // 1. 读取模板
-    const filePath = `/Examination/${TEMPLATE_FILE_NAME}`;
-    console.log(`📄 读取模板文件: ${filePath}`);
-
-    const response = await fetch(filePath);
-    if (!response.ok) {
-      throw new Error(`无法访问模板文件：${TEMPLATE_FILE_NAME}（HTTP ${response.status}）`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
+    const arrayBuffer = await fetchStaticFile(TEMPLATE_FILE_NAME);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(arrayBuffer);
 
@@ -235,7 +254,7 @@ export const exportTargetPerformance = async () => {
       console.warn(`⚠️ 未匹配到数据的行 (${unmatchedRows.length}):`, unmatchedRows);
     }
 
-    // 5. 生成并下载
+    // 5. 生成系统口径 Excel
     // exceljs 有 bug：load → writeBuffer 会破坏部分 XML，此处用 JSZip 后处理修回去
     let buffer = await workbook.xlsx.writeBuffer();
 
@@ -289,21 +308,46 @@ export const exportTargetPerformance = async () => {
       console.warn("⚠️ XML 修补失败，导出的 Excel 可能提示修复:", patchError);
     }
 
-    const blob = new Blob([buffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    // 6. 打包下载：系统口径表 + 领导确认的签字版文件（原样放入，不做修改）
+    const now = dayjs().format("YYYYMMDDHHmmss");
+    const systemFileName = `目标绩效结果表_${now}.xlsx`;
+
+    const packageZip = new JSZip();
+    packageZip.file(systemFileName, buffer);
+
+    let signedFileIncluded = false;
+    let signedFileError = "";
+    try {
+      const signedBuffer = await fetchStaticFile(SIGNED_FILE_NAME);
+      packageZip.file(SIGNED_FILE_NAME, signedBuffer);
+      signedFileIncluded = true;
+      console.log(`📎 已加入签字版文件: ${SIGNED_FILE_NAME}`);
+    } catch (error) {
+      // 签字版读取失败不阻断系统口径表的导出
+      signedFileError = error instanceof Error ? error.message : "未知错误";
+      console.warn("⚠️ 签字版文件读取失败，ZIP 中仅包含系统口径表:", error);
+    }
+
+    const zipBuffer = await packageZip.generateAsync({
+      type: "arraybuffer",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 }
     });
 
-    const now = dayjs().format("YYYYMMDDHHmmss");
-    const outputFileName = `目标绩效结果表_${now}.xlsx`;
-    saveAs(blob, outputFileName);
+    const zipFileName = `目标绩效结果表_Q4_${now}.zip`;
+    saveAs(new Blob([zipBuffer], { type: "application/zip" }), zipFileName);
 
-    console.log(`🎉 导出成功: ${outputFileName}`);
+    console.log(`🎉 导出成功: ${zipFileName}`);
 
     return {
       success: true,
       filledCount,
       unmatchedCount: unmatchedRows.length,
-      unmatchedRows
+      unmatchedRows,
+      signedFileIncluded,
+      signedFileError,
+      zipFileName,
+      systemFileName
     };
   } catch (error) {
     console.error("❌ 导出目标绩效结果表失败:", error);
