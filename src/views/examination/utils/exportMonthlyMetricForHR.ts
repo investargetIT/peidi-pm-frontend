@@ -161,6 +161,38 @@ const applyReferenceMetricRules = (items: any[]) => {
   });
 };
 
+// 临时排除规则：按「考核月份」排除指定用户的全部数据（格式 YYYY-MM）
+// 例：刘天然 2026 年 10 月无数据，但年度结果接口仍会返回其指标，临时从人事导出中排除
+const TEMPORARY_EXCLUDED_USERS_BY_ASSESSED_MONTH: Record<string, string[]> = {
+  刘天然: ["2026-10"]
+};
+
+// 获取考核月份（导出月份的上一个月），如导出 2026-11 → 考核 2026-10
+const getAssessedMonthKey = (year: number, exportMonth: number) =>
+  dayjs(`${year}-${exportMonth}-01`).subtract(1, "month").format("YYYY-MM");
+
+// 按临时规则过滤原始数据
+const filterTemporaryExcludedRecords = <T extends { username?: string }>(
+  records: T[],
+  year: number,
+  exportMonth: number
+): T[] => {
+  const assessedMonth = getAssessedMonthKey(year, exportMonth);
+  const filtered = records.filter(record => {
+    const username = String(record.username || "").trim();
+    const excludedMonths = TEMPORARY_EXCLUDED_USERS_BY_ASSESSED_MONTH[username];
+    return !excludedMonths?.includes(assessedMonth);
+  });
+
+  if (filtered.length !== records.length) {
+    console.log(
+      `[月度指标导出] 临时规则：已排除 ${assessedMonth} 的 ${records.length - filtered.length} 条数据`
+    );
+  }
+
+  return filtered;
+};
+
 interface MonthlyMetricOtherConfig {
   calculationType?: number;
   notifyUserList?: Array<number | string>;
@@ -486,11 +518,13 @@ const checkLastMonthManualData = (
  * 计算月度指标数据并返回处理后的数组（不导出Excel，不做校验）
  * @param year 指定年份，默认当前年
  * @param currentMonth 指定当前月份（1-12），默认当前月
+ * @param applyTemporaryExclusions 是否应用临时排除规则（人事导出时传 true）
  * @returns 处理后的月度指标数据数组
  */
 export const calculateMonthlyMetricData = async (
   year?: number,
-  currentMonth?: number
+  currentMonth?: number,
+  applyTemporaryExclusions = false
 ): Promise<ProcessedMonthlyMetricData[]> => {
   try {
     // 获取实际使用的年份和月份（参数优先，默认当前）
@@ -498,7 +532,10 @@ export const calculateMonthlyMetricData = async (
     const curMonth = currentMonth || dayjs().month() + 1; // 当前月份（1-12）
 
     // 获取月度指标数据并转换格式
-    const rawData = await fetchMonthlyMetricFullData(curYear);
+    const allRawData = await fetchMonthlyMetricFullData(curYear);
+    const rawData = applyTemporaryExclusions
+      ? filterTemporaryExcludedRecords(allRawData, curYear, curMonth)
+      : allRawData;
     const apiTableData = transformMonthlyMetricData(rawData);
 
     const previousMonth = curMonth - 1; // 上个月份
@@ -689,8 +726,12 @@ export const processAndExportMonthlyMetricForHR = async (
     const curYear = year || dayjs().year();
     const curMonth = currentMonth || dayjs().month() + 1;
 
-    // 获取月度指标数据并转换格式
-    const rawData = await fetchMonthlyMetricFullData(curYear);
+    // 获取月度指标数据并转换格式（应用临时排除规则）
+    const rawData = filterTemporaryExcludedRecords(
+      await fetchMonthlyMetricFullData(curYear),
+      curYear,
+      curMonth
+    );
 
     // 获取当前登录用户信息
     let currentUserId = "";
@@ -767,7 +808,11 @@ export const processAndExportMonthlyMetricForHR = async (
     }
 
     // 先计算好所有数据
-    const processedData = await calculateMonthlyMetricData(curYear, curMonth);
+    const processedData = await calculateMonthlyMetricData(
+      curYear,
+      curMonth,
+      true
+    );
 
     // 获取当前月份
     const previousMonth = curMonth - 1; // 上个月份
