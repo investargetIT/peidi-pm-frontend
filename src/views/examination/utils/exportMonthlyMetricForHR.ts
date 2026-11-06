@@ -15,6 +15,36 @@ export const getMetricTypeText = (
   return String(metricType ?? "");
 };
 
+// 导出时指标名称中的半角括号统一为中文全角括号，便于人事系统识别
+const toChineseBrackets = (name?: string | null) =>
+  String(name ?? "")
+    .replace(/\(/g, "（")
+    .replace(/\)/g, "）");
+
+// 复制单元格样式：只复制源单元格真实存在的样式，
+// 避免给没有样式的单元格写入空字体/空填充，导致导出的 xlsx 被 Excel 判定需要修复
+const copyCellStyle = (targetCell: ExcelJS.Cell, sourceCell: ExcelJS.Cell) => {
+  const font = sourceCell.font;
+  if (font && Object.keys(font).length > 0) {
+    targetCell.font = { ...font };
+  }
+
+  const alignment = sourceCell.alignment;
+  if (alignment && Object.keys(alignment).length > 0) {
+    targetCell.alignment = { ...alignment };
+  }
+
+  const border = sourceCell.border;
+  if (border && Object.keys(border).length > 0) {
+    targetCell.border = { ...border };
+  }
+
+  const fill = sourceCell.fill;
+  if (fill && Object.keys(fill).length > 0) {
+    targetCell.fill = { ...fill };
+  }
+};
+
 const toNumber = (value: any) => {
   const num = Number(value ?? 0);
   return Number.isFinite(num) ? num : 0;
@@ -59,20 +89,61 @@ const SKIP_CHECK_USER_IDS = [
   "1926449443739601753" //刘汪洋
 ];
 
-// 指标数据关联规则：目标用户直接复用来源用户的同一指标数据（目标值、达成值）
-// 例如：俞梦秋 / 季节 / 蒙炳如 的「商品卡+短视频（自营）销售收入月度目标达成率」
-//      与黄向前的是同一个指标，导出时直接取黄向前的目标值/达成值
+// 指标数据关联规则：目标用户直接复用来源用户的指标数据（目标值、达成值、计算模式）
+// 1) 俞梦秋 / 季节 / 蒙炳如 的「商品卡+短视频（自营）销售收入月度目标达成率」
+//    与黄向前的是同一个指标，导出时直接取黄向前的目标值/达成值
+// 2) 王湘妮为新人，上半年无数据，「前台全渠道业绩目标达成率」直接复制王琳「渠道累计收入」的数据
 const REFERENCE_METRIC_RULES: Array<{
   sourceUserName: string;
+  sourceMetricKeywords: string[];
+  sourceExcludeKeywords?: string[]; // 来源指标名称包含这些关键词时不匹配，避免误命中
   targetUserNames: string[];
-  metricKeywords: string[];
-  label: string;
+  targetMetricKeywords: string[];
+  label: string; // 来源指标名称（日志展示，并用于来源指标的精确匹配优先）
+  targetLabel?: string; // 目标指标名称（日志展示，默认同 label）
 }> = [
   {
     sourceUserName: "黄向前",
+    sourceMetricKeywords: ["商品卡", "短视频", "自营", "销售收入"],
     targetUserNames: ["俞梦秋", "季节", "蒙炳如"],
-    metricKeywords: ["商品卡", "短视频", "自营", "销售收入"],
+    targetMetricKeywords: ["商品卡", "短视频", "自营", "销售收入"],
     label: "商品卡+短视频（自营）销售收入月度目标达成率"
+  },
+  {
+    sourceUserName: "王琳",
+    sourceMetricKeywords: ["渠道累计收入"],
+    sourceExcludeKeywords: ["达成率"], // 只复用金额口径的「渠道累计收入」
+    targetUserNames: ["王湘妮"],
+    targetMetricKeywords: ["前台全渠道业绩目标达成率"],
+    label: "渠道累计收入",
+    targetLabel: "前台全渠道业绩目标达成率"
+  }
+];
+
+// 固定累计目标规则：指定指标在 1~fixedThroughMonth 月的累计「目标值/完成值」写死为固定金额，
+// 不按系统逐月数据累加；自 fixedThroughMonth+1 月起的月度数据照常累加在固定值之上。
+// 例：黄向前 / 梁钰 / 方林霞 的「渠道全年累计销售收入GMV」
+//   导出 10 月（考核 9 月）：上月目标 = 3229 万，上月完成 = 2683.106524 万，
+//                            次月目标 = 3229 万 + 10 月目标
+//   导出 11 月（考核 10 月）：上月目标 = 3229 万 + 10 月目标，上月完成 = 2683.106524 万 + 10 月完成
+// 完成率 = 完成值 / 目标值
+// ⚠️ 该固定值只对「考核 fixedThroughMonth 月及以后」成立；更早月份的历史数据来自旧指标口径
+//    （该指标口径历史上多次调整），导出结果不可用，代码会输出告警，页面「目标值口径说明」中也有标注
+const FIXED_CUMULATIVE_TARGET_RULES: Array<{
+  userNames: string[];
+  metricKeywords: string[]; // 指标名称需同时包含的关键词（归一化后匹配）
+  fixedThroughMonth: number;
+  fixedCumulativeTarget: number; // 1~fixedThroughMonth 月累计目标，单位：元
+  fixedCumulativeActual?: number; // 1~fixedThroughMonth 月累计完成值，单位：元
+  label: string;
+}> = [
+  {
+    userNames: ["黄向前", "梁钰", "方林霞"],
+    metricKeywords: ["渠道全年累计销售收入GMV"],
+    fixedThroughMonth: 9,
+    fixedCumulativeTarget: 32_290_000, // 3229 万元
+    fixedCumulativeActual: 26_831_065.24, // 2683.106524 万元
+    label: "渠道全年累计销售收入GMV"
   }
 ];
 
@@ -82,12 +153,61 @@ const normalizeMetricName = (name?: string | null) =>
     .replace(/\s/g, "")
     .replace(/＋/g, "+");
 
-const isReferenceMetricMatched = (
-  metricName: string | undefined,
-  keywords: string[]
+// 指标名称是否命中固定累计目标规则的关键词
+const isFixedTargetRuleMatched = (
+  rule: (typeof FIXED_CUMULATIVE_TARGET_RULES)[number],
+  metricName?: string | null
 ) => {
   const normalized = normalizeMetricName(metricName);
-  return keywords.every(keyword => normalized.includes(keyword));
+  return rule.metricKeywords.every(keyword =>
+    normalized.includes(normalizeMetricName(keyword))
+  );
+};
+
+// 匹配固定累计目标规则
+const matchFixedCumulativeTargetRule = (
+  userName?: string | null,
+  metricName?: string | null
+) =>
+  FIXED_CUMULATIVE_TARGET_RULES.find(
+    rule =>
+      rule.userNames.includes(String(userName ?? "").trim()) &&
+      isFixedTargetRuleMatched(rule, metricName)
+  );
+
+// 累加 [startMonth, endMonth] 区间内的月度值（startMonth > endMonth 时返回 0）
+const sumValueByMonthRange = (
+  monthData: any[],
+  startMonth: number,
+  endMonth: number,
+  year: number
+) => {
+  let sum = 0;
+  for (let m = startMonth; m <= endMonth; m++) {
+    sum += toNumber(findObjectByMonthWithFirstDay(monthData, m, year)?.value);
+  }
+  return sum;
+};
+
+// 指标名称是否同时包含全部关键词（支持排除关键词）
+const isKeywordMatched = (
+  metricName: string | undefined,
+  keywords: string[],
+  excludeKeywords?: string[]
+) => {
+  const normalized = normalizeMetricName(metricName);
+
+  if (
+    excludeKeywords?.some(keyword =>
+      normalized.includes(normalizeMetricName(keyword))
+    )
+  ) {
+    return false;
+  }
+
+  return keywords.every(keyword =>
+    normalized.includes(normalizeMetricName(keyword))
+  );
 };
 
 /**
@@ -96,10 +216,16 @@ const isReferenceMetricMatched = (
  */
 const applyReferenceMetricRules = (items: any[]) => {
   REFERENCE_METRIC_RULES.forEach(rule => {
+    const targetLabel = rule.targetLabel || rule.label;
+
     const matchedSourceItems = items.filter(
       item =>
         item.userName === rule.sourceUserName &&
-        isReferenceMetricMatched(item.examinationType, rule.metricKeywords)
+        isKeywordMatched(
+          item.examinationType,
+          rule.sourceMetricKeywords,
+          rule.sourceExcludeKeywords
+        )
     );
 
     const hasEnoughExamination = (item: any) =>
@@ -118,14 +244,16 @@ const applyReferenceMetricRules = (items: any[]) => {
 
     if (!sourceItem || !hasEnoughExamination(sourceItem)) {
       console.warn(
-        `[月度指标导出] 未找到 ${rule.sourceUserName} 的「${rule.label}」有效数据，跳过关联`
+        `[月度指标导出] 未找到 ${rule.sourceUserName} 的「${rule.label}」有效数据，跳过关联「${targetLabel}」`
       );
       return;
     }
 
     if (matchedSourceItems.length > 1) {
       console.warn(
-        `[月度指标导出] ${rule.sourceUserName} 的「${rule.label}」匹配到 ${matchedSourceItems.length} 条记录，已使用第一条有效数据`
+        `[月度指标导出] ${rule.sourceUserName} 的「${rule.label}」匹配到 ${matchedSourceItems.length} 条记录（${matchedSourceItems
+          .map((item: any) => item.examinationType)
+          .join("、")}），已使用第一条有效数据`
       );
     }
 
@@ -135,14 +263,22 @@ const applyReferenceMetricRules = (items: any[]) => {
       const targetItems = items.filter(
         item =>
           item.userName === userName &&
-          isReferenceMetricMatched(item.examinationType, rule.metricKeywords)
+          isKeywordMatched(item.examinationType, rule.targetMetricKeywords)
       );
 
       if (targetItems.length === 0) {
         console.warn(
-          `[月度指标导出] 未找到 ${userName} 的「${rule.label}」，跳过关联`
+          `[月度指标导出] 未找到 ${userName} 的「${targetLabel}」，跳过关联`
         );
         return;
+      }
+
+      if (targetItems.length > 1) {
+        console.warn(
+          `[月度指标导出] ${userName} 的「${targetLabel}」匹配到 ${targetItems.length} 条记录（${targetItems
+            .map((item: any) => item.examinationType)
+            .join("、")}），已全部按 ${rule.sourceUserName} 的数据覆盖`
+        );
       }
 
       targetItems.forEach(item => {
@@ -155,7 +291,7 @@ const applyReferenceMetricRules = (items: any[]) => {
 
     if (appliedUserNames.length > 0) {
       console.log(
-        `[月度指标导出] 已将 ${rule.sourceUserName} 的「${rule.label}」目标值/达成值关联给：${appliedUserNames.join("、")}`
+        `[月度指标导出] 已将 ${rule.sourceUserName} 的「${rule.label}」目标值/达成值关联至「${targetLabel}」：${appliedUserNames.join("、")}`
       );
     }
   });
@@ -675,6 +811,61 @@ export const calculateMonthlyMetricData = async (
       valueK = toNumber(valueK);
       valueO = toNumber(valueO);
 
+      // 固定累计规则：如 黄向前 / 梁钰 / 方林霞 的「渠道全年累计销售收入GMV」
+      // 1~9 月累计目标/完成值写死为固定值，10 月起在固定值上继续累加各月数据
+      const fixedTargetRule = matchFixedCumulativeTargetRule(
+        dataItem.userName,
+        dataItem.examinationType
+      );
+      if (fixedTargetRule) {
+        const incrementalStartMonth = fixedTargetRule.fixedThroughMonth + 1;
+        valueI =
+          fixedTargetRule.fixedCumulativeTarget +
+          sumValueByMonthRange(
+            targetData,
+            incrementalStartMonth,
+            previousMonth,
+            curYear
+          );
+        valueO =
+          fixedTargetRule.fixedCumulativeTarget +
+          sumValueByMonthRange(
+            targetData,
+            incrementalStartMonth,
+            curMonth,
+            curYear
+          );
+
+        // 1~fixedThroughMonth 月的累计完成值同样写死，10 月起累加各月完成值
+        if (fixedTargetRule.fixedCumulativeActual !== undefined) {
+          valueK =
+            fixedTargetRule.fixedCumulativeActual +
+            sumValueByMonthRange(
+              actualData,
+              incrementalStartMonth,
+              previousMonth,
+              curYear
+            );
+        }
+
+        // 固定值只对「考核 fixedThroughMonth 月及以后」成立；
+        // 导出更早月份时，历史数据来自旧口径，结果不可用
+        if (curMonth <= fixedTargetRule.fixedThroughMonth) {
+          console.warn(
+            `[月度指标导出] 注意：${dataItem.userName}「${dataItem.examinationType}」的 ` +
+              `1-${fixedTargetRule.fixedThroughMonth} 月历史数据来自旧指标口径，` +
+              `本次导出 ${curMonth} 月（考核 ${previousMonth} 月）结果可能不准确，请人工核对`
+          );
+        }
+
+        console.log(
+          `[月度指标导出] ${dataItem.userName}「${dataItem.examinationType}」按固定累计口径：` +
+            `1-${fixedTargetRule.fixedThroughMonth}月累计目标=${fixedTargetRule.fixedCumulativeTarget}，` +
+            `累计完成=${fixedTargetRule.fixedCumulativeActual ?? "取系统数据"}，` +
+            `上月目标=${valueI}，上月完成=${valueK}，次月目标=${valueO}`
+        );
+      }
+
       // 计算完成率
       let completionRate = 0;
       if (valueI !== 0) {
@@ -697,6 +888,39 @@ export const calculateMonthlyMetricData = async (
         currentMonthTarget: valueO,
         completionRate: Number(Math.max(0, completionRate).toFixed(2))
       });
+    });
+
+    // 校验固定累计目标规则是否命中，避免指标改名后静默回退到系统累计值
+    FIXED_CUMULATIVE_TARGET_RULES.forEach(rule => {
+      const missingUsers: string[] = [];
+
+      rule.userNames.forEach(userName => {
+        const matchedItems = apiTableData.filter(
+          (item: any) =>
+            String(item.userName ?? "").trim() === userName &&
+            isFixedTargetRuleMatched(rule, item.examinationType)
+        );
+
+        if (matchedItems.length === 0) {
+          missingUsers.push(userName);
+          return;
+        }
+
+        if (matchedItems.length > 1) {
+          console.warn(
+            `[月度指标导出] ${userName} 匹配到多条固定累计目标指标「${rule.label}」，` +
+              `已全部按固定口径处理，请确认是否误命中：` +
+              matchedItems.map((item: any) => item.examinationType).join("、")
+          );
+        }
+      });
+
+      if (missingUsers.length > 0) {
+        console.warn(
+          `[月度指标导出] 以下用户未匹配到固定累计目标指标「${rule.label}」，` +
+            `将回退为系统累计目标，请检查指标名称：${missingUsers.join("、")}`
+        );
+      }
     });
 
     return result;
@@ -892,8 +1116,8 @@ export const processAndExportMonthlyMetricForHR = async (
         row.getCell(2).value = dataItem.userName;
         // C 列：指标类型
         row.getCell(3).value = getMetricTypeText(dataItem.metricType);
-        // D 列：指标名称
-        row.getCell(4).value = dataItem.examinationType;
+        // D 列：指标名称（半角括号统一为中文括号）
+        row.getCell(4).value = toChineseBrackets(dataItem.examinationType);
         // E 列（原 F 列）：指标ID
         row.getCell(5).value = dataItem.metricId;
         // F 列（原 G 列）：指标描述
@@ -968,6 +1192,41 @@ export const processAndExportMonthlyMetricForHR = async (
         type: "pattern",
         pattern: "none"
       };
+    }
+
+    // 末尾新增一列：姓名&指标名称（便于人事核对/引用）
+    // 注意：两次删列后工作表尾部可能残留空列，这里以表头行最后一个非空列为准
+    const headerRow = worksheet.getRow(2);
+    let lastHeaderColumn = 0;
+    for (let c = 1; c <= worksheet.columnCount; c++) {
+      const headerValue = headerRow.getCell(c).value;
+      if (
+        headerValue !== null &&
+        headerValue !== undefined &&
+        String(headerValue).trim() !== ""
+      ) {
+        lastHeaderColumn = c;
+      }
+    }
+
+    const nameAndMetricColumn = lastHeaderColumn + 1;
+    const referenceHeaderCell = headerRow.getCell(lastHeaderColumn);
+    const newHeaderCell = headerRow.getCell(nameAndMetricColumn);
+    newHeaderCell.value = "姓名&指标名称";
+    copyCellStyle(newHeaderCell, referenceHeaderCell);
+    worksheet.getColumn(nameAndMetricColumn).width = 40;
+
+    // 数据行用 B 列（姓名）和 D 列（指标名称）拼接；分组标题行没有这两个值，自动跳过
+    for (let r = 3; r < currentRowNum; r++) {
+      const row = worksheet.getRow(r);
+      const userName = row.getCell(2).value;
+      const metricName = row.getCell(4).value;
+
+      if (!userName || !metricName) continue;
+
+      const cell = row.getCell(nameAndMetricColumn);
+      cell.value = `${userName}&${metricName}`;
+      copyCellStyle(cell, row.getCell(4));
     }
 
     workbook.modified = new Date();
