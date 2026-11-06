@@ -2364,6 +2364,21 @@ onMounted(() => {
 
       <div class="calc-logic-block">
         <div class="calc-logic-title">
+          <el-tag type="danger" effect="dark" size="small">王湘妮</el-tag>
+          <span>前台全渠道业绩目标达成率</span>
+        </div>
+        <div class="calc-logic-desc">
+          该项指标与 <b>王琳</b> 的<b>「渠道累计收入（目标值）」</b>口径一致（王琳该项指标的
+          目标值口径见上方「王琳」说明）。
+        </div>
+        <div class="calc-logic-warn">
+          ⚠️ 人事导出时仍取 <b>王湘妮自己填写的数据</b>，不会自动复制王琳的数据；如发现两边不一致，
+          请先补填王湘妮的数据。
+        </div>
+      </div>
+
+      <div class="calc-logic-block">
+        <div class="calc-logic-title">
           <el-tag type="danger" effect="dark" size="small">黄向前</el-tag>
           <el-tag type="danger" effect="dark" size="small">梁钰</el-tag>
           <el-tag type="danger" effect="dark" size="small">方林霞</el-tag>
@@ -2383,6 +2398,23 @@ onMounted(() => {
         <div class="calc-logic-warn">
           ⚠️ 即：渠道全年累计销售收入GMV = 达播达成率 ＋ 商品卡&短视频（自营）达成率
           ＋ 自播间达成率。三人共用同一结果，<b>不是</b>各自 GMV 的累计求和，也不是各自独立的数值。
+        </div>
+      </div>
+
+      <div class="calc-logic-block">
+        <div class="calc-logic-title">
+          <el-tag type="danger" effect="dark" size="small">俞梦秋</el-tag>
+          <el-tag type="danger" effect="dark" size="small">季节</el-tag>
+          <el-tag type="danger" effect="dark" size="small">蒙炳如</el-tag>
+          <span>商品卡+短视频（自营）销售收入月度目标达成率</span>
+        </div>
+        <div class="calc-logic-desc">
+          这三人的该项指标与 <b>黄向前</b> 为同一条指标，数值应完全一致。
+          人事导出时<b>直接复制黄向前同名指标的数据</b>，不取各自填写的值，也不做额外的累计或换算。
+        </div>
+        <div class="calc-logic-warn">
+          ⚠️ 复制内容：<b>目标值、达成值（完成值）、完成率、次月目标</b>，计算模式（calculationType）
+          也跟随黄向前。若黄向前当月该指标无有效数据，则保留三人各自原值并在控制台告警，不影响整份导出。
         </div>
       </div>
 

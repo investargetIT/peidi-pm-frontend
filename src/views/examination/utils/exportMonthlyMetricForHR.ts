@@ -59,6 +59,108 @@ const SKIP_CHECK_USER_IDS = [
   "1926449443739601753" //刘汪洋
 ];
 
+// 指标数据关联规则：目标用户直接复用来源用户的同一指标数据（目标值、达成值）
+// 例如：俞梦秋 / 季节 / 蒙炳如 的「商品卡+短视频（自营）销售收入月度目标达成率」
+//      与黄向前的是同一个指标，导出时直接取黄向前的目标值/达成值
+const REFERENCE_METRIC_RULES: Array<{
+  sourceUserName: string;
+  targetUserNames: string[];
+  metricKeywords: string[];
+  label: string;
+}> = [
+  {
+    sourceUserName: "黄向前",
+    targetUserNames: ["俞梦秋", "季节", "蒙炳如"],
+    metricKeywords: ["商品卡", "短视频", "自营", "销售收入"],
+    label: "商品卡+短视频（自营）销售收入月度目标达成率"
+  }
+];
+
+// 去除空白字符并统一全角加号，避免指标名称中的空格/符号差异导致匹配失败
+const normalizeMetricName = (name?: string | null) =>
+  String(name ?? "")
+    .replace(/\s/g, "")
+    .replace(/＋/g, "+");
+
+const isReferenceMetricMatched = (
+  metricName: string | undefined,
+  keywords: string[]
+) => {
+  const normalized = normalizeMetricName(metricName);
+  return keywords.every(keyword => normalized.includes(keyword));
+};
+
+/**
+ * 应用指标数据关联规则：把来源用户的指标数据同步给目标用户
+ * @param items 按用户+指标分组后的数据
+ */
+const applyReferenceMetricRules = (items: any[]) => {
+  REFERENCE_METRIC_RULES.forEach(rule => {
+    const matchedSourceItems = items.filter(
+      item =>
+        item.userName === rule.sourceUserName &&
+        isReferenceMetricMatched(item.examinationType, rule.metricKeywords)
+    );
+
+    const hasEnoughExamination = (item: any) =>
+      Array.isArray(item.examination) && item.examination.length >= 2;
+
+    // 优先使用与规则名称完全一致的记录，其次使用任意关键词匹配且数据完整的记录
+    const sourceItem =
+      matchedSourceItems.find(
+        item =>
+          hasEnoughExamination(item) &&
+          normalizeMetricName(item.examinationType) ===
+            normalizeMetricName(rule.label)
+      ) ||
+      matchedSourceItems.find(hasEnoughExamination) ||
+      matchedSourceItems[0];
+
+    if (!sourceItem || !hasEnoughExamination(sourceItem)) {
+      console.warn(
+        `[月度指标导出] 未找到 ${rule.sourceUserName} 的「${rule.label}」有效数据，跳过关联`
+      );
+      return;
+    }
+
+    if (matchedSourceItems.length > 1) {
+      console.warn(
+        `[月度指标导出] ${rule.sourceUserName} 的「${rule.label}」匹配到 ${matchedSourceItems.length} 条记录，已使用第一条有效数据`
+      );
+    }
+
+    const appliedUserNames: string[] = [];
+
+    rule.targetUserNames.forEach(userName => {
+      const targetItems = items.filter(
+        item =>
+          item.userName === userName &&
+          isReferenceMetricMatched(item.examinationType, rule.metricKeywords)
+      );
+
+      if (targetItems.length === 0) {
+        console.warn(
+          `[月度指标导出] 未找到 ${userName} 的「${rule.label}」，跳过关联`
+        );
+        return;
+      }
+
+      targetItems.forEach(item => {
+        // 深拷贝，避免后续排序等操作互相影响
+        item.examination = JSON.parse(JSON.stringify(sourceItem.examination));
+        item.calculationType = sourceItem.calculationType;
+      });
+      appliedUserNames.push(userName);
+    });
+
+    if (appliedUserNames.length > 0) {
+      console.log(
+        `[月度指标导出] 已将 ${rule.sourceUserName} 的「${rule.label}」目标值/达成值关联给：${appliedUserNames.join("、")}`
+      );
+    }
+  });
+};
+
 interface MonthlyMetricOtherConfig {
   calculationType?: number;
   notifyUserList?: Array<number | string>;
@@ -97,7 +199,7 @@ interface MonthlyMetricResultRecord {
 
 // 处理后的月度指标数据接口
 export interface ProcessedMonthlyMetricData {
-  userId?: number;
+  userId?: string | number;
   userName?: string;
   jobNum?: string;
   metricType?: number | string;
@@ -255,7 +357,12 @@ const transformMonthlyMetricData = (records: MonthlyMetricResultRecord[]) => {
   });
 
   // 转换为数组格式
-  return Object.values(groupedData);
+  const result = Object.values(groupedData);
+
+  // 应用指标数据关联规则（如：俞梦秋/季节/蒙炳如 复用黄向前的商品卡+短视频指标数据）
+  applyReferenceMetricRules(result as any[]);
+
+  return result;
 };
 
 /**
