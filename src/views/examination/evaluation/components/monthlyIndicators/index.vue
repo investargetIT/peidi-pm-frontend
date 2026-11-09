@@ -20,6 +20,14 @@ import {
   EXPORT_SCOPE_LABEL,
   SIGNED_FILE_LABEL
 } from "@/views/examination/utils/exportTargetPerformance";
+import {
+  findAggregateRule,
+  findConsistencyGroup,
+  findMetricInList,
+  findSourceMetricForRule,
+  findTargetReferenceRule,
+  getAggregateFormulaText
+} from "@/views/examination/utils/metricReference";
 import { ElMessage, ElMessageBox, ElCheckbox } from "element-plus";
 import {
   Download,
@@ -53,6 +61,20 @@ interface MetricTargetItem {
   existSqlConfig?: number;
   otherConfig?: string | null;
   isEdit?: number;
+  /** 是否为联动指标（数据读时派生自来源用户） */
+  isReference?: boolean;
+  /** 联动指标的来源用户 */
+  referenceFrom?: string;
+  /** 自动汇总结果写入的字段（当前只有目标值） */
+  aggregateField?: "target" | "achieved";
+  /** 自动汇总公式说明，用于提示与日志 */
+  aggregateFrom?: string;
+  /** 一致性校验分组 ID（如「渠道全年累计销售收入GMV」三人同值） */
+  consistencyGroup?: string;
+  /** 一致性校验结果：same=一致 / mismatch=不一致 / unknown=数据不全 */
+  consistencyStatus?: "same" | "mismatch" | "unknown";
+  /** 一致性校验提示（公式 + 三人当前值） */
+  consistencyTip?: string;
 }
 
 interface RecordItem extends MetricTargetItem {
@@ -136,12 +158,80 @@ const handleEditTouch = (
   }
 };
 
+// 侯子洋「好适嘉」系列指标按「次月考核」取数：本行数据用于下个月考核。
+// 常见误填：把 10 月考核的数据填到了 10 月行（应填 9 月行），这里加提示 + 二次确认。
+const HOUZIYANG_HAOSHIJIA_METRIC_NAMES = [
+  "好适嘉项目累计净毛利",
+  "好适嘉项目净毛利20%"
+];
+
+const isHouZiyangHaoShijiaMetric = (row: RecordItem): boolean =>
+  String(row.username || "").trim() === "侯子洋" &&
+  HOUZIYANG_HAOSHIJIA_METRIC_NAMES.includes(
+    String(row.targetName || "").trim()
+  );
+
+const getHaoShijiaMonthTip = (row: RecordItem) => {
+  const rowMonth = dayjs(row.month);
+  return {
+    rowMonthText: rowMonth.format("YYYY 年 MM 月"),
+    nextAssessMonthText: rowMonth.add(1, "month").format("YYYY 年 MM 月"),
+    prevRowMonthText: rowMonth.subtract(1, "month").format("YYYY 年 MM 月")
+  };
+};
+
+// 「次月考核」标签的 Tooltip 文案
+const getHaoShijiaMonthTipText = (row: RecordItem) => {
+  const { rowMonthText, nextAssessMonthText, prevRowMonthText } =
+    getHaoShijiaMonthTip(row);
+  return `按次月考核取数：本行（${rowMonthText}）数据用于 ${nextAssessMonthText} 考核；若要填 ${rowMonthText} 的考核数据，请改填 ${prevRowMonthText} 行。`;
+};
+
+// 编辑前的月份二次确认（桌面端双击 / 移动端点击都会走到 startEdit）
+const confirmHaoShijiaMetricMonth = async (row: RecordItem) => {
+  const { rowMonthText, nextAssessMonthText, prevRowMonthText } =
+    getHaoShijiaMonthTip(row);
+
+  await ElMessageBox.confirm(
+    `<div style="text-align: left; line-height: 1.8;">
+      <p style="margin: 0 0 8px;">
+        「<b>${row.targetName}</b>」按 <b>次月考核</b> 取数。
+      </p>
+      <p style="margin: 0 0 8px;">
+        本行（<b>${rowMonthText}</b>）的数据将用于 <b>${nextAssessMonthText}</b> 考核。
+      </p>
+      <p style="margin: 0; color: #e6a23c;">
+        若你要填的是 <b>${rowMonthText}</b> 的考核数据，请改填
+        <b>${prevRowMonthText}</b> 行。
+      </p>
+    </div>`,
+    "确认填写月份",
+    {
+      confirmButtonText: "月份正确，继续编辑",
+      cancelButtonText: "取消",
+      type: "warning",
+      dangerouslyUseHTMLString: true,
+      customClass: "haoshijia-month-confirm"
+    }
+  );
+};
+
 // 处理单元格点击，兼容触摸和鼠标
 const handleCellClick = (row: RecordItem, field: "target" | "achieved") => {
   if (isMobile.value) {
     // 手机端需要二次确认
     const fieldName = field === "target" ? "目标值" : "完成值";
     const currentValue = row[field] ?? "-";
+    const haoShijiaTip = isHouZiyangHaoShijiaMetric(row)
+      ? (() => {
+          const { rowMonthText, nextAssessMonthText, prevRowMonthText } =
+            getHaoShijiaMonthTip(row);
+          return `<p style="margin-top: 10px; color: #e6a23c; font-size: 13px; line-height: 1.6;">
+            该指标按<b>次月考核</b>取数：本行（${rowMonthText}）数据用于 ${nextAssessMonthText} 考核；<br/>
+            若要填 ${rowMonthText} 的考核数据，请改填 ${prevRowMonthText} 行。
+          </p>`;
+        })()
+      : "";
 
     ElMessageBox.confirm(
       `<div style="text-align: center;">
@@ -152,6 +242,7 @@ const handleCellClick = (row: RecordItem, field: "target" | "achieved") => {
         <p style="margin-top: 8px; color: #909399; font-size: 13px;">
           当前值：${formatNumber(currentValue)}
         </p>
+        ${haoShijiaTip}
       </div>`,
       "确认编辑",
       {
@@ -309,10 +400,16 @@ const tableCellStyle = ({
   columnIndex: number;
 }) => {
   // 目标值(4)不分手填/自动计算，未锁定即可编辑：手填行显示黄色背景，自动计算行显示浅灰背景
-  // 完成值(5)、完成率(6)只在手填数据行显示黄色背景
+  // 完成值(5)只在手填数据行显示黄色背景
   // 黄色背景只和isManualRow关联，不受isEdit影响
+  // 联动指标行显示蓝色背景，表示数据读时派生自来源用户、不可直接编辑
+  // 自动汇总字段（目标值）显示浅绿色背景
   let bgColor = "#ffffff";
-  if (isManualRow(row) && [3, 4, 5, 6].includes(columnIndex)) {
+  if (row.aggregateField === "target" && columnIndex === 4) {
+    bgColor = "#eafaf1";
+  } else if (row.isReference && [3, 4, 5].includes(columnIndex)) {
+    bgColor = "#e6f4ff";
+  } else if (isManualRow(row) && [3, 4, 5].includes(columnIndex)) {
     bgColor = "#fff3cd";
   } else if (columnIndex === 4 && canEditRow(row)) {
     // 目标值列在自动计算数据行也显示浅灰色，表示未锁定即可编辑
@@ -523,6 +620,234 @@ const updateTableDataByPage = () => {
   tableData.value = flattenRecords(visibleRecords.value.slice(start, end));
 };
 
+// ============ 联动指标（读时派生） ============
+// 只保留来源用户的一份权威数据，目标用户的数据在「展示」时引用来源用户；
+// 不写回、不落库，避免出现两份数据互相打架。规则统一维护在 utils/metricReference.ts。
+type ReferenceSourceIndex = Map<string, MetricTargetItem[]>;
+
+const buildReferenceSourceIndex = (
+  records: ApiRecordItem[]
+): ReferenceSourceIndex => {
+  const index: ReferenceSourceIndex = new Map();
+  records.forEach(record => {
+    const username = String(record.username || "").trim();
+    if (!username) return;
+    const metrics = (record.metricTargetList || []).filter(
+      metric => metric.status !== 0
+    );
+    if (metrics.length > 0) {
+      index.set(username, metrics);
+    }
+  });
+  return index;
+};
+
+const applyMetricReferences = (
+  username: string,
+  metrics: MetricTargetItem[],
+  sourceIndex: ReferenceSourceIndex,
+  month?: string
+): MetricTargetItem[] =>
+  metrics.map(metric => {
+    const rule = findTargetReferenceRule(username, metric.targetName, month);
+    if (!rule) return metric;
+
+    const sourceMetric = findSourceMetricForRule(
+      sourceIndex.get(rule.sourceUserName) || [],
+      rule
+    );
+    if (!sourceMetric) {
+      console.warn(
+        `[月度指标] 联动指标未找到来源数据：${username} - ${metric.targetName}（来源：${rule.sourceUserName}）`
+      );
+      return metric;
+    }
+
+    return {
+      ...metric,
+      target: sourceMetric.target,
+      achieved: sourceMetric.achieved,
+      // 数据类型（手填/自动计算）也跟随来源，保证筛选行为一致
+      existSqlConfig: sourceMetric.existSqlConfig,
+      isReference: true,
+      referenceFrom: rule.sourceUserName
+    };
+  });
+
+const isReferenceRow = (row: RecordItem): boolean => !!row.isReference;
+
+// ============ 自动汇总指标（读时派生） ============
+// 目标指标的值 = 若干来源指标当月值之和（如王琳「渠道累计收入」目标值）。
+// 同样不写回数据库，只在展示 / 导出时计算；任一来源缺失则保留原值并告警，避免展示错误数字。
+const applyAggregateMetricRules = (
+  username: string,
+  metrics: MetricTargetItem[],
+  sourceIndex: ReferenceSourceIndex
+): MetricTargetItem[] =>
+  metrics.map(metric => {
+    const rule = findAggregateRule(username, metric.targetName);
+    if (!rule) return metric;
+
+    const missingSources: string[] = [];
+    let sum = 0;
+
+    rule.sources.forEach(source => {
+      const sourceMetric = findMetricInList(
+        sourceIndex.get(source.userName) || [],
+        source.metricKeywords,
+        source.metricExcludeKeywords,
+        source.metricLabel
+      );
+      if (!sourceMetric) {
+        missingSources.push(source.userName);
+        return;
+      }
+      sum += Number(sourceMetric[source.field] ?? 0) || 0;
+    });
+
+    if (missingSources.length > 0) {
+      console.warn(
+        `[月度指标] 自动汇总缺少来源数据：${username} - ${metric.targetName}（缺少：${missingSources.join("、")}）`
+      );
+      return metric;
+    }
+
+    return {
+      ...metric,
+      [rule.targetField]: Number(sum.toFixed(4)),
+      aggregateField: rule.targetField,
+      aggregateFrom: getAggregateFormulaText(rule)
+    };
+  });
+
+const isAggregateField = (
+  row: RecordItem,
+  field: "target" | "achieved"
+): boolean => row.aggregateField === field;
+
+// ============ 一致性校验（只标记，不计算、不写回） ============
+// 例：黄向前 / 梁钰 / 方林霞 的「渠道全年累计销售收入GMV」三人必须同值。
+// 三人都有值时比对目标值、完成值；不一致时标签变黄提示，避免悄无声息地出错。
+const CONSISTENCY_FIELDS: Array<"target" | "achieved"> = ["target", "achieved"];
+
+const toComparableNumber = (value: number | string | null | undefined) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  return Number(num.toFixed(4));
+};
+
+// 视为「已填写」：非空且不为 0（与页面其他「未填写」判断保持一致）
+const isFilledValue = (value: number | string | null | undefined) =>
+  value !== null && value !== undefined && value !== "" && Number(value) !== 0;
+
+const annotateConsistencyGroup = (
+  username: string,
+  metrics: MetricTargetItem[],
+  sourceIndex: ReferenceSourceIndex
+): MetricTargetItem[] =>
+  metrics.map(metric => {
+    const group = findConsistencyGroup(username, metric.targetName);
+    if (!group) return metric;
+
+    const members = group.userNames.map(userName => ({
+      userName,
+      metric: findMetricInList(
+        sourceIndex.get(userName) || [],
+        group.metricKeywords,
+        group.metricExcludeKeywords,
+        group.label
+      )
+    }));
+    const missingUsers = members
+      .filter(member => !member.metric)
+      .map(member => member.userName);
+
+    const valueText = members
+      .map(({ userName, metric: memberMetric }) =>
+        memberMetric
+          ? `${userName} 目标 ${memberMetric.target ?? "-"} / 完成 ${memberMetric.achieved ?? "-"}`
+          : `${userName} 未取到`
+      )
+      .join("；");
+
+    let status: "same" | "mismatch" | "unknown" = "unknown";
+    if (missingUsers.length === 0) {
+      let hasMismatch = false;
+      let allFilled = true;
+
+      CONSISTENCY_FIELDS.forEach(field => {
+        const values = members.map(member => member.metric![field]);
+        if (!values.every(isFilledValue)) {
+          allFilled = false;
+          return;
+        }
+        const numbers = values.map(toComparableNumber);
+        if (numbers.some(num => num === null)) {
+          allFilled = false;
+          return;
+        }
+        if (numbers.some(num => num !== numbers[0])) {
+          hasMismatch = true;
+        }
+      });
+
+      if (hasMismatch) status = "mismatch";
+      else if (allFilled) status = "same";
+    }
+
+    return {
+      ...metric,
+      consistencyGroup: group.id,
+      consistencyStatus: status,
+      consistencyTip:
+        `三人数值应一致：${group.formulaLines.join(" ＋ ")}。当前：${valueText}` +
+        (missingUsers.length > 0
+          ? `（未取到：${missingUsers.join("、")}）`
+          : "")
+    };
+  });
+
+// 指标名称列自适应宽度：按当前筛选结果中最长的指标名称测量（联动标签计入），
+// 限制在 [200, 340]。注意：Element Plus 会把容器剩余宽度分给所有弹性列（min-width）。
+// 因此目标值 / 完成值两列也使用 min-width，避免宽屏时指标名称一列独吞全部剩余宽度。
+const metricNameColumnWidth = computed<number>(() => {
+  const DEFAULT_WIDTH = 200;
+  const MAX_WIDTH = 340;
+  // 联动标签「联动 · 黄向前」+ 左边距的近似占用宽度
+  const REFERENCE_TAG_WIDTH = 110;
+  // 单元格左右内边距与边框余量
+  const CELL_PADDING = 32;
+
+  const names: Array<{ name: string; reference: boolean }> = [];
+  visibleRecords.value.forEach(record => {
+    (record.metricTargetList || []).forEach(metric => {
+      names.push({
+        name: String(metric.targetName || ""),
+        reference: !!metric.isReference
+      });
+    });
+  });
+  if (names.length === 0) return DEFAULT_WIDTH;
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return DEFAULT_WIDTH;
+  ctx.font =
+    '14px "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif';
+
+  let maxWidth = 0;
+  names.forEach(({ name, reference }) => {
+    const width =
+      ctx.measureText(name).width + (reference ? REFERENCE_TAG_WIDTH : 0);
+    if (width > maxWidth) maxWidth = width;
+  });
+
+  return Math.min(
+    MAX_WIDTH,
+    Math.max(DEFAULT_WIDTH, Math.ceil(maxWidth) + CELL_PADDING)
+  );
+});
+
 const fetchData = async () => {
   loading.value = true;
   try {
@@ -538,6 +863,12 @@ const fetchData = async () => {
       // 指标全部请求回来，先按部门负责人权限过滤，再由前端按人员维度分页
       allRecords.value = (res.data.records || []).filter(record =>
         (record.metricTargetList || []).some(metric => metric.status !== 0)
+      );
+
+      // 联动指标的来源索引：用全量返回数据构建（不受权限/筛选影响），
+      // 这样即使来源用户被筛选条件过滤掉，目标用户仍能拿到权威值
+      const referenceSourceIndex = buildReferenceSourceIndex(
+        res.data.records || []
       );
 
       // 先按权限过滤
@@ -562,59 +893,75 @@ const fetchData = async () => {
       // 再根据数据类型过滤
       visibleRecords.value = filteredByPermission
         .map(record => {
-          // 过滤符合dataType条件的metric
-          let filteredMetrics = (record.metricTargetList || []).filter(
-            metric => {
-              if (metric.status === 0) return false;
-
-              if (searchParams.value.dataType === "manual") {
-                return metric.existSqlConfig === 0;
-              } else if (
-                searchParams.value.dataType === "manual_unfilled_achieved"
-              ) {
-                // 手填且完成值为空或0
-                return (
-                  metric.existSqlConfig === 0 &&
-                  (metric.achieved == null ||
-                    metric.achieved === "" ||
-                    Number(metric.achieved) === 0)
-                );
-              } else if (
-                searchParams.value.dataType === "manual_unfilled_target"
-              ) {
-                // 手填且目标值为空或0
-                return (
-                  metric.existSqlConfig === 0 &&
-                  (metric.target == null ||
-                    metric.target === "" ||
-                    Number(metric.target) === 0)
-                );
-              } else if (searchParams.value.dataType === "auto") {
-                return metric.existSqlConfig === 1;
-              } else if (
-                searchParams.value.dataType === "auto_unfilled_achieved"
-              ) {
-                // 自动计算且完成值为空或0
-                return (
-                  metric.existSqlConfig === 1 &&
-                  (metric.achieved == null ||
-                    metric.achieved === "" ||
-                    Number(metric.achieved) === 0)
-                );
-              } else if (
-                searchParams.value.dataType === "auto_unfilled_target"
-              ) {
-                // 自动计算且目标值为空或0
-                return (
-                  metric.existSqlConfig === 1 &&
-                  (metric.target == null ||
-                    metric.target === "" ||
-                    Number(metric.target) === 0)
-                );
-              }
-              return true; // 全部类型
-            }
+          // 先做联动派生 / 自动汇总，再做筛选/排序，保证筛选、排序用到的值与表格展示一致
+          const username = String(record.username || "").trim();
+          const baseMetrics = (record.metricTargetList || []).filter(
+            metric => metric.status !== 0
           );
+          const derivedMetrics = annotateConsistencyGroup(
+            username,
+            applyAggregateMetricRules(
+              username,
+              applyMetricReferences(
+                username,
+                baseMetrics,
+                referenceSourceIndex,
+                record.month || searchParams.value.startDate
+              ),
+              referenceSourceIndex
+            ),
+            referenceSourceIndex
+          );
+
+          // 过滤符合dataType条件的metric
+          let filteredMetrics = derivedMetrics.filter(metric => {
+            if (metric.status === 0) return false;
+
+            if (searchParams.value.dataType === "manual") {
+              return metric.existSqlConfig === 0;
+            } else if (
+              searchParams.value.dataType === "manual_unfilled_achieved"
+            ) {
+              // 手填且完成值为空或0
+              return (
+                metric.existSqlConfig === 0 &&
+                (metric.achieved == null ||
+                  metric.achieved === "" ||
+                  Number(metric.achieved) === 0)
+              );
+            } else if (
+              searchParams.value.dataType === "manual_unfilled_target"
+            ) {
+              // 手填且目标值为空或0
+              return (
+                metric.existSqlConfig === 0 &&
+                (metric.target == null ||
+                  metric.target === "" ||
+                  Number(metric.target) === 0)
+              );
+            } else if (searchParams.value.dataType === "auto") {
+              return metric.existSqlConfig === 1;
+            } else if (
+              searchParams.value.dataType === "auto_unfilled_achieved"
+            ) {
+              // 自动计算且完成值为空或0
+              return (
+                metric.existSqlConfig === 1 &&
+                (metric.achieved == null ||
+                  metric.achieved === "" ||
+                  Number(metric.achieved) === 0)
+              );
+            } else if (searchParams.value.dataType === "auto_unfilled_target") {
+              // 自动计算且目标值为空或0
+              return (
+                metric.existSqlConfig === 1 &&
+                (metric.target == null ||
+                  metric.target === "" ||
+                  Number(metric.target) === 0)
+              );
+            }
+            return true; // 全部类型
+          });
 
           // 当选择手填类型时，完成值为空的数据放上面
           if (searchParams.value.dataType === "manual") {
@@ -787,8 +1134,8 @@ const objectSpanMethod = ({
   row: RecordItem;
   columnIndex: number;
 }) => {
-  // 合并公共信息列：序号(0)、月份(1)、负责人(2)、操作列(最后一列)
-  if (columnIndex <= 2 || columnIndex === 7) {
+  // 合并公共信息列：序号(0)、月份(1)、负责人(2)、操作列（最后一列，索引 6）
+  if (columnIndex <= 2 || columnIndex === 6) {
     if (row.rowSpan && row.rowSpan > 0) {
       return { rowspan: row.rowSpan, colspan: 1 };
     }
@@ -821,6 +1168,20 @@ const isSaving = (row: RecordItem, field: "target" | "achieved") => {
 
 const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
   if (savingCellKey.value) return;
+  // 联动指标只做读时派生，不允许在目标用户行上修改（避免产生第二份数据）
+  if (isReferenceRow(row)) {
+    ElMessage.warning(
+      `联动指标，数据跟随「${row.referenceFrom}」，请到该用户处修改`
+    );
+    return;
+  }
+  // 自动汇总字段由系统计算，禁止手工填写
+  if (isAggregateField(row, field)) {
+    ElMessage.warning(
+      `该列为系统自动汇总，无需手工填写（${row.aggregateFrom}）`
+    );
+    return;
+  }
   // 如果isEdit为0，绝对不能编辑
   if (!canEditRow(row)) {
     ElMessage.warning("当前数据已锁定，不可编辑");
@@ -831,6 +1192,15 @@ const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
   if (field === "achieved" && !isManualRow(row)) {
     ElMessage.warning("只有手填数据的完成值才可以修改");
     return;
+  }
+  // 侯子洋「好适嘉」指标：编辑前二次确认月份，避免把 10 月考核数据填到 10 月行
+  // （移动端在 handleCellClick 的确认弹窗中已给出同样的月份提示，这里不再重复弹窗）
+  if (!isMobile.value && isHouZiyangHaoShijiaMetric(row)) {
+    try {
+      await confirmHaoShijiaMetricMonth(row);
+    } catch {
+      return;
+    }
   }
   editingCell.value = {
     rowId: row.id,
@@ -891,6 +1261,22 @@ const handleEditKeydown = (
 
 const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
   if (!isEditing(row, field)) return;
+  // 联动指标只做读时派生，不允许在目标用户行上修改（避免产生第二份数据）
+  if (isReferenceRow(row)) {
+    ElMessage.warning(
+      `联动指标，数据跟随「${row.referenceFrom}」，请到该用户处修改`
+    );
+    cancelEdit();
+    return;
+  }
+  // 自动汇总字段由系统计算，禁止手工填写
+  if (isAggregateField(row, field)) {
+    ElMessage.warning(
+      `该列为系统自动汇总，无需手工填写（${row.aggregateFrom}）`
+    );
+    cancelEdit();
+    return;
+  }
   // 如果isEdit为0，绝对不能编辑
   if (!canEditRow(row)) {
     ElMessage.warning("当前数据已锁定，不可编辑");
@@ -974,29 +1360,6 @@ const confirmEdit = async (row: RecordItem, field: "target" | "achieved") => {
   }
 };
 
-// 计算完成率
-const getCompletionRate = (
-  target: number | string,
-  achieved: number | string
-) => {
-  const targetNum = Number(target);
-  const achievedNum = Number(achieved);
-  if (!targetNum || targetNum === 0) return "-";
-  const rate = (achievedNum / targetNum) * 100;
-  return rate.toFixed(2) + "%";
-};
-
-// 根据完成率返回样式
-const getRateClass = (target: number | string, achieved: number | string) => {
-  const targetNum = Number(target);
-  const achievedNum = Number(achieved);
-  if (!targetNum || targetNum === 0) return "";
-  const rate = achievedNum / targetNum;
-  if (rate >= 1) return "rate-excellent";
-  if (rate >= 0.8) return "rate-good";
-  return "rate-poor";
-};
-
 // 格式化月份
 const formatMonth = (dateStr: string) => {
   if (!dateStr) return "-";
@@ -1073,12 +1436,35 @@ const handleExport = async () => {
       })) as ApiResponse;
 
       if (res?.success && res?.data?.records?.length) {
-        const records =
+        // 联动指标按当月全量数据解析来源，保证导出与页面展示一致
+        const referenceSourceIndex = buildReferenceSourceIndex(
+          res.data.records
+        );
+        const matchedRecords =
           selectedUsernameSet.size > 0
             ? res.data.records.filter(record =>
                 selectedUsernameSet.has(String(record.username || "").trim())
               )
             : res.data.records;
+        const records = matchedRecords.map(record => {
+          const username = String(record.username || "").trim();
+          const baseMetrics = (record.metricTargetList || []).filter(
+            metric => metric.status !== 0
+          );
+          return {
+            ...record,
+            metricTargetList: applyAggregateMetricRules(
+              username,
+              applyMetricReferences(
+                username,
+                baseMetrics,
+                referenceSourceIndex,
+                monthDate
+              ),
+              referenceSourceIndex
+            )
+          };
+        });
         allYearRecords.push(...records);
       }
     }
@@ -1576,11 +1962,12 @@ const confirmBatchTodoNotify = async () => {
 
   try {
     // 收集所有唯一的记录id
+    // 联动指标（读时派生）不提醒目标用户填写，应由来源用户维护
     const idSet = new Set<number>();
     visibleRecords.value.forEach(record => {
       if (record.metricTargetList) {
         record.metricTargetList.forEach(metric => {
-          if (metric.id && metric.status !== 0) {
+          if (metric.id && metric.status !== 0 && !metric.isReference) {
             idSet.add(Number(metric.id));
           }
         });
@@ -1829,16 +2216,7 @@ onMounted(() => {
         <div class="table-tip">
           <el-tag size="small" type="warning" effect="light">提示</el-tag>
           <span class="tip-text"
-            >黄色背景行为手填数据；目标值不分手填/自动计算，未锁定即可编辑（自动计算行显示浅灰背景），完成值仅手填数据可编辑。备注：王琳每个月的「本月目标」和「次月目标」都一样，因此「次月目标」无参考价值</span
-          >
-        </div>
-        <div class="table-tip table-tip-rate">
-          <el-tag size="small" type="info" effect="light">完成率说明</el-tag>
-          <span class="tip-text"
-            >表格中的「完成率」仅为界面速查（完成值 ÷ 目标值 ×
-            100%），并非最终考核结果；最终结果请以「人事导出」Excel
-            中的计算逻辑为准。该列仅供检查是否有异常数据（如 100000%
-            这类离谱值）</span
+            >黄色背景行为手填数据；目标值不分手填/自动计算，未锁定即可编辑（自动计算行显示浅灰背景），完成值仅手填数据可编辑；蓝色背景行为联动指标（数据跟随来源用户，请到来源用户处修改）。备注：王琳每个月的「本月目标」和「次月目标」都一样，因此「次月目标」无参考价值</span
           >
         </div>
         <!-- 黄向前的特殊通知 -->
@@ -1903,13 +2281,84 @@ onMounted(() => {
             <el-table-column
               prop="targetName"
               label="指标名称"
-              min-width="200"
-              show-overflow-tooltip
-            />
+              :min-width="metricNameColumnWidth"
+            >
+              <template #default="{ row }">
+                <span>{{ row.targetName }}</span>
+                <el-tag
+                  v-if="row.isReference"
+                  size="small"
+                  type="info"
+                  effect="plain"
+                  class="reference-tag"
+                >
+                  联动 · {{ row.referenceFrom }}
+                </el-tag>
+                <el-tooltip
+                  v-if="row.aggregateField"
+                  :content="`自动汇总＝${row.aggregateFrom}`"
+                  placement="top"
+                  effect="dark"
+                  :show-after="100"
+                  popper-class="haoshijia-month-tooltip"
+                >
+                  <el-tag
+                    size="small"
+                    type="success"
+                    effect="plain"
+                    class="reference-tag"
+                  >
+                    自动汇总
+                  </el-tag>
+                </el-tooltip>
+                <el-tooltip
+                  v-if="row.consistencyGroup"
+                  :content="row.consistencyTip"
+                  placement="top"
+                  effect="dark"
+                  :show-after="100"
+                  popper-class="consistency-tooltip"
+                >
+                  <el-tag
+                    size="small"
+                    :type="
+                      row.consistencyStatus === 'mismatch'
+                        ? 'warning'
+                        : 'primary'
+                    "
+                    effect="plain"
+                    class="reference-tag"
+                  >
+                    {{
+                      row.consistencyStatus === "mismatch"
+                        ? "数值不一致"
+                        : "三人同值"
+                    }}
+                  </el-tag>
+                </el-tooltip>
+                <el-tooltip
+                  v-if="isHouZiyangHaoShijiaMetric(row)"
+                  :content="getHaoShijiaMonthTipText(row)"
+                  placement="top"
+                  effect="dark"
+                  :show-after="100"
+                  popper-class="haoshijia-month-tooltip"
+                >
+                  <el-tag
+                    size="small"
+                    type="warning"
+                    effect="plain"
+                    class="reference-tag"
+                  >
+                    次月考核
+                  </el-tag>
+                </el-tooltip>
+              </template>
+            </el-table-column>
             <el-table-column
               prop="target"
               label="目标值（元）"
-              width="160"
+              min-width="160"
               align="right"
             >
               <template #default="{ row }">
@@ -1926,22 +2375,35 @@ onMounted(() => {
                   v-loading="isSaving(row, 'target')"
                   class="editable-cell"
                   :class="{
-                    'editable-cell-disabled': !canEditRow(row)
+                    'editable-cell-disabled':
+                      !canEditRow(row) ||
+                      isReferenceRow(row) ||
+                      isAggregateField(row, 'target')
                   }"
                   :title="
-                    !canEditRow(row)
-                      ? '已锁定，不可编辑'
-                      : isMobile
-                        ? '点击进入编辑（需确认）'
-                        : '双击修改'
+                    isAggregateField(row, 'target')
+                      ? `系统自动汇总，无需手工填写：${row.aggregateFrom}`
+                      : isReferenceRow(row)
+                        ? `联动指标，数据跟随「${row.referenceFrom}」，请到该用户处修改`
+                        : !canEditRow(row)
+                          ? '已锁定，不可编辑'
+                          : isMobile
+                            ? '点击进入编辑（需确认）'
+                            : '双击修改'
                   "
                   @dblclick="
-                    !isMobile && canEditRow(row)
+                    !isMobile &&
+                    canEditRow(row) &&
+                    !isReferenceRow(row) &&
+                    !isAggregateField(row, 'target')
                       ? startEdit(row, 'target')
                       : undefined
                   "
                   @click="
-                    isMobile && canEditRow(row)
+                    isMobile &&
+                    canEditRow(row) &&
+                    !isReferenceRow(row) &&
+                    !isAggregateField(row, 'target')
                       ? handleCellClick(row, 'target')
                       : undefined
                   "
@@ -1953,7 +2415,7 @@ onMounted(() => {
             <el-table-column
               prop="achieved"
               label="完成值（元）"
-              width="160"
+              min-width="160"
               align="right"
             >
               <template #default="{ row }">
@@ -1971,36 +2433,39 @@ onMounted(() => {
                   class="editable-cell"
                   :class="{
                     'editable-cell-disabled':
-                      !canEditRow(row) || !isManualRow(row)
+                      !canEditRow(row) ||
+                      !isManualRow(row) ||
+                      isReferenceRow(row)
                   }"
                   :title="
-                    !canEditRow(row)
-                      ? '已锁定，不可编辑'
-                      : isManualRow(row)
-                        ? isMobile
-                          ? '点击进入编辑（需确认）'
-                          : '双击修改'
-                        : '不可编辑'
+                    isReferenceRow(row)
+                      ? `联动指标，数据跟随「${row.referenceFrom}」，请到该用户处修改`
+                      : !canEditRow(row)
+                        ? '已锁定，不可编辑'
+                        : isManualRow(row)
+                          ? isMobile
+                            ? '点击进入编辑（需确认）'
+                            : '双击修改'
+                          : '不可编辑'
                   "
                   @dblclick="
-                    !isMobile && canEditRow(row) && isManualRow(row)
+                    !isMobile &&
+                    canEditRow(row) &&
+                    isManualRow(row) &&
+                    !isReferenceRow(row)
                       ? startEdit(row, 'achieved')
                       : undefined
                   "
                   @click="
-                    isMobile && canEditRow(row) && isManualRow(row)
+                    isMobile &&
+                    canEditRow(row) &&
+                    isManualRow(row) &&
+                    !isReferenceRow(row)
                       ? handleCellClick(row, 'achieved')
                       : undefined
                   "
                 >
                   {{ formatNumber(row.achieved) }}
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column label="完成率" width="140" align="center">
-              <template #default="{ row }">
-                <span :class="getRateClass(row.target, row.achieved)">
-                  {{ getCompletionRate(row.target, row.achieved) }}
                 </span>
               </template>
             </el-table-column>
@@ -2328,9 +2793,32 @@ onMounted(() => {
         <el-icon color="#409eff" style="margin-right: 6px"
           ><InfoFilled
         /></el-icon>
-        以下为容易遗忘的复杂目标值计算口径，仅供掌握
+        以下为容易遗忘的复杂目标值计算口径与联动指标口径，仅供掌握
         <b>开发者权限</b>
         的同学维护与核对
+      </div>
+
+      <div class="calc-logic-block calc-logic-block-general">
+        <div class="calc-logic-title">
+          <el-tag type="primary" effect="dark" size="small">通用</el-tag>
+          <span>联动指标：页面展示 vs 人事导出</span>
+        </div>
+        <div class="calc-logic-desc">
+          联动指标（某人的指标数据跟随另一个人）只做<b>读时派生</b>：不写回、不修改任何人的原始数据。
+          <ol class="calc-logic-list">
+            <li>
+              <b>页面表格</b>：只请求当前所选月份，联动指标直接展示
+              <b>来源用户当月原始值</b>（目标值 / 完成值），<b>不做累计</b>。
+            </li>
+            <li>
+              <b>人事导出</b>：先复制来源用户
+              <b>整年的目标 / 完成序列和计算模式（calculationType）</b
+              >，再按该模式重新计算， 因此导出的是
+              <b>来源用户算完后的结果</b>——累计模式下即 1 月至上月 /
+              本月的累计值。
+            </li>
+          </ol>
+        </div>
       </div>
 
       <div class="calc-logic-block">
@@ -2355,11 +2843,6 @@ onMounted(() => {
           <b>累计月销售(GMV)达成之和</b> ＋ <b>梁钰</b> 的
           <b>「渠道全年累计销售收入GMV」</b>。
         </div>
-        <div class="calc-logic-warn">
-          ⚠️ 其中 <b>梁钰</b> 不取其个人 GMV，而是取
-          <b>「渠道全年累计销售收入GMV」</b> 计入（该值口径见下方「黄向前 / 梁钰 /
-          方林霞」说明）； 其余 5 人取各自累计月销售(GMV)达成。
-        </div>
       </div>
 
       <div class="calc-logic-block">
@@ -2368,13 +2851,10 @@ onMounted(() => {
           <span>前台全渠道业绩目标达成率</span>
         </div>
         <div class="calc-logic-desc">
-          该项指标与 <b>王琳</b> 的<b>「渠道累计收入（目标值）」</b>口径一致（王琳该项指标的
+          该项指标与
+          <b>王琳</b>
+          的<b>「渠道累计收入（目标值）」</b>口径一致（王琳该项指标的
           目标值口径见上方「王琳」说明）。
-        </div>
-        <div class="calc-logic-warn">
-          ⚠️ 王湘妮为新人，上半年无数据：人事导出时直接
-          <b>复制王琳「渠道累计收入」的目标值、完成值和次月目标值</b>（计算模式也跟随王琳），
-          不取王湘妮自己填写的数据；若未找到王琳的有效数据，则保留王湘妮原值并在控制台告警。
         </div>
       </div>
 
@@ -2391,26 +2871,33 @@ onMounted(() => {
           <ol class="calc-logic-list">
             <li><b>梁钰</b>的<b>达播销售收入</b>月度目标达成率</li>
             <li>
-              <b>黄向前</b>的<b>商品卡 + 短视频（自营）销售收入</b>月度目标达成率
+              <b>黄向前</b>的<b>商品卡 + 短视频（自营）销售收入</b
+              >月度目标达成率
             </li>
             <li><b>方林霞</b>的<b>自播间销售收入</b>月度目标达成率</li>
           </ol>
         </div>
         <div class="calc-logic-warn">
-          ⚠️ 即：渠道全年累计销售收入GMV = 达播达成率 ＋ 商品卡&短视频（自营）达成率
-          ＋ 自播间达成率。三人共用同一结果，<b>不是</b>各自 GMV 的累计求和，也不是各自独立的数值。
+          ⚠️ 即：渠道全年累计销售收入GMV = 达播达成率 ＋
+          商品卡&短视频（自营）达成率 ＋
+          自播间达成率。三人共用同一结果，<b>不是</b>各自 GMV
+          的累计求和，也不是各自独立的数值。
         </div>
         <div class="calc-logic-warn">
           ⚠️ 人事导出时，该项 <b>1-9 月的累计目标固定为 3229 万元</b>、
-          <b>1-9 月的累计完成值固定为 2683.106524 万元</b>（均不按系统逐月数据累加）。
-          <b>10 月起</b>目标 = 固定值 + 各月目标累计，完成值 = 固定值 + 各月完成值累计；
-          例如导出 10 月即：上月目标 3229 万、上月完成 2683.106524 万、次月目标 = 3229 万 +
+          <b>1-9 月的累计完成值固定为 2683.106524 万元</b
+          >（均不按系统逐月数据累加）。 <b>10 月起</b>目标 = 固定值 +
+          各月目标累计，完成值 = 固定值 + 各月完成值累计； 例如导出 10
+          月即：上月目标 3229 万、上月完成 2683.106524 万、次月目标 = 3229 万 +
           10 月目标。完成率 = 完成值 ÷ 上月目标。
         </div>
         <div class="calc-logic-warn">
-          ⚠️ <b>以上固定值只对「考核 9 月及以后」成立（即导出 10 月及以后）</b>。由于该指标
-          口径历史上多次调整，导出 1-9 月（考核 1-8 月）时，历史月份数据与当前口径不一致，
-          <b>导出结果会不准确，请勿直接使用，需人工核对</b>；如需导出早期月份，应重新确认当期口径后再处理。
+          ⚠️
+          <b>以上固定值只对「考核 9 月及以后」成立（即导出 10 月及以后）</b
+          >。由于该指标 口径历史上多次调整，导出 1-9 月（考核 1-8
+          月）时，历史月份数据与当前口径不一致，
+          <b>导出结果会不准确，请勿直接使用，需人工核对</b
+          >；如需导出早期月份，应重新确认当期口径后再处理。
         </div>
       </div>
 
@@ -2423,11 +2910,21 @@ onMounted(() => {
         </div>
         <div class="calc-logic-desc">
           这三人的该项指标与 <b>黄向前</b> 为同一条指标，数值应完全一致。
-          人事导出时<b>直接复制黄向前同名指标的数据</b>，不取各自填写的值，也不做额外的累计或换算。
+          系统在<b>页面展示和导出</b>时直接引用黄向前同名指标的数据（读时派生、不写回），
+          不取各自填写的值，也不做额外的累计或换算。
         </div>
-        <div class="calc-logic-warn">
-          ⚠️ 复制内容：<b>目标值、达成值（完成值）、完成率、次月目标</b>，计算模式（calculationType）
-          也跟随黄向前。若黄向前当月该指标无有效数据，则保留三人各自原值并在控制台告警，不影响整份导出。
+      </div>
+
+      <div class="calc-logic-block">
+        <div class="calc-logic-title">
+          <el-tag type="danger" effect="dark" size="small">俞梦秋</el-tag>
+          <el-tag type="danger" effect="dark" size="small">季节</el-tag>
+          <span>自营全域净成交ROI（不含达播）</span>
+        </div>
+        <div class="calc-logic-desc">
+          两人的该项指标与 <b>黄向前</b> 为同一条指标，数值应完全一致。
+          系统在<b>页面展示和导出</b>时直接引用黄向前同名指标的数据（读时派生、不写回），
+          不取各自填写的值，也不做额外的累计或换算。
         </div>
       </div>
 
@@ -2749,16 +3246,6 @@ onMounted(() => {
   border-radius: 4px;
 }
 
-.table-tip-rate {
-  margin-top: 8px;
-  background-color: #ecf5ff;
-  border-color: #409eff;
-}
-
-.table-tip-rate .tip-text {
-  color: #409eff;
-}
-
 .tip-text {
   font-size: 14px;
   color: #e6a23c;
@@ -2858,6 +3345,12 @@ onMounted(() => {
 
 .calc-logic-block:last-of-type {
   margin-bottom: 0;
+}
+
+/* 通用说明卡片：浅蓝底，与具体指标卡片区分 */
+.calc-logic-block-general {
+  background: #f5f9ff;
+  border-color: #d6e8ff;
 }
 
 .calc-logic-title {
@@ -3045,6 +3538,24 @@ onMounted(() => {
   opacity: 0.8;
 }
 
+/* 联动指标标签：数据跟随来源用户 */
+.reference-tag {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* 「次月考核」标签的 Tooltip（挂载在 body 上，需要用 :global） */
+:global(.haoshijia-month-tooltip) {
+  max-width: 340px;
+  line-height: 1.7;
+}
+
+/* 「三人同值」一致性校验的 Tooltip */
+:global(.consistency-tooltip) {
+  max-width: 480px;
+  line-height: 1.7;
+}
+
 .editable-cell-disabled:hover {
   background: transparent;
   color: inherit;
@@ -3090,21 +3601,6 @@ onMounted(() => {
       text-align: right;
     }
   }
-}
-
-.rate-excellent {
-  color: var(--el-color-success);
-  font-weight: 600;
-}
-
-.rate-good {
-  color: var(--el-color-warning);
-  font-weight: 500;
-}
-
-.rate-poor {
-  color: var(--el-color-danger);
-  font-weight: 500;
 }
 
 .action-buttons {

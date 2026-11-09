@@ -2,6 +2,11 @@ import {
   getPmKpiMonthMetricTargetResultList,
   updateEditStatusApi
 } from "@/api/evaluation";
+import {
+  METRIC_REFERENCE_RULES,
+  isKeywordMatched,
+  normalizeMetricName
+} from "@/views/examination/utils/metricReference";
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -89,36 +94,17 @@ const SKIP_CHECK_USER_IDS = [
   "1926449443739601753" //刘汪洋
 ];
 
-// 指标数据关联规则：目标用户直接复用来源用户的指标数据（目标值、达成值、计算模式）
-// 1) 俞梦秋 / 季节 / 蒙炳如 的「商品卡+短视频（自营）销售收入月度目标达成率」
-//    与黄向前的是同一个指标，导出时直接取黄向前的目标值/达成值
-// 2) 王湘妮为新人，上半年无数据，「前台全渠道业绩目标达成率」直接复制王琳「渠道累计收入」的数据
-const REFERENCE_METRIC_RULES: Array<{
-  sourceUserName: string;
-  sourceMetricKeywords: string[];
-  sourceExcludeKeywords?: string[]; // 来源指标名称包含这些关键词时不匹配，避免误命中
-  targetUserNames: string[];
-  targetMetricKeywords: string[];
-  label: string; // 来源指标名称（日志展示，并用于来源指标的精确匹配优先）
-  targetLabel?: string; // 目标指标名称（日志展示，默认同 label）
-}> = [
-  {
-    sourceUserName: "黄向前",
-    sourceMetricKeywords: ["商品卡", "短视频", "自营", "销售收入"],
-    targetUserNames: ["俞梦秋", "季节", "蒙炳如"],
-    targetMetricKeywords: ["商品卡", "短视频", "自营", "销售收入"],
-    label: "商品卡+短视频（自营）销售收入月度目标达成率"
-  },
-  {
-    sourceUserName: "王琳",
-    sourceMetricKeywords: ["渠道累计收入"],
-    sourceExcludeKeywords: ["达成率"], // 只复用金额口径的「渠道累计收入」
-    targetUserNames: ["王湘妮"],
-    targetMetricKeywords: ["前台全渠道业绩目标达成率"],
-    label: "渠道累计收入",
-    targetLabel: "前台全渠道业绩目标达成率"
-  }
-];
+// 指标数据关联规则（读时派生）：目标用户直接复用来源用户的指标数据（目标值、达成值、计算模式）
+// 规则统一维护在 ./metricReference.ts，页面表格与人事导出共用，避免两边口径不一致
+const REFERENCE_METRIC_RULES = METRIC_REFERENCE_RULES.map(rule => ({
+  sourceUserName: rule.sourceUserName,
+  sourceMetricKeywords: rule.sourceMetricKeywords,
+  sourceExcludeKeywords: rule.sourceExcludeKeywords,
+  targetUserNames: rule.targetUserNames,
+  targetMetricKeywords: rule.targetMetricKeywords,
+  label: rule.sourceMetricLabel,
+  targetLabel: rule.targetMetricLabel
+}));
 
 // 固定累计目标规则：指定指标在 1~fixedThroughMonth 月的累计「目标值/完成值」写死为固定金额，
 // 不按系统逐月数据累加；自 fixedThroughMonth+1 月起的月度数据照常累加在固定值之上。
@@ -146,12 +132,6 @@ const FIXED_CUMULATIVE_TARGET_RULES: Array<{
     label: "渠道全年累计销售收入GMV"
   }
 ];
-
-// 去除空白字符并统一全角加号，避免指标名称中的空格/符号差异导致匹配失败
-const normalizeMetricName = (name?: string | null) =>
-  String(name ?? "")
-    .replace(/\s/g, "")
-    .replace(/＋/g, "+");
 
 // 指标名称是否命中固定累计目标规则的关键词
 const isFixedTargetRuleMatched = (
@@ -187,27 +167,6 @@ const sumValueByMonthRange = (
     sum += toNumber(findObjectByMonthWithFirstDay(monthData, m, year)?.value);
   }
   return sum;
-};
-
-// 指标名称是否同时包含全部关键词（支持排除关键词）
-const isKeywordMatched = (
-  metricName: string | undefined,
-  keywords: string[],
-  excludeKeywords?: string[]
-) => {
-  const normalized = normalizeMetricName(metricName);
-
-  if (
-    excludeKeywords?.some(keyword =>
-      normalized.includes(normalizeMetricName(keyword))
-    )
-  ) {
-    return false;
-  }
-
-  return keywords.every(keyword =>
-    normalized.includes(normalizeMetricName(keyword))
-  );
 };
 
 /**
@@ -781,11 +740,8 @@ export const calculateMonthlyMetricData = async (
             )?.value || 0;
 
           valueO =
-            findObjectByMonthWithFirstDay(
-              targetData,
-              curMonth - 1,
-              curYear
-            )?.value || 0;
+            findObjectByMonthWithFirstDay(targetData, curMonth - 1, curYear)
+              ?.value || 0;
         } else {
           // 其他 calculationType 为 4 但没有定义逻辑的指标，不计算
           console.warn(

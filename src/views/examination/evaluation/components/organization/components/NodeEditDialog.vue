@@ -47,7 +47,7 @@ const allowedNodeTypes = computed(() => {
   const parentType = props.parentNode.nodeType;
 
   if (parentType === "department") {
-    return ["department", "position"];
+    return ["department", "position", "examination_group"];
   } else if (parentType === "position") {
     return ["position", "examination_group"];
   } else if (parentType === "examination_group") {

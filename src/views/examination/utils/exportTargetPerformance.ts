@@ -1,4 +1,9 @@
 import { getPmKpiMonthMetricTargetPage } from "@/api/evaluation";
+import {
+  findTargetReferenceRule,
+  isKeywordMatched,
+  normalizeMetricName
+} from "@/views/examination/utils/metricReference";
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -44,7 +49,7 @@ const SIGNED_FILE_NAME = "2026年Q4季度GMV目标（签字版).xlsx";
 const MONTH_CONFIG = [
   { month: 10, column: 5 }, // E列 = 10月
   { month: 11, column: 6 }, // F列 = 11月
-  { month: 12, column: 7 }  // G列 = 12月
+  { month: 12, column: 7 } // G列 = 12月
 ];
 
 /**
@@ -79,7 +84,8 @@ const parseTemplateRows = (worksheet: ExcelJS.Worksheet): TemplateRow[] => {
     const dbTargetName = row.getCell(9).value?.toString()?.trim() || "";
 
     // 跳过空行、小计行、表头分隔行
-    if (!name || name === "小计：" || name === "小计:" || name === "姓名") return;
+    if (!name || name === "小计：" || name === "小计:" || name === "姓名")
+      return;
     // 跳过没有数据库指标名称的行
     if (!dbTargetName) return;
 
@@ -104,7 +110,9 @@ const parseTemplateRows = (worksheet: ExcelJS.Worksheet): TemplateRow[] => {
  * 调用 API 获取指定月份的所有指标数据
  * 构建 (username + targetName) → { month: { target, achieved } } 的映射表
  */
-const fetchAllMonthData = async (): Promise<Map<string, Record<string, MonthData>>> => {
+const fetchAllMonthData = async (): Promise<
+  Map<string, Record<string, MonthData>>
+> => {
   const dataMap = new Map<string, Record<string, MonthData>>();
 
   for (const { month } of MONTH_CONFIG) {
@@ -151,7 +159,9 @@ const fetchAllMonthData = async (): Promise<Map<string, Record<string, MonthData
           }
         }
 
-        console.log(`  ✅ ${DATA_YEAR}年${month}月: 获取 ${res.data.records.length} 条记录，${recordCount} 个指标`);
+        console.log(
+          `  ✅ ${DATA_YEAR}年${month}月: 获取 ${res.data.records.length} 条记录，${recordCount} 个指标`
+        );
       } else {
         console.warn(`  ⚠️ ${DATA_YEAR}年${month}月: 无数据或接口返回异常`);
       }
@@ -161,6 +171,82 @@ const fetchAllMonthData = async (): Promise<Map<string, Record<string, MonthData
   }
 
   return dataMap;
+};
+
+//#endregion
+
+//#region 联动指标解析
+
+type MonthDataMap = Record<string, MonthData>;
+type ReferenceSourceLookup = Map<
+  string,
+  Array<{ targetName: string; monthData: MonthDataMap }>
+>;
+
+/**
+ * 建立「来源用户 → 指标列表」索引，供联动规则按关键词查找
+ */
+const buildReferenceSourceLookup = (
+  dataMap: Map<string, MonthDataMap>
+): ReferenceSourceLookup => {
+  const lookup: ReferenceSourceLookup = new Map();
+
+  dataMap.forEach((monthData, key) => {
+    const separatorIndex = key.indexOf("||");
+    if (separatorIndex < 0) return;
+
+    const username = key.slice(0, separatorIndex);
+    const targetName = key.slice(separatorIndex + 2);
+    const list = lookup.get(username) || [];
+    list.push({ targetName, monthData });
+    lookup.set(username, list);
+  });
+
+  return lookup;
+};
+
+/**
+ * 解析模板行实际应使用的数据：
+ * - 未命中联动规则：用该用户自身数据；
+ * - 命中联动规则：用来源用户的数据（读时派生，不写回）；
+ * - 来源缺失：回退自身数据并告警。
+ */
+const resolveReferenceMonthData = (
+  name: string,
+  dbTargetName: string,
+  ownData: MonthDataMap | undefined,
+  lookup: ReferenceSourceLookup
+): MonthDataMap | undefined => {
+  const rule = findTargetReferenceRule(name, dbTargetName);
+  if (!rule) return ownData;
+
+  const candidates = lookup.get(rule.sourceUserName) || [];
+  const matched = candidates.filter(candidate =>
+    isKeywordMatched(
+      candidate.targetName,
+      rule.sourceMetricKeywords,
+      rule.sourceExcludeKeywords
+    )
+  );
+  const source =
+    matched.find(
+      candidate =>
+        normalizeMetricName(candidate.targetName) ===
+        normalizeMetricName(rule.sourceMetricLabel)
+    ) || matched[0];
+
+  if (!source) {
+    console.warn(
+      `[目标绩效导出] 未找到 ${rule.sourceUserName} 的「${rule.sourceMetricLabel}」，` +
+        `${name} 的「${dbTargetName}」将使用自身数据`
+    );
+    return ownData;
+  }
+
+  console.log(
+    `[目标绩效导出] ${name} 的「${dbTargetName}」联动 ${rule.sourceUserName} 的「${source.targetName}」`
+  );
+  return source.monthData;
 };
 
 //#endregion
@@ -219,6 +305,9 @@ export const exportTargetPerformance = async () => {
     const dataMap = await fetchAllMonthData();
     console.log(`📊 API 数据共 ${dataMap.size} 个匹配键`);
 
+    // 联动指标的来源索引（如：俞梦秋/季节/蒙炳如 的指标数据跟随黄向前）
+    const referenceLookup = buildReferenceSourceLookup(dataMap);
+
     // 4. 匹配并填充数据
     let filledCount = 0;
     const unmatchedRows: string[] = [];
@@ -226,10 +315,18 @@ export const exportTargetPerformance = async () => {
 
     for (const row of templateRows) {
       const key = `${row.name}||${row.dbTargetName}`;
-      const monthData = dataMap.get(key);
+      // 命中联动规则时取来源用户的数据，否则取自身数据
+      const monthData = resolveReferenceMonthData(
+        row.name,
+        row.dbTargetName,
+        dataMap.get(key),
+        referenceLookup
+      );
 
       if (!monthData) {
-        unmatchedRows.push(`${row.name} - ${row.dbTargetName} (行${row.rowNumber})`);
+        unmatchedRows.push(
+          `${row.name} - ${row.dbTargetName} (行${row.rowNumber})`
+        );
         console.warn(`  ⚠️ 未匹配: ${row.name} - ${row.dbTargetName}`);
         continue;
       }
@@ -242,7 +339,9 @@ export const exportTargetPerformance = async () => {
         }
       }
 
-      matchedRows.push(`${row.name} - ${row.dbTargetName} (行${row.rowNumber})`);
+      matchedRows.push(
+        `${row.name} - ${row.dbTargetName} (行${row.rowNumber})`
+      );
       filledCount++;
     }
 
@@ -251,7 +350,10 @@ export const exportTargetPerformance = async () => {
       console.log("已匹配的行:", matchedRows);
     }
     if (unmatchedRows.length > 0) {
-      console.warn(`⚠️ 未匹配到数据的行 (${unmatchedRows.length}):`, unmatchedRows);
+      console.warn(
+        `⚠️ 未匹配到数据的行 (${unmatchedRows.length}):`,
+        unmatchedRows
+      );
     }
 
     // 5. 生成系统口径 Excel
@@ -276,7 +378,7 @@ export const exportTargetPerformance = async () => {
         if (fixedXml !== stylesXml) {
           zip.file("xl/styles.xml", fixedXml);
           patched = true;
-          console.log("🔧 已修复数字格式编码（0\\.0,\"万\"）");
+          console.log('🔧 已修复数字格式编码（0\\.0,"万"）');
         }
       }
 
@@ -292,7 +394,10 @@ export const exportTargetPerformance = async () => {
 
         const fixedXml = sheetXml
           .replace(/\s*<conditionalFormatting\b[^>]*\/>/g, "")
-          .replace(/\s*<conditionalFormatting\b[^>]*>\s*<\/conditionalFormatting>/g, "");
+          .replace(
+            /\s*<conditionalFormatting\b[^>]*>\s*<\/conditionalFormatting>/g,
+            ""
+          );
         if (fixedXml !== sheetXml) {
           zip.file(name, fixedXml);
           patched = true;

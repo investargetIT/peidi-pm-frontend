@@ -85,7 +85,18 @@ const fetchPmKpiGroupNodePage = async () => {
       pageSize: 1000
     })) as ApiResponse;
     if (res.success && res.data.records) {
-      dataSource.value = res.data.records;
+      // 需求：test 部门固定展示在第一位，佩蒂智创部门固定展示在最后一位
+      const records = [...res.data.records];
+      const isTest = (node: TreeNode) =>
+        String(node.nodeName || "").trim().toLowerCase() === "test";
+      const isPeidi = (node: TreeNode) =>
+        String(node.nodeName || "").trim() === "佩蒂智创";
+      const testNodes = records.filter(isTest);
+      const peidiNodes = records.filter(isPeidi);
+      const otherNodes = records.filter(
+        node => !isTest(node) && !isPeidi(node)
+      );
+      dataSource.value = [...testNodes, ...otherNodes, ...peidiNodes];
     }
   } catch (error) {
     console.error("获取节点列表失败", error);
