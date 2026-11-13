@@ -732,11 +732,11 @@ onMounted(() => {
         <div class="types-container">
           <div class="type-item">
             <span class="type-name">累计模式</span>
-            <span class="type-desc">举个例子：如果现在是6月，我们统计5月的数据，累计模式会计算1月到5月的总和作为目标值和完成值</span>
+            <span class="type-desc">举个例子：当前是 N 月，我们统计 N-1 月的数据，累计模式会计算 1 月至 N-1 月的总和作为目标值和完成值</span>
           </div>
           <div class="type-item">
             <span class="type-name">当月模式</span>
-            <span class="type-desc">举个例子：如果现在是6月，我们统计5月的数据，当月模式只会计算5月这一个月的数据作为目标值和完成值</span>
+            <span class="type-desc">举个例子：当前是 N 月，我们统计 N-1 月的数据，当月模式只会计算 N-1 月这一个月的数据作为目标值和完成值</span>
           </div>
           <div class="type-item">
             <span class="type-name">自定义模式</span>

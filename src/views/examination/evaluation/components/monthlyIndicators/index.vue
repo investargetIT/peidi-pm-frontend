@@ -158,63 +158,66 @@ const handleEditTouch = (
   }
 };
 
-// 侯子洋「好适嘉」系列指标按「次月考核」取数：本行数据用于下个月考核。
-// 常见误填：把 10 月考核的数据填到了 10 月行（应填 9 月行），这里加提示 + 二次确认。
-const HOUZIYANG_HAOSHIJIA_METRIC_NAMES = [
-  "好适嘉项目累计净毛利",
-  "好适嘉项目净毛利20%"
-];
-
-const isHouZiyangHaoShijiaMetric = (row: RecordItem): boolean =>
-  String(row.username || "").trim() === "侯子洋" &&
-  HOUZIYANG_HAOSHIJIA_METRIC_NAMES.includes(
-    String(row.targetName || "").trim()
-  );
-
-const getHaoShijiaMonthTip = (row: RecordItem) => {
-  const rowMonth = dayjs(row.month);
-  return {
-    rowMonthText: rowMonth.format("YYYY 年 MM 月"),
-    nextAssessMonthText: rowMonth.add(1, "month").format("YYYY 年 MM 月"),
-    prevRowMonthText: rowMonth.subtract(1, "month").format("YYYY 年 MM 月")
-  };
-};
-
-// 「次月考核」标签的 Tooltip 文案
-const getHaoShijiaMonthTipText = (row: RecordItem) => {
-  const { rowMonthText, nextAssessMonthText, prevRowMonthText } =
-    getHaoShijiaMonthTip(row);
-  return `按次月考核取数：本行（${rowMonthText}）数据用于 ${nextAssessMonthText} 考核；若要填 ${rowMonthText} 的考核数据，请改填 ${prevRowMonthText} 行。`;
-};
-
-// 编辑前的月份二次确认（桌面端双击 / 移动端点击都会走到 startEdit）
-const confirmHaoShijiaMetricMonth = async (row: RecordItem) => {
-  const { rowMonthText, nextAssessMonthText, prevRowMonthText } =
-    getHaoShijiaMonthTip(row);
-
-  await ElMessageBox.confirm(
-    `<div style="text-align: left; line-height: 1.8;">
-      <p style="margin: 0 0 8px;">
-        「<b>${row.targetName}</b>」按 <b>次月考核</b> 取数。
-      </p>
-      <p style="margin: 0 0 8px;">
-        本行（<b>${rowMonthText}</b>）的数据将用于 <b>${nextAssessMonthText}</b> 考核。
-      </p>
-      <p style="margin: 0; color: #e6a23c;">
-        若你要填的是 <b>${rowMonthText}</b> 的考核数据，请改填
-        <b>${prevRowMonthText}</b> 行。
-      </p>
-    </div>`,
-    "确认填写月份",
-    {
-      confirmButtonText: "月份正确，继续编辑",
-      cancelButtonText: "取消",
-      type: "warning",
-      dangerouslyUseHTMLString: true,
-      customClass: "haoshijia-month-confirm"
-    }
-  );
-};
+// ⚠️ 侯子洋「好适嘉项目累计净毛利」「好适嘉项目净毛利20%」已改为「累计模式」，
+// 按正常月份取数（M 月行即 M 月数据），原「次月考核」的提示 / 二次确认已停用，
+// 原逻辑保留代码备查，如需恢复取消注释即可。
+// // 侯子洋「好适嘉」系列指标按「次月考核」取数：本行数据用于下个月考核。
+// // 常见误填：把 N 月考核的数据填到了 N 月行（应填 N-1 月行），这里加提示 + 二次确认。
+// const HOUZIYANG_HAOSHIJIA_METRIC_NAMES = [
+//   "好适嘉项目累计净毛利",
+//   "好适嘉项目净毛利20%"
+// ];
+//
+// const isHouZiyangHaoShijiaMetric = (row: RecordItem): boolean =>
+//   String(row.username || "").trim() === "侯子洋" &&
+//   HOUZIYANG_HAOSHIJIA_METRIC_NAMES.includes(
+//     String(row.targetName || "").trim()
+//   );
+//
+// const getHaoShijiaMonthTip = (row: RecordItem) => {
+//   const rowMonth = dayjs(row.month);
+//   return {
+//     rowMonthText: rowMonth.format("YYYY 年 MM 月"),
+//     nextAssessMonthText: rowMonth.add(1, "month").format("YYYY 年 MM 月"),
+//     prevRowMonthText: rowMonth.subtract(1, "month").format("YYYY 年 MM 月")
+//   };
+// };
+//
+// // 「次月考核」标签的 Tooltip 文案
+// const getHaoShijiaMonthTipText = (row: RecordItem) => {
+//   const { rowMonthText, nextAssessMonthText, prevRowMonthText } =
+//     getHaoShijiaMonthTip(row);
+//   return `按次月考核取数：本行（${rowMonthText}）数据用于 ${nextAssessMonthText} 考核；若要填 ${rowMonthText} 的考核数据，请改填 ${prevRowMonthText} 行。`;
+// };
+//
+// // 编辑前的月份二次确认（桌面端双击 / 移动端点击都会走到 startEdit）
+// const confirmHaoShijiaMetricMonth = async (row: RecordItem) => {
+//   const { rowMonthText, nextAssessMonthText, prevRowMonthText } =
+//     getHaoShijiaMonthTip(row);
+//
+//   await ElMessageBox.confirm(
+//     `<div style="text-align: left; line-height: 1.8;">
+//       <p style="margin: 0 0 8px;">
+//         「<b>${row.targetName}</b>」按 <b>次月考核</b> 取数。
+//       </p>
+//       <p style="margin: 0 0 8px;">
+//         本行（<b>${rowMonthText}</b>）的数据将用于 <b>${nextAssessMonthText}</b> 考核。
+//       </p>
+//       <p style="margin: 0; color: #e6a23c;">
+//         若你要填的是 <b>${rowMonthText}</b> 的考核数据，请改填
+//         <b>${prevRowMonthText}</b> 行。
+//       </p>
+//     </div>`,
+//     "确认填写月份",
+//     {
+//       confirmButtonText: "月份正确，继续编辑",
+//       cancelButtonText: "取消",
+//       type: "warning",
+//       dangerouslyUseHTMLString: true,
+//       customClass: "haoshijia-month-confirm"
+//     }
+//   );
+// };
 
 // 处理单元格点击，兼容触摸和鼠标
 const handleCellClick = (row: RecordItem, field: "target" | "achieved") => {
@@ -222,16 +225,18 @@ const handleCellClick = (row: RecordItem, field: "target" | "achieved") => {
     // 手机端需要二次确认
     const fieldName = field === "target" ? "目标值" : "完成值";
     const currentValue = row[field] ?? "-";
-    const haoShijiaTip = isHouZiyangHaoShijiaMetric(row)
-      ? (() => {
-          const { rowMonthText, nextAssessMonthText, prevRowMonthText } =
-            getHaoShijiaMonthTip(row);
-          return `<p style="margin-top: 10px; color: #e6a23c; font-size: 13px; line-height: 1.6;">
-            该指标按<b>次月考核</b>取数：本行（${rowMonthText}）数据用于 ${nextAssessMonthText} 考核；<br/>
-            若要填 ${rowMonthText} 的考核数据，请改填 ${prevRowMonthText} 行。
-          </p>`;
-        })()
-      : "";
+    // ⚠️ 「次月考核」提示已停用（两条指标改为累计模式），如需恢复取消下方注释
+    // const haoShijiaTip = isHouZiyangHaoShijiaMetric(row)
+    //   ? (() => {
+    //       const { rowMonthText, nextAssessMonthText, prevRowMonthText } =
+    //         getHaoShijiaMonthTip(row);
+    //       return `<p style="margin-top: 10px; color: #e6a23c; font-size: 13px; line-height: 1.6;">
+    //         该指标按<b>次月考核</b>取数：本行（${rowMonthText}）数据用于 ${nextAssessMonthText} 考核；<br/>
+    //         若要填 ${rowMonthText} 的考核数据，请改填 ${prevRowMonthText} 行。
+    //       </p>`;
+    //     })()
+    //   : "";
+    const haoShijiaTip = "";
 
     ElMessageBox.confirm(
       `<div style="text-align: center;">
@@ -401,15 +406,16 @@ const tableCellStyle = ({
 }) => {
   // 目标值(4)不分手填/自动计算，未锁定即可编辑：手填行显示黄色背景，自动计算行显示浅灰背景
   // 完成值(5)只在手填数据行显示黄色背景
+  // 参考完成率(6)是派生列，跟随所在行的底色（联动蓝 / 手填黄）
   // 黄色背景只和isManualRow关联，不受isEdit影响
   // 联动指标行显示蓝色背景，表示数据读时派生自来源用户、不可直接编辑
   // 自动汇总字段（目标值）显示浅绿色背景
   let bgColor = "#ffffff";
   if (row.aggregateField === "target" && columnIndex === 4) {
     bgColor = "#eafaf1";
-  } else if (row.isReference && [3, 4, 5].includes(columnIndex)) {
+  } else if (row.isReference && [3, 4, 5, 6].includes(columnIndex)) {
     bgColor = "#e6f4ff";
-  } else if (isManualRow(row) && [3, 4, 5].includes(columnIndex)) {
+  } else if (isManualRow(row) && [3, 4, 5, 6].includes(columnIndex)) {
     bgColor = "#fff3cd";
   } else if (columnIndex === 4 && canEditRow(row)) {
     // 目标值列在自动计算数据行也显示浅灰色，表示未锁定即可编辑
@@ -1134,8 +1140,9 @@ const objectSpanMethod = ({
   row: RecordItem;
   columnIndex: number;
 }) => {
-  // 合并公共信息列：序号(0)、月份(1)、负责人(2)、操作列（最后一列，索引 6）
-  if (columnIndex <= 2 || columnIndex === 6) {
+  // 合并公共信息列：序号(0)、月份(1)、负责人(2)、操作列（最后一列，索引 7）
+  // 注意：新增「参考完成率」列后，操作列索引由 6 变为 7，改动列结构时需同步调整
+  if (columnIndex <= 2 || columnIndex === 7) {
     if (row.rowSpan && row.rowSpan > 0) {
       return { rowspan: row.rowSpan, colspan: 1 };
     }
@@ -1193,15 +1200,15 @@ const startEdit = async (row: RecordItem, field: "target" | "achieved") => {
     ElMessage.warning("只有手填数据的完成值才可以修改");
     return;
   }
-  // 侯子洋「好适嘉」指标：编辑前二次确认月份，避免把 10 月考核数据填到 10 月行
-  // （移动端在 handleCellClick 的确认弹窗中已给出同样的月份提示，这里不再重复弹窗）
-  if (!isMobile.value && isHouZiyangHaoShijiaMetric(row)) {
-    try {
-      await confirmHaoShijiaMetricMonth(row);
-    } catch {
-      return;
-    }
-  }
+  // ⚠️ 「次月考核」月份二次确认已停用（两条指标改为累计模式，按正常月份填写）
+  // 侯子洋「好适嘉」指标：编辑前二次确认月份，避免把 N 月考核数据填到 N 月行
+  // if (!isMobile.value && isHouZiyangHaoShijiaMetric(row)) {
+  //   try {
+  //     await confirmHaoShijiaMetricMonth(row);
+  //   } catch {
+  //     return;
+  //   }
+  // }
   editingCell.value = {
     rowId: row.id,
     field
@@ -1378,6 +1385,35 @@ const formatNumber = (num: number | string) => {
   }
   // 如果是数字，转换为字符串保持其格式
   return String(num);
+};
+
+// 「参考完成率」：完成值 ÷ 目标值 × 100%
+// 仅用于快速发现异常 / 离谱数据，不代表考核口径：
+// 累计、混合模式下当月的目标值可能是累计值，与当月完成值口径不同，比值仅供参考
+const getReferenceRate = (row: RecordItem): number | null => {
+  const isBlank = (value: unknown) =>
+    value === null || value === undefined || String(value).trim() === "";
+
+  if (isBlank(row.target) || isBlank(row.achieved)) return null;
+
+  const target = Number(row.target);
+  const achieved = Number(row.achieved);
+  if (!Number.isFinite(target) || !Number.isFinite(achieved) || target === 0) {
+    return null;
+  }
+
+  return (achieved / target) * 100;
+};
+
+const getReferenceCompletionRate = (row: RecordItem): string => {
+  const rate = getReferenceRate(row);
+  return rate === null ? "-" : `${rate.toFixed(2)}%`;
+};
+
+// 明显异常的参考完成率（负数或 ≥200%），仅用于标红提示，便于快速定位离谱数据
+const isReferenceRateAbnormal = (row: RecordItem): boolean => {
+  const rate = getReferenceRate(row);
+  return rate !== null && (rate < 0 || rate >= 200);
 };
 
 // 保留小数位数，最多4位
@@ -1832,8 +1868,13 @@ const todoNotifyLoading = ref(false);
 const tableStatusDialogVisible = ref(false);
 const tableStatusChecked = ref(false);
 const tableStatusLoading = ref(false);
-const tableStatusMonth = ref(getDefaultMonth());
+// 加锁 / 解锁支持多月份批量设置
+const tableStatusMonths = ref<string[]>([getDefaultMonth()]);
 const tableStatusAction = ref<"lock" | "unlock">("unlock");
+// 清空多选时 Element Plus 会把 v-model 置为 null，这里统一兜底成 0
+const tableStatusMonthCount = computed(
+  () => (tableStatusMonths.value || []).length
+);
 
 // 批量通知相关
 const batchTodoNotifyDialogVisible = ref(false);
@@ -1903,44 +1944,64 @@ const confirmNotify = async () => {
 const handleTableStatus = (action: "lock" | "unlock") => {
   tableStatusAction.value = action;
   tableStatusChecked.value = false;
-  tableStatusMonth.value = getDefaultMonth();
+  tableStatusMonths.value = [getDefaultMonth()];
   tableStatusDialogVisible.value = true;
 };
 
-// 确认设置表格状态
+// 确认设置表格状态（支持多月份批量设置）
 const confirmTableStatus = async () => {
   if (!tableStatusChecked.value) {
     ElMessage.warning("请先勾选确认");
     return;
   }
 
+  // 去重 + 按时间排序，便于提示文案展示
+  const months = [
+    ...new Set((tableStatusMonths.value || []).filter(Boolean))
+  ].sort();
+  if (months.length === 0) {
+    ElMessage.warning("请至少选择一个月份");
+    return;
+  }
+
+  const isEdit = tableStatusAction.value === "unlock" ? 1 : 0;
+  const actionText = tableStatusAction.value === "unlock" ? "解锁" : "加锁";
+  const failedMonths: string[] = [];
+
   try {
     tableStatusLoading.value = true;
-    tableStatusDialogVisible.value = false;
+    // 弹窗保持打开，确定按钮显示 loading；全部处理完再关闭
 
-    const isEdit = tableStatusAction.value === "unlock" ? 1 : 0;
-    const res = (await updateEditStatusApi({
-      isEdit,
-      month: tableStatusMonth.value
-    })) as any;
+    // 接口一次只支持一个月，按月依次提交，失败的不影响其他月份
+    for (const month of months) {
+      try {
+        const res = (await updateEditStatusApi({ isEdit, month })) as any;
+        if (!(res?.code === 200 || res?.success)) {
+          failedMonths.push(month);
+        }
+      } catch (error) {
+        console.error(`设置表格状态失败（${formatMonth(month)}）:`, error);
+        failedMonths.push(month);
+      }
+    }
 
-    if (res?.code === 200 || res?.success) {
-      ElMessage.success(
-        tableStatusAction.value === "unlock" ? "解锁成功" : "加锁成功"
-      );
-      fetchData(); // 重新获取数据以更新锁定状态
+    const successCount = months.length - failedMonths.length;
+    const failedText = failedMonths.map(formatMonth).join("、");
+
+    if (failedMonths.length === 0) {
+      ElMessage.success(`${actionText}成功（${successCount} 个月份）`);
+    } else if (successCount === 0) {
+      ElMessage.error(`${actionText}失败：${failedText}`);
     } else {
-      ElMessage.error(
-        res?.msg ||
-          (tableStatusAction.value === "unlock" ? "解锁失败" : "加锁失败")
+      ElMessage.warning(
+        `${actionText}完成 ${successCount} 个月份，失败 ${failedMonths.length} 个：${failedText}`
       );
     }
-  } catch (error) {
-    console.error("设置表格状态失败:", error);
-    ElMessage.error(
-      tableStatusAction.value === "unlock" ? "解锁失败" : "加锁失败"
-    );
+
+    // 重新获取数据以更新锁定状态，等刷新完再结束 loading
+    await fetchData();
   } finally {
+    tableStatusDialogVisible.value = false;
     tableStatusLoading.value = false;
   }
 };
@@ -2152,20 +2213,30 @@ onMounted(() => {
               <el-button
                 type="danger"
                 :loading="tableStatusLoading && tableStatusAction === 'lock'"
+                :disabled="tableStatusLoading && tableStatusAction !== 'lock'"
                 @click="handleTableStatus('lock')"
               >
                 <el-icon><Warning /></el-icon>
-                表格填写加锁
+                {{
+                  tableStatusLoading && tableStatusAction === "lock"
+                    ? "正在加锁…"
+                    : "表格填写加锁"
+                }}
               </el-button>
             </el-tooltip>
             <el-tooltip content="解锁指定月份的表格填写权限" placement="top">
               <el-button
                 type="warning"
                 :loading="tableStatusLoading && tableStatusAction === 'unlock'"
+                :disabled="tableStatusLoading && tableStatusAction !== 'unlock'"
                 @click="handleTableStatus('unlock')"
               >
                 <el-icon><CircleCheck /></el-icon>
-                表格填写解锁
+                {{
+                  tableStatusLoading && tableStatusAction === "unlock"
+                    ? "正在解锁…"
+                    : "表格填写解锁"
+                }}
               </el-button>
             </el-tooltip>
           </template>
@@ -2336,6 +2407,7 @@ onMounted(() => {
                     }}
                   </el-tag>
                 </el-tooltip>
+                <!-- ⚠️ 「次月考核」标签已停用（两条指标改为累计模式），如需恢复取消注释
                 <el-tooltip
                   v-if="isHouZiyangHaoShijiaMetric(row)"
                   :content="getHaoShijiaMonthTipText(row)"
@@ -2353,6 +2425,7 @@ onMounted(() => {
                     次月考核
                   </el-tag>
                 </el-tooltip>
+                -->
               </template>
             </el-table-column>
             <el-table-column
@@ -2466,6 +2539,31 @@ onMounted(() => {
                   "
                 >
                   {{ formatNumber(row.achieved) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="参考完成率" width="120" align="center">
+              <template #header>
+                <!-- 延迟 400ms 出现：避免鼠标划过表头就频繁创建 / 定位弹层导致卡顿 -->
+                <el-tooltip
+                  content="完成值 ÷ 目标值 × 100%，仅用于快速发现异常数据；累计 / 混合模式下当月目标值可能是累计值，与当月完成值口径不同，该比值不代表考核完成度"
+                  placement="top"
+                  :show-after="400"
+                  :hide-after="0"
+                >
+                  <span class="rate-header">
+                    参考完成率
+                    <el-icon><InfoFilled /></el-icon>
+                  </span>
+                </el-tooltip>
+              </template>
+              <template #default="{ row }">
+                <span
+                  :class="{
+                    'rate-abnormal': isReferenceRateAbnormal(row)
+                  }"
+                >
+                  {{ getReferenceCompletionRate(row) }}
                 </span>
               </template>
             </el-table-column>
@@ -2756,7 +2854,7 @@ onMounted(() => {
         </el-form-item>
         <div class="hr-export-tip">
           ⚠ 非必要请勿修改月份，默认即为当前月<br />
-          &nbsp;&nbsp;&nbsp;&nbsp;例如：考核 7 月，请选择 8 月（系统将自动取 7
+          &nbsp;&nbsp;&nbsp;&nbsp;例如：考核 N 月，请选择 N+1 月（系统将自动取 N
           月数据）
         </div>
       </div>
@@ -2813,9 +2911,10 @@ onMounted(() => {
             <li>
               <b>人事导出</b>：先复制来源用户
               <b>整年的目标 / 完成序列和计算模式（calculationType）</b
-              >，再按该模式重新计算， 因此导出的是
-              <b>来源用户算完后的结果</b>——累计模式下即 1 月至上月 /
-              本月的累计值。
+              >，再按该模式重新计算，因此导出的是 <b>来源用户算完后的结果</b>。
+              以累计模式为例（导出 N 月，即考核 N-1 月）：<b
+                >「本月-目标值」「本月-完成值」= 1 月至 N-1 月累计</b
+              >； <b>「次月-目标值」= 1 月至 N 月累计</b>。
             </li>
           </ol>
         </div>
@@ -2827,9 +2926,27 @@ onMounted(() => {
           <span>好适嘉项目累计净毛利 / 好适嘉项目净毛利20%</span>
         </div>
         <div class="calc-logic-desc">
-          取 <b>上上个月</b> 的 <b>当月单月值</b>（不做累计求和）。 例：导出 8
-          月（考核 7 月）时—— 上月目标/上月实际取 <b>6 月</b> 当月值，本月目标取
-          <b>7 月</b> 当月值。
+          <b>正常填，不用换行填</b>：考核哪个月，就填在哪个月那一行。
+          只是行里的数字含义要注意——它代表
+          <b>该月考核实际要用到的值</b>，而这个值取的是 <b>N-1 月</b>的净毛利。
+          <ol class="calc-logic-list">
+            <li>
+              <b>填在哪一行</b>：考核 N 月 → 填
+              <b>N 月行</b>，和别的指标一样，不用往前挪。
+            </li>
+            <li>
+              <b>填什么数</b>：N 月行里填的是 <b>N-1 月的净毛利</b>（N
+              月考核用的是 N-1 月的数）。
+            </li>
+          </ol>
+        </div>
+        <div class="calc-logic-warn">
+          ⚠️ 最容易填错的地方：看到「N 月行」就顺手填了 N 月的净毛利。
+          记住一句话——<b>行 = 考核月 N，数 = N-1 月的净毛利</b>。
+        </div>
+        <div class="calc-logic-warn">
+          导出口径：按<b>累计模式</b>逐月累加（1 月至 N
+          月），不再单独取某一个月。
         </div>
       </div>
 
@@ -2887,9 +3004,9 @@ onMounted(() => {
           ⚠️ 人事导出时，该项 <b>1-9 月的累计目标固定为 3229 万元</b>、
           <b>1-9 月的累计完成值固定为 2683.106524 万元</b
           >（均不按系统逐月数据累加）。 <b>10 月起</b>目标 = 固定值 +
-          各月目标累计，完成值 = 固定值 + 各月完成值累计； 例如导出 10
-          月即：上月目标 3229 万、上月完成 2683.106524 万、次月目标 = 3229 万 +
-          10 月目标。完成率 = 完成值 ÷ 上月目标。
+          各月目标累计，完成值 = 固定值 + 各月完成值累计； 例如导出 N 月（N ≥
+          10）即：上月目标 3229 万、上月完成 2683.106524 万、次月目标 = 3229 万
+          + N 月目标。完成率 = 完成值 ÷ 上月目标。
         </div>
         <div class="calc-logic-warn">
           ⚠️
@@ -2943,6 +3060,8 @@ onMounted(() => {
       :title="tableStatusAction === 'unlock' ? '表格填写解锁' : '表格填写加锁'"
       width="520px"
       :close-on-click-modal="false"
+      :close-on-press-escape="!tableStatusLoading"
+      :show-close="!tableStatusLoading"
       :class="tableStatusAction === 'unlock' ? 'unlock-dialog' : 'lock-dialog'"
     >
       <div
@@ -2967,8 +3086,8 @@ onMounted(() => {
           <div class="notify-desc">
             {{
               tableStatusAction === "unlock"
-                ? "即将解锁指定月份的表格填写权限"
-                : "即将锁定指定月份的表格填写权限"
+                ? "即将解锁所选月份的表格填写权限（支持多选，批量处理）"
+                : "即将锁定所选月份的表格填写权限（支持多选，批量处理）"
             }}
           </div>
         </div>
@@ -2978,8 +3097,8 @@ onMounted(() => {
           <el-icon color="#67C23A"><CircleCheck /></el-icon>
           <span>{{
             tableStatusAction === "unlock"
-              ? "解锁后，用户可以编辑该月份的指标数据"
-              : "加锁后，用户无法编辑该月份的指标数据"
+              ? "解锁后，用户可以编辑所选月份的指标数据"
+              : "加锁后，用户无法编辑所选月份的指标数据"
           }}</span>
         </div>
         <div class="feature-item">
@@ -2994,34 +3113,52 @@ onMounted(() => {
       <div class="unlock-month-select">
         <el-form-item label="选择月份">
           <el-date-picker
-            v-model="tableStatusMonth"
-            type="month"
-            placeholder="选择月份"
+            v-model="tableStatusMonths"
+            type="months"
+            placeholder="选择月份（可多选）"
             value-format="YYYY-MM-DD"
+            :disabled="tableStatusLoading"
             style="width: 100%"
           />
         </el-form-item>
+        <div class="table-status-month-tip">
+          支持多选，已选
+          <b>{{ tableStatusMonthCount }}</b> 个月份{{
+            tableStatusMonthCount > 1 ? "（将批量处理）" : ""
+          }}
+        </div>
       </div>
       <div class="notify-checkbox">
-        <el-checkbox v-model="tableStatusChecked" size="large">
-          我确认{{
-            tableStatusAction === "unlock" ? "解锁" : "锁定"
-          }}该月份的表格填写权限
+        <el-checkbox
+          v-model="tableStatusChecked"
+          size="large"
+          :disabled="tableStatusLoading"
+        >
+          我确认{{ tableStatusAction === "unlock" ? "解锁" : "锁定" }}所选
+          {{ tableStatusMonthCount }} 个月份的表格填写权限
         </el-checkbox>
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button size="large" @click="tableStatusDialogVisible = false">
+          <el-button
+            size="large"
+            :disabled="tableStatusLoading"
+            @click="tableStatusDialogVisible = false"
+          >
             取消
           </el-button>
           <el-button
             :type="tableStatusAction === 'unlock' ? 'warning' : 'danger'"
             size="large"
             :loading="tableStatusLoading"
-            :disabled="!tableStatusChecked"
+            :disabled="!tableStatusChecked || tableStatusMonthCount === 0"
             @click="confirmTableStatus"
           >
-            确定{{ tableStatusAction === "unlock" ? "解锁" : "加锁" }}
+            {{
+              tableStatusLoading
+                ? "处理中…"
+                : `确定${tableStatusAction === "unlock" ? "解锁" : "加锁"}`
+            }}
           </el-button>
         </div>
       </template>
@@ -3088,6 +3225,14 @@ onMounted(() => {
 .unlock-month-select {
   padding: 0 20px;
   margin-bottom: 16px;
+}
+
+/* 加锁 / 解锁：批量选择月份的提示 */
+.table-status-month-tip {
+  margin-top: -8px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
 }
 
 .hr-export-tip {
@@ -3544,7 +3689,21 @@ onMounted(() => {
   vertical-align: middle;
 }
 
-/* 「次月考核」标签的 Tooltip（挂载在 body 上，需要用 :global） */
+/* 「参考完成率」表头 */
+.rate-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 「参考完成率」异常值（负数或 ≥200%）：仅作视觉提示 */
+.rate-abnormal {
+  color: #f56c6c;
+  font-weight: 600;
+}
+
+/* 「次月考核」标签的 Tooltip（挂载在 body 上，需要用 :global）
+   该 class 目前仍被「自动汇总」Tooltip 复用，故保留 */
 :global(.haoshijia-month-tooltip) {
   max-width: 340px;
   line-height: 1.7;

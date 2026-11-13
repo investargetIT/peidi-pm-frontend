@@ -569,25 +569,15 @@ const checkLastMonthManualData = (
       // 检查条件：目标值不等于0，且完成值为0或null
       if (targetValue !== null && targetValue !== 0) {
         if (achievedValue === null || achievedValue === 0) {
-          // 忽略侯子洋的"好适嘉项目累计净毛利"和"好适嘉项目净毛利20%"
-          const isIgnoredRecord =
-            record.username === "侯子洋" &&
-            (record.targetName === "好适嘉项目累计净毛利" ||
-              record.targetName === "好适嘉项目净毛利20%");
-
-          if (!isIgnoredRecord) {
-            console.log(
-              `  ❌ 不符合要求: 目标值=${targetValue}, 完成值=${achievedValue}`
-            );
-            invalidRecords.push({
-              username: record.username || "未知用户",
-              targetName: record.targetName || "未知指标",
-              targetValue: targetValue,
-              achievedValue: achievedValue
-            });
-          } else {
-            // console.log(`  - 忽略特殊用户的指标数据`);
-          }
+          console.log(
+            `  ❌ 不符合要求: 目标值=${targetValue}, 完成值=${achievedValue}`
+          );
+          invalidRecords.push({
+            username: record.username || "未知用户",
+            targetName: record.targetName || "未知指标",
+            targetValue: targetValue,
+            achievedValue: achievedValue
+          });
         } else {
           // console.log(`  ✅ 符合要求`);
         }
@@ -718,37 +708,44 @@ export const calculateMonthlyMetricData = async (
           0;
       } else if (calculationType === 4) {
         // 自定义模式：需要在这里单独写逻辑的指标
-        if (
-          dataItem.userName === "侯子洋" &&
-          (dataItem.examinationType === "好适嘉项目累计净毛利" ||
-            dataItem.examinationType === "好适嘉项目净毛利20%")
-        ) {
-          // 侯子洋 好适嘉项目累计净毛利 / 好适嘉项目净毛利20%：取上上个月的当月数据（单月，不累计）
-          // 例：导出8月（考核7月），上月取6月单月值，本月目标取7月单月值
-          valueI =
-            findObjectByMonthWithFirstDay(
-              targetData,
-              previousMonth - 1,
-              curYear
-            )?.value || 0;
-
-          valueK =
-            findObjectByMonthWithFirstDay(
-              actualData,
-              previousMonth - 1,
-              curYear
-            )?.value || 0;
-
-          valueO =
-            findObjectByMonthWithFirstDay(targetData, curMonth - 1, curYear)
-              ?.value || 0;
-        } else {
-          // 其他 calculationType 为 4 但没有定义逻辑的指标，不计算
-          console.warn(
-            `未定义 calculationType 为 4 的指标逻辑：${dataItem.userName} - ${dataItem.examinationType}`
-          );
-          return;
-        }
+        // ⚠️ 侯子洋「好适嘉项目累计净毛利」「好适嘉项目净毛利20%」已改为「累计模式」（calculationType = 2），
+        // 原「取上上个月当月值（单月，不累计）」的自定义逻辑已停用，保留代码备查，如需恢复取消注释即可。
+        // if (
+        //   dataItem.userName === "侯子洋" &&
+        //   (dataItem.examinationType === "好适嘉项目累计净毛利" ||
+        //     dataItem.examinationType === "好适嘉项目净毛利20%")
+        // ) {
+        //   // 侯子洋 好适嘉项目累计净毛利 / 好适嘉项目净毛利20%：取上上个月的当月数据（单月，不累计）
+        //   // 例：导出8月（考核7月），上月取6月单月值，本月目标取7月单月值
+        //   valueI =
+        //     findObjectByMonthWithFirstDay(
+        //       targetData,
+        //       previousMonth - 1,
+        //       curYear
+        //     )?.value || 0;
+        //
+        //   valueK =
+        //     findObjectByMonthWithFirstDay(
+        //       actualData,
+        //       previousMonth - 1,
+        //       curYear
+        //     )?.value || 0;
+        //
+        //   valueO =
+        //     findObjectByMonthWithFirstDay(targetData, curMonth - 1, curYear)
+        //       ?.value || 0;
+        // } else {
+        //   // 其他 calculationType 为 4 但没有定义逻辑的指标，不计算
+        //   console.warn(
+        //     `未定义 calculationType 为 4 的指标逻辑：${dataItem.userName} - ${dataItem.examinationType}`
+        //   );
+        //   return;
+        // }
+        // 其他 calculationType 为 4 但没有定义逻辑的指标，不计算
+        console.warn(
+          `未定义 calculationType 为 4 的指标逻辑：${dataItem.userName} - ${dataItem.examinationType}`
+        );
+        return;
       } else if (calculationType === -1) {
         // 人工填报：直接取上个月的目标值和实际值，以及当前月的目标值
         valueI =
