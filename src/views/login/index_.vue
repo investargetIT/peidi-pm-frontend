@@ -27,20 +27,33 @@ const getKeyFromUrl = () => {
 const queryKey = getKeyFromUrl();
 
 onMounted(() => {
-  // const userInfo = storageLocal().getItem("peidi-userInfo");
+  const stored = storageLocal().getItem<{
+    username?: string;
+    password?: string;
+    site?: string;
+  }>("peidi-userInfo");
+  // 结构不完整（脏数据 / 存了空账号密码）一律视为没记住
   let userInfo: { username: string; password: string; site?: string } | null =
-    storageLocal().getItem("peidi-userInfo") || null;
+    stored?.username && stored?.password
+      ? {
+          username: stored.username,
+          password: stored.password,
+          site: stored.site
+        }
+      : null;
 
   console.log("queryKey", queryKey);
 
-  // 如果有记住密码的参数，就按照参数来处理
+  // 门户勾选「记住我」：落盘账号密码；取消勾选：清除
   if (queryKey.key3) {
     const isRemember = decryptMessage(queryKey.key3);
     console.log("isRemember", isRemember);
-    if (isRemember === "true") {
+    const rememberedUsername = decryptMessage(queryKey.key1 || "");
+    const rememberedPassword = decryptMessage(queryKey.key2 || "");
+    if (isRemember === "true" && rememberedUsername && rememberedPassword) {
       storageLocal().setItem("peidi-userInfo", {
-        username: decryptMessage(queryKey.key1 || ""),
-        password: decryptMessage(queryKey.key2 || ""),
+        username: rememberedUsername,
+        password: rememberedPassword,
         site: null
       });
     } else {
@@ -48,13 +61,24 @@ onMounted(() => {
     }
   }
 
+  // 本次登录用的是不是「记住的密码」（URL 没带账号密码时才成立）
+  const fromRemembered = !(queryKey.key1 && queryKey.key2);
+
   // username and password
   if (queryKey.key1 && queryKey.key2) {
     const username = decryptMessage(queryKey.key1);
     const password = decryptMessage(queryKey.key2);
     userInfo = { username, password };
+    // 门户没带 key3：若和记住的账号不是同一个，清掉旧凭据，避免下次静默登录成上一个用户
+    if (!queryKey.key3) {
+      const remembered = storageLocal().getItem<{ username?: string }>(
+        "peidi-userInfo"
+      );
+      if (remembered && remembered.username !== username) {
+        storageLocal().removeItem("peidi-userInfo");
+      }
+    }
   }
-  console.log("userInfo", userInfo);
 
   if (userInfo) {
     useUserStoreHook()
@@ -155,6 +179,10 @@ onMounted(() => {
           }
         } else {
           message("登录失败", { type: "error" });
+          // 记住的密码已失效（改密 / 账号被禁用等）：先清掉，避免每次打开都拿废凭据失败一次
+          if (fromRemembered) {
+            storageLocal().removeItem("peidi-userInfo");
+          }
           window.location.href = `https://login.peidigroup.cn/#/login?source=${encryptMessage(window.location.href)}`;
         }
       });
