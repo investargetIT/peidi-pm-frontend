@@ -1178,7 +1178,7 @@ export const processAndExportMonthlyMetricForHR = async (
       if (!userName || !metricName) continue;
 
       const cell = row.getCell(nameAndMetricColumn);
-      cell.value = `${userName}&${metricName}`;
+      cell.value = `${userName}${metricName}`;
       copyCellStyle(cell, row.getCell(4));
     }
 
